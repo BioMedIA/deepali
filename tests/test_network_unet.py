@@ -1,0 +1,125 @@
+from typing import Tuple
+
+import pytest
+
+import torch
+from torch import Tensor
+
+from deepali.networks.layers import convolution
+from deepali.networks.unet import UNet, UNetConfig
+
+
+@pytest.fixture(scope="function")
+def input_tensor(request) -> Tensor:
+    if request.param == 2:
+        return torch.rand((1, 1, 256, 256))
+    elif request.param == 3:
+        return torch.rand((1, 1, 128, 256, 256))
+    else:
+        raise ValueError("input_tensor() 'request.param' must be 2 or 3")
+
+
+@pytest.mark.parametrize("input_tensor", [2, 3], indirect=True)
+def test_unet_without_output_layer(input_tensor: Tensor) -> None:
+    dimensions = input_tensor.ndim - 2
+    in_channels = input_tensor.shape[1]
+
+    model = UNet(dimensions=dimensions, in_channels=in_channels)
+    model.eval()
+    print(model)
+
+    assert model.output_is_tensor() is False
+    assert model.output_is_dict() is False
+    assert model.output_is_tuple() is True
+
+    output: Tuple[Tensor, ...] = model(input_tensor)
+    assert isinstance(output, tuple)
+    assert len(output) == 4
+    assert isinstance(output[0], Tensor)
+    assert isinstance(output[1], Tensor)
+    assert isinstance(output[2], Tensor)
+    assert isinstance(output[3], Tensor)
+
+    for i, output_tensor in enumerate(output):
+        ds = 2 ** (model.num_levels - 1 - i)
+        channels = model.num_channels[i]
+        shape = (input_tensor.shape[0], channels) + tuple(n // ds for n in input_tensor.shape[2:])
+        assert output_tensor.shape == shape
+
+
+@pytest.mark.parametrize("input_tensor", [2, 3], indirect=True)
+def test_unet_with_single_output_layer(input_tensor: Tensor) -> None:
+    dimensions = input_tensor.ndim - 2
+    in_channels = input_tensor.shape[1]
+    out_channels = in_channels
+
+    model = UNet(dimensions=dimensions, in_channels=in_channels, out_channels=out_channels)
+    print(model)
+
+    assert model.output_is_tensor() is True
+    assert model.output_is_dict() is False
+    assert model.output_is_tuple() is False
+
+    output_tensor = model(input_tensor)
+    assert isinstance(output_tensor, Tensor)
+    assert output_tensor.shape[0] == input_tensor.shape[0]
+    assert output_tensor.shape[1] == out_channels
+    assert output_tensor.shape[2:] == input_tensor.shape[2:]
+
+
+@pytest.mark.parametrize("input_tensor", [2, 3], indirect=True)
+def test_unet_with_multiple_output_layers(input_tensor: Tensor) -> None:
+
+    dimensions = input_tensor.ndim - 2
+    config = UNetConfig()
+
+    output_modules = {}
+    output_indices = {}
+    for i, channels in enumerate(config.decoder.num_channels):
+        name = f"output_{i + 1}"
+        output = convolution(
+            dimensions=dimensions, in_channels=channels, out_channels=1, kernel_size=1, bias=False
+        )
+        output_modules[name] = output
+        output_indices[name] = i
+
+    model = UNet(
+        dimensions=dimensions,
+        in_channels=1,
+        output_modules=output_modules,
+        output_indices=output_indices,
+    )
+    model.eval()
+    print(model)
+
+    assert model.output_is_tensor() is False
+    assert model.output_is_dict() is True
+    assert model.output_is_tuple() is False
+
+    output = model(input_tensor)
+    assert isinstance(output, dict)
+    assert len(output) == len(output_modules)
+    assert set(output.keys()) == set(output_modules.keys())
+    assert all(isinstance(x, Tensor) for x in output.values())
+
+
+@pytest.mark.parametrize("input_tensor", [2, 3], indirect=True)
+def test_nnunet(input_tensor: Tensor) -> None:
+    dimensions = input_tensor.ndim - 2
+    channels = input_tensor.shape[1]
+    config = UNetConfig.nnunet(dimensions, input_tensor.shape[2:])
+
+    max_ds = 2 ** (config.encoder.num_levels - 1)
+    assert all(n // max_ds > 1 for n in input_tensor.shape[2:])
+
+    model = UNet(dimensions=dimensions, in_channels=channels, out_channels=channels, config=config)
+    model.eval()
+    print(model)
+
+    assert model.output_is_tensor() is True
+    assert model.output_is_dict() is False
+    assert model.output_is_tuple() is False
+
+    output_tensor = model(input_tensor)
+    assert isinstance(output_tensor, Tensor)
+    assert output_tensor.shape == input_tensor.shape

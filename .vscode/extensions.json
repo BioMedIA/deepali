@@ -1,0 +1,21 @@
+{
+    "recommendations": [
+        // Python
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        // Remote SSH
+        "ms-vscode-remote.remote-ssh",
+        "ms-vscode-remote.remote-ssh-edit",
+        // Code completion
+        "visualstudioexptteam.vscodeintellicode",
+        // Docker
+        "ms-azuretools.vscode-docker",
+        // Tables (e.g. CSV)
+        "grapecity.gc-excelviewer",
+        // Git
+        "eamodio.gitlens",
+        // Markdown
+        "yzhang.markdown-all-in-one",
+        "shd101wyy.markdown-preview-enhanced",
+    ]
+}

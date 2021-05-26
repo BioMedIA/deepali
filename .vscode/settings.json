@@ -1,0 +1,32 @@
+{
+    "files.exclude": {
+        "**/__pycache__": true,
+        "**/.ipynb_checkpoints": true,
+        "**/.git": true,
+        "**/.DS_Store": true,
+        "**/._.DS_Store": true,
+        "**/.pytest_cache": true,
+        "**/*.egg-info": true,
+        ".venv": true
+    },
+    "editor.formatOnSave": false,
+    "[python]": {
+        "editor.formatOnSave": true,
+        "editor.formatOnSaveMode": "file",
+    },
+    "restructuredtext.confPath": "",
+    "jupyter.jupyterServerType": "local",
+    "python.formatting.provider": "black",
+    "python.linting.enabled": true,
+    "python.linting.flake8Enabled": true,
+    "python.testing.unittestEnabled": false,
+    "python.testing.nosetestsEnabled": false,
+    "python.testing.pytestEnabled": true,
+    "python.testing.pytestArgs": ["tests"],
+    // Add the following to your local user or remote machine settings JSON file at
+    // $HOME/.vscode-server/data/Machine/settings.json. This deprecates the automatic addition of
+    // "python.pythonPath" to this settings file such that it can be checked into version control.
+    "python.experiments.optInto": [
+        "DeprecatePythonPath - experiment",
+    ],
+}
