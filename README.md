@@ -34,7 +34,7 @@ At a granular level, *deepali* is a library that consists of the following compo
 The following lists the main dependencies of this project. For a complete list, please open file [setup.py](setup.py).
 
 - [PyTorch]: The automatic differentiation and deep learning framework powering this project.
-- [SimpleITK]: Used to read and write images in file formats supported by ITK.
+- [SimpleITK] (optional): Used by ``deepali.data`` to read and write images in file formats supported by ITK.
 - [NumPy] (optional): Used by ``deepali.utils``. Other components use pure PyTorch.
 - [VTK] (optional): May be used to read and write point sets and surface meshes.
 

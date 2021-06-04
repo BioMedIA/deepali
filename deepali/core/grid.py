@@ -6,7 +6,11 @@ from copy import copy as shallow_copy
 from enum import Enum
 from typing import Any, Dict, Optional, Union, overload
 
-import SimpleITK as sitk
+try:
+    import SimpleITK as sitk
+except ImportError:
+    sitk = None
+
 import torch
 import torch.nn.functional as F
 from torch import Tensor
@@ -194,13 +198,17 @@ class Grid(object):
     @classmethod
     def from_file(cls, path: PathStr, align_corners: bool = ALIGN_CORNERS) -> Grid:
         r"""Create sampling grid from image file header information."""
+        if sitk is None:
+            raise RuntimeError(f"{cls.__name__}.from_file() requires SimpleITK")
         reader = sitk.ImageFileReader()
         reader.SetFileName(str(path))
         reader.ReadImageInformation()
         return cls.from_reader(reader, align_corners=align_corners)
 
     @classmethod
-    def from_reader(cls, reader: sitk.ImageFileReader, align_corners: bool = ALIGN_CORNERS) -> Grid:
+    def from_reader(
+        cls, reader: "sitk.ImageFileReader", align_corners: bool = ALIGN_CORNERS
+    ) -> Grid:
         r"""Create sampling grid from image file reader attributes."""
         return cls(
             size=reader.GetSize(),
@@ -211,7 +219,7 @@ class Grid(object):
         )
 
     @classmethod
-    def from_sitk(cls, image: sitk.Image, align_corners: bool = ALIGN_CORNERS) -> Grid:
+    def from_sitk(cls, image: "sitk.Image", align_corners: bool = ALIGN_CORNERS) -> Grid:
         r"""Create sampling grid from ``SimpleITK.Image`` attributes."""
         return cls(
             size=image.GetSize(),

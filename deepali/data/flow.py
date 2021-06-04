@@ -14,8 +14,6 @@ from ..core.grid import Domain, Grid
 from ..core.tensor import move_dim
 from ..core.types import Array, Device, PathStr
 
-from ..utils.sitk.imageio import read_image
-
 from .image import Image, ImageBatch
 
 
@@ -309,7 +307,7 @@ class FlowField(Image):
     @classmethod
     def read(cls: Type[TFlowField], path: PathStr, domain: Optional[Domain] = None) -> TFlowField:
         r"""Read image data from file."""
-        image = read_image(path)
+        image = cls._read_sitk(path)
         return cls.from_sitk(image, domain=domain)
 
     def exp(self: TFlowField, **kwargs) -> TFlowField:

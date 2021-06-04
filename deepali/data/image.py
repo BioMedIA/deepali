@@ -7,7 +7,13 @@ from typing import Dict, Optional, Sequence, Tuple, Type, TypeVar, Union, overlo
 
 import torch
 from torch import Tensor
-import SimpleITK as sitk
+
+try:
+    import SimpleITK as sitk
+    from ..utils.sitk.torch import image_from_tensor, tensor_from_image
+    from ..utils.sitk.imageio import read_image
+except ImportError:
+    sitk = None
 
 from ..core.enum import PaddingMode, Sampling
 from ..core.grid import ALIGN_CORNERS, Domain, Grid
@@ -16,9 +22,6 @@ from ..core.names import image_batch_tensor_names, image_tensor_names
 from ..core.path import unlink_or_mkdir
 from ..core.tensor import as_tensor, cat_scalars
 from ..core.types import Array, Device, PathStr, Scalar, ScalarOrTuple, Size
-
-from ..utils.sitk.torch import image_from_tensor, tensor_from_image
-from ..utils.sitk.imageio import read_image
 
 from .tensor import TensorDecorator
 
@@ -903,23 +906,34 @@ class Image(TensorDecorator):
     @classmethod
     def from_sitk(
         cls: Type[TImage],
-        image: sitk.Image,
+        image: "sitk.Image",
         align_corners: bool = ALIGN_CORNERS,
         dtype: Optional[torch.dtype] = None,
         device: Optional[Device] = None,
     ) -> TImage:
         r"""Create image from ``SimpleITK.Image`` instance."""
+        if sitk is None:
+            raise RuntimeError(f"{cls.__name__}.from_sitk() requires SimpleITK")
         data = tensor_from_image(image, dtype=dtype, device=device)
         grid = Grid.from_sitk(image, align_corners=align_corners)
         return cls(data=data, grid=grid)
 
-    def sitk(self: TImage) -> sitk.Image:
+    def sitk(self: TImage) -> "sitk.Image":
         r"""Create ``SimpleITK.Image`` from this image."""
+        if sitk is None:
+            raise RuntimeError(f"{type(self).__name__}.sitk() requires SimpleITK")
         grid = self._grid
         origin = grid.origin().tolist()
         spacing = grid.spacing().tolist()
         direction = grid.direction().flatten().tolist()
         return image_from_tensor(self._tensor, origin=origin, spacing=spacing, direction=direction)
+
+    @classmethod
+    def _read_sitk(cls, path: PathStr) -> "sitk.Image":
+        r"""Read SimpleITK.Image from file path."""
+        if sitk is None:
+            raise RuntimeError(f"{cls.__name__}.read() requires SimpleITK")
+        return read_image(path)
 
     @classmethod
     def read(
@@ -930,11 +944,13 @@ class Image(TensorDecorator):
         device: Optional[Device] = None,
     ) -> TImage:
         r"""Read image data from file."""
-        image = read_image(path)
+        image = cls._read_sitk(path)
         return cls.from_sitk(image, align_corners=align_corners, dtype=dtype, device=device)
 
     def write(self: TImage, path: PathStr, compress: bool = True) -> None:
         r"""Write image data to file."""
+        if sitk is None:
+            raise RuntimeError(f"{type(self).__name__}.write() requires SimpleITK")
         image = self.sitk()
         path = unlink_or_mkdir(path)
         sitk.WriteImage(image, str(path), compress)
