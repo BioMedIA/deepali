@@ -1,16 +1,16 @@
 r"""Image data transforms."""
 
-from ..data.transforms.image import AvgPoolImage
-from ..data.transforms.image import CastImage
-from ..data.transforms.image import CenterCropImage
-from ..data.transforms.image import CenterPadImage
-from ..data.transforms.image import ClampImage
-from ..data.transforms.image import ImageToTensor
-from ..data.transforms.image import NarrowImage
-from ..data.transforms.image import NormalizeImage
-from ..data.transforms.image import ReadImage
-from ..data.transforms.image import ResampleImage
-from ..data.transforms.image import RescaleImage
+from ..data.transforms import AvgPoolImage
+from ..data.transforms import CastImage
+from ..data.transforms import CenterCropImage
+from ..data.transforms import CenterPadImage
+from ..data.transforms import ClampImage
+from ..data.transforms import ImageToTensor
+from ..data.transforms import NarrowImage
+from ..data.transforms import NormalizeImage
+from ..data.transforms import ReadImage
+from ..data.transforms import ResampleImage
+from ..data.transforms import RescaleImage
 
 
 __all__ = (
