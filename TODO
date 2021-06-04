@@ -2,9 +2,19 @@ Core:
 - [ ] Rename `Domain` enum to `Axes`, `CoordSystem` or similar to avoid confusion when referring to volume covered by sampling `Grid` as a domain. This includes a major refactoring of `grid.py` and dependent modules.
 - [ ] Enable `Grid` to represent a batch of sampling grids, or add `GridBatch` (cf. `Image` <-> `ImageBatch`).
 
+Data:
+- [ ] Get rid of `TensorDecorator` by using `__torch_function__`.
+
 Transforms:
 - [ ] Basic data augmentations.
 
 Examples:
 - [ ] Implement traditional free-form deformation algorithm as an example.
 - [ ] Implement Image-and-Spatial Transformer Networks as an example.
+
+Tests:
+- [ ] Full test coverage of core library functions.
+- [ ] Tests of spatial transformation models.
+- [ ] Tests for main data classes.
+- [ ] Tests for datasets.
+- [ ] Tests of loss terms.
