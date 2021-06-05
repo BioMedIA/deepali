@@ -60,7 +60,7 @@ class Axes(Enum):
         return cls(arg)
 
     @classmethod
-    def from_grid(cls, grid) -> Axes:
+    def from_grid(cls, grid: Grid) -> Axes:
         r"""Create enumeration value from sampling grid object."""
         return cls.from_align_corners(grid.align_corners())
 
@@ -76,18 +76,18 @@ class Grid(object):
     The dimensions of ``Grid.shape`` are in reverse order of the dimensions of ``Grid.size()``.
     The latter is consistent with SimpleITK, and the order of coordinates of ``Grid.origin()``,
     ``Grid.spacing()``, and ``Grid.direction()``. Property ``Grid.shape``, on the other hand,
-    is consistent with the order of dimensions of an image data ``torch.Tensor``.
+    is consistent with the order of dimensions of an image data tensor of type ``torch.Tensor``.
 
     To not confuse ``Grid.size()`` with ``torch.Tensor.size()``, it is recommended to prefer
     property ``torch.Tensor.shape``. The ``shape`` property is also known from ``numpy.ndarray.shape``.
 
     A ``Grid`` instance stores the grid-aligned unit cube center point instead of the grid origin.
-    This simplifies grid resizing operations, which need not modify the origin explicitly, but simply
-    keep the center fixed. The ``Grid.origin()`` can still be accessed and provided to ``Grid.__init__()``
+    This simplifies grid resizing operations, which do not need to modify the origin explicitly, but
+    keep the center fixed. The ``Grid.origin()`` can still be accessed and used to initialize a ``Grid()``
     for convenience. Conversion between center point and origin are taken care of by the ``Grid``.
 
     In addition, ``Grid.points()``, ``Grid.transform()`` and ``Grid.transform_points()`` support point
-    coordinates with respect to different domains, i.e., (continuous) grid indices as used for example
+    coordinates with respect to different axes, i.e., (continuous) grid indices as used for example
     by SimpleITK, world space coordinates, and the grid-aligned unit cube with side length 2 with cube
     center at the ``Grid.center()``. This ``Axes.CUBE`` makes grid point coordinates independent of
     ``Grid.size()`` and ``Grid.spacing()``. These normalized grid coordinates are furthermore compatible
