@@ -191,6 +191,15 @@ class FlowFields(ImageBatch):
         )
         return image.tensor(data, grid=self._grid)
 
+    def __torch_function__(self: TFlowFields, func, types, args=(), kwargs=None) -> TFlowFields:
+        r"""Support use of instances of this type with torch.* functions."""
+        if kwargs is None:
+            kwargs = {}
+        args = [getattr(arg, "_tensor", arg) for arg in args]
+        ret = func(*args, **kwargs)
+        cls = type(self)
+        return cls(ret, grid=self._grid, axes=self._axes)
+
 
 class FlowField(Image):
     r"""Flow field image.
@@ -350,3 +359,12 @@ class FlowField(Image):
         if isinstance(image, Image) and len(result) == 1:
             return result[0]
         return result
+
+    def __torch_function__(self: TFlowField, func, types, args=(), kwargs=None) -> TFlowField:
+        r"""Support use of instances of this type with torch.* functions."""
+        if kwargs is None:
+            kwargs = {}
+        args = [getattr(arg, "_tensor", arg) for arg in args]
+        ret = func(*args, **kwargs)
+        cls = type(self)
+        return cls(ret, grid=self._grid, axes=self._axes)

@@ -764,6 +764,15 @@ class ImageBatch(TensorDecorator):
         r"""Concatenate or repeat scalar function arguments."""
         return cat_scalars(arg, *args, num=self.ndim, device=self.device)
 
+    def __torch_function__(self: TImageBatch, func, types, args=(), kwargs=None) -> TImageBatch:
+        r"""Support use of instances of this type with torch.* functions."""
+        if kwargs is None:
+            kwargs = {}
+        args = [getattr(arg, "_tensor", arg) for arg in args]
+        ret = func(*args, **kwargs)
+        cls = type(self)
+        return cls(ret, self._grid)
+
 
 class Image(TensorDecorator):
     r"""Image sampled on oriented grid."""
@@ -1133,3 +1142,12 @@ class Image(TensorDecorator):
         batch = self.batch()
         other = batch.sample(grid, *args, **kwargs)[0]
         return self.tensor_(other._tensor, grid=other._grid)
+
+    def __torch_function__(self: TImage, func, types, args=(), kwargs=None) -> TImage:
+        r"""Support use of instances of this type with torch.* functions."""
+        if kwargs is None:
+            kwargs = {}
+        args = [getattr(arg, "_tensor", arg) for arg in args]
+        ret = func(*args, **kwargs)
+        cls = type(self)
+        return cls(ret, self._grid)
