@@ -1,9 +1,5 @@
 Core:
-- [ ] Add `Domain` subclass of `Grid` which has no `size` property.
 - [ ] Enable `Grid` to represent a batch of sampling grids, or add `GridBatch` (cf. `Image` <-> `ImageBatch`).
-
-Data:
-- [ ] Get rid of `TensorDecorator` by using `__torch_function__`.
 
 Transforms:
 - [ ] Basic data augmentations.
