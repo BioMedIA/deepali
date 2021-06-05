@@ -1115,10 +1115,13 @@ def normalize_image(
     Returns:
         Normalized image data.
 
+    Raises:
+        TypeError: When ``inplace=True`` and ``data.dtype`` is not a floating point data type.
+
     """
     if inplace:
         if not data.is_floating_point():
-            raise AssertionError("normalize_image() 'data.dtype' must be float when inplace=True")
+            raise TypeError("normalize_image() 'data.dtype' must be float when inplace=True")
         add_fn = data.add_
         sub_fn = data.sub_
         mul_fn = data.mul_
@@ -1179,8 +1182,8 @@ def rescale(
         max: Maximum value of output tensor. Use ``data_max`` if ``None``.
         data_min: Minimum value of input ``data``. Use ``data.min()`` if ``None``.
         data_max: Maximum value of input ``data``. Use ``data.max()`` if ``None``.
-        dtype: Data type used for rescaling operation and output tensor. If ``None``,
-            use ``data.dtype`` if it is a floating point type, or ``torch.float`` otherwise.
+        dtype: Cast rescaled values to specified output data type. If ``None``,
+            use ``data.dtype`` if it is a floating point type, otherwise ``torch.float``.
 
     Returns:
         Tensor of same shape as ``data`` with specified ``dtype`` and values in closed interval ``[min, max]``.
@@ -1192,7 +1195,13 @@ def rescale(
         dtype = data.dtype
         if not is_float_dtype(dtype):
             dtype = torch.float
-    data = data.type(dtype)
+    if dtype.is_floating_point:
+        interim_dtype = dtype
+    elif data.dtype.is_floating_point:
+        interim_dtype = data.dtype
+    else:
+        interim_dtype = torch.float
+    data = data.type(interim_dtype)
     if data_min is None:
         data_min = data.min()
     data_min = float(data_min)
@@ -1207,7 +1216,9 @@ def rescale(
     else:
         scale = (max - min) / (data_max - data_min)
         result = min + scale * (data - data_min)
-    return result.clamp_(min=min, max=max)
+    result = result.clamp_(min=min, max=max)
+    result = result.type(dtype)
+    return result
 
 
 def spatial_derivatives(

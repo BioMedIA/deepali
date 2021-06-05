@@ -60,10 +60,10 @@ class AvgPoolImage(ItemwiseTransform, Module):
         self.ceil_mode = ceil_mode
         self.count_include_pad = count_include_pad
 
-    def forward(self, data: Image) -> Image:
-        if not isinstance(data, Image):
-            raise TypeError(f"{type(self).__name__}() 'data' must be Image")
-        return data.avg_pool(
+    def forward(self, image: Image) -> Image:
+        if not isinstance(image, Image):
+            raise TypeError(f"{type(self).__name__}.forward() argument must be Image")
+        return image.avg_pool(
             self.kernel_size,
             stride=self.stride,
             padding=self.padding,
@@ -89,10 +89,10 @@ class CastImage(ItemwiseTransform, Module):
         super().__init__()
         self.dtype = dtype
 
-    def forward(self, data: Image) -> Image:
-        if not isinstance(data, Image):
-            raise TypeError(f"{type(self).__name__}() 'data' must be Image")
-        return data.type(self.dtype)
+    def forward(self, image: Image) -> Image:
+        if not isinstance(image, Image):
+            raise TypeError(f"{type(self).__name__}.forward() argument must be Image")
+        return image.type(self.dtype)
 
     def __repr__(self) -> str:
         return type(self).__name__ + f"(dtype={self.dtype!r})"
@@ -105,10 +105,10 @@ class CenterCropImage(ItemwiseTransform, Module):
         super().__init__()
         self.size = size
 
-    def forward(self, data: Image) -> Image:
-        if not isinstance(data, Image):
-            raise TypeError(f"{type(self).__name__}() 'data' must be Image")
-        return data.center_crop(self.size)
+    def forward(self, image: Image) -> Image:
+        if not isinstance(image, Image):
+            raise TypeError(f"{type(self).__name__}.forward() argument must be Image")
+        return image.center_crop(self.size)
 
     def __repr__(self) -> str:
         return type(self).__name__ + f"(size={self.size!r})"
@@ -128,10 +128,10 @@ class CenterPadImage(ItemwiseTransform, Module):
         self.mode = PaddingMode(mode)
         self.value = float(value)
 
-    def forward(self, data: Image) -> Image:
-        if not isinstance(data, Image):
-            raise TypeError(f"{type(self).__name__}() 'data' must be Image")
-        return data.center_pad(self.size, mode=self.mode, value=self.value)
+    def forward(self, image: Image) -> Image:
+        if not isinstance(image, Image):
+            raise TypeError(f"{type(self).__name__}.forward() argument must be Image")
+        return image.center_pad(self.size, mode=self.mode, value=self.value)
 
     def __repr__(self) -> str:
         return (
@@ -151,12 +151,12 @@ class ClampImage(ItemwiseTransform, Module):
         self.max = max
         self.inplace = bool(inplace)
 
-    def forward(self, data: Image) -> Image:
-        if not isinstance(data, Image):
-            raise TypeError(f"{type(self).__name__}() 'data' must be Image")
-        clamp_fn = data.clamp_ if self.inplace else data.clamp
-        data = clamp_fn(self.min, self.max)
-        return data
+    def forward(self, image: Image) -> Image:
+        if not isinstance(image, Image):
+            raise TypeError(f"{type(self).__name__}.forward() argument must be Image")
+        clamp_fn = image.clamp_ if self.inplace else image.clamp
+        image = clamp_fn(self.min, self.max)
+        return image
 
     def __repr__(self) -> str:
         return (
@@ -167,10 +167,10 @@ class ClampImage(ItemwiseTransform, Module):
 class ImageToTensor(ItemwiseTransform, Module):
     r"""Convert image to data tensor."""
 
-    def forward(self, data: Image) -> Tensor:
-        if not isinstance(data, Image):
-            raise TypeError(f"{type(self).__name__}() 'data' must be Image")
-        return data.tensor()
+    def forward(self, image: Image) -> Tensor:
+        if not isinstance(image, Image):
+            raise TypeError(f"{type(self).__name__}.forward() argument must be Image")
+        return image.tensor()
 
     def __repr__(self) -> str:
         return type(self).__name__ + "()"
@@ -190,14 +190,14 @@ class NarrowImage(ItemwiseTransform, Module):
         self.start = start
         self.length = length
 
-    def forward(self, data: Image) -> Tensor:
-        if not isinstance(data, Image):
-            raise TypeError(f"{type(self).__name__}() 'data' must be Image")
-        tensor = data.tensor().narrow(self.dim, self.start, self.length)
-        return data.tensor_(tensor)
+    def forward(self, image: Image) -> Tensor:
+        if not isinstance(image, Image):
+            raise TypeError(f"{type(self).__name__}.forward() argument must be Image")
+        image = image.narrow(self.dim, self.start, self.length)
+        return image
 
     def __repr__(self) -> str:
-        return type(self).__name__ + "()"
+        return type(self).__name__ + f"(dim={self.dim}, start={self.start}, length={self.length})"
 
 
 class NormalizeImage(ItemwiseTransform, Module):
@@ -218,10 +218,10 @@ class NormalizeImage(ItemwiseTransform, Module):
         self.mode = mode
         self.inplace = inplace
 
-    def forward(self, data: Image) -> Image:
-        if not isinstance(data, Image):
-            raise TypeError(f"{type(self).__name__}() 'data' must be Image")
-        normalize_fn = data.normalize_ if self.inplace else data.normalize
+    def forward(self, image: Image) -> Image:
+        if not isinstance(image, Image):
+            raise TypeError(f"{type(self).__name__}.forward() argument must be Image")
+        normalize_fn = image.normalize_ if self.inplace else image.normalize
         return normalize_fn(mode=self.mode, min=self.min, max=self.max)
 
     def __repr__(self) -> str:
@@ -253,7 +253,8 @@ class ReadImage(ItemwiseTransform, Module):
     def forward(self, path: PathStr) -> Image:
         if not isinstance(path, (str, Path)):
             raise TypeError(f"{type(self).__name__}() 'path' must be Path or str")
-        return Image.read(path, dtype=self.dtype, device=self.device)
+        image = Image.read(path, dtype=self.dtype, device=self.device)
+        return image
 
     def __repr__(self) -> str:
         return type(self).__name__ + f"(dtype={self.dtype}, device='{self.device!s}')"
@@ -271,10 +272,11 @@ class ResampleImage(ItemwiseTransform, Module):
         self.spacing = spacing
         self.mode = Sampling(mode)
 
-    def forward(self, data: Image) -> Image:
-        if not isinstance(data, Image):
-            raise TypeError(f"{type(self).__name__}() 'data' must be Image")
-        return data.resample(self.spacing, mode=self.mode)
+    def forward(self, image: Image) -> Image:
+        if not isinstance(image, Image):
+            raise TypeError(f"{type(self).__name__}.forward() argument must be Image")
+        image = image.resample(self.spacing, mode=self.mode)
+        return image
 
     def __repr__(self) -> str:
         return type(self).__name__ + f"(spacing={self.spacing!r}, mode={self.mode.value!r})"
@@ -308,21 +310,21 @@ class RescaleImage(ItemwiseTransform, Module):
             self.add = None
         self.inplace = bool(inplace)
 
-    def forward(self, data: Image) -> Image:
-        if not isinstance(data, Image):
-            raise TypeError(f"{type(self).__name__}() 'data' must be Image")
+    def forward(self, image: Image) -> Image:
+        if not isinstance(image, Image):
+            raise TypeError(f"{type(self).__name__}.forward() argument must be Image")
         if self.mul is not None or self.add is not None:
             assert self.min is None and self.max is None
             if self.mul != 1:
-                mul_fn = data.mul_ if self.inplace else data.mul
-                data = mul_fn(self.mul)
+                mul_fn = image.mul_ if self.inplace else image.mul
+                image = mul_fn(self.mul)
             if self.add != 0:
-                add_fn = data.add_ if self.inplace else data.add
-                data = add_fn(self.add)
+                add_fn = image.add_ if self.inplace else image.add
+                image = add_fn(self.add)
         else:
-            rescale_fn = data.rescale_ if self.inplace else data.rescale
-            data = rescale_fn(min=self.min, max=self.max)
-        return data
+            rescale_fn = image.rescale_ if self.inplace else image.rescale
+            image = rescale_fn(min=self.min, max=self.max)
+        return image
 
     def __repr__(self) -> str:
         s = type(self).__name__ + "("

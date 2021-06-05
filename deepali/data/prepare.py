@@ -11,7 +11,6 @@ from ..core.types import Batch, Dataclass, Device, is_namedtuple
 
 from .sample import sample_field_names, sample_field_value
 from .sample import replace_all_sample_field_values
-from .tensor import TensorDecorator
 
 
 __all__ = ("prepare_batch",)
@@ -58,7 +57,7 @@ def prepare_item(
 ) -> Any:
     r"""Move batch item data to execution device."""
     kwargs = dict(device=device, non_blocking=non_blocking, memory_format=memory_format)
-    if isinstance(value, (Tensor, TensorDecorator)):
+    if isinstance(value, Tensor):
         value = value.to(**kwargs)
     elif isinstance(value, abc.Mapping) or is_dataclass(value) or is_namedtuple(value):
         value = prepare_batch(value, **kwargs)

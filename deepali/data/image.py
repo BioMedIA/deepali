@@ -1,8 +1,7 @@
-r"""Decorator for tensors of image data."""
+r"""Image tensors."""
 
 from __future__ import annotations
 
-from copy import copy as shallow_copy
 from typing import Dict, Optional, Sequence, Tuple, Type, TypeVar, Union, overload
 
 import torch
@@ -18,12 +17,11 @@ except ImportError:
 from ..core.enum import PaddingMode, Sampling
 from ..core.grid import ALIGN_CORNERS, Axes, Grid
 from ..core import image as U
-from ..core.names import image_batch_tensor_names, image_tensor_names
 from ..core.path import unlink_or_mkdir
-from ..core.tensor import as_tensor, cat_scalars
-from ..core.types import Array, Device, PathStr, Scalar, ScalarOrTuple, Size
+from ..core.tensor import cat_scalars
+from ..core.types import Array, Device, DType, PathStr, Scalar, ScalarOrTuple, Size
 
-from .tensor import TensorDecorator
+from .tensor import DataTensor
 
 
 TImage = TypeVar("TImage", bound="Image")
@@ -33,21 +31,22 @@ TImageBatch = TypeVar("TImageBatch", bound="ImageBatch")
 __all__ = ("Image", "ImageBatch")
 
 
-class ImageBatch(TensorDecorator):
+class ImageBatch(DataTensor):
     r"""Batch of images sampled on regular oriented grids."""
-
-    __slots__ = ("_grid",)
 
     def __init__(
         self: TImageBatch,
         data: Array,
         grid: Optional[Union[Grid, Sequence[Grid]]] = None,
+        dtype: Optional[DType] = None,
         device: Optional[Device] = None,
+        requires_grad: Optional[bool] = None,
+        pin_memory: bool = False,
     ) -> None:
-        r"""Initialize image batch.
+        r"""Initialize image decorator.
 
         Args:
-            data: Image data tensor of shape (N, C, ...X).
+            data: Image batch data tensor of shape (N, C, ...X).
             grid: Sampling grid of image data oriented in world space. Can be either a single shared
                 sampling grid, or a separate grid for each image in the batch. Note that operations
                 which would result in differently sized images (e.g., resampling to a certain voxel
@@ -56,79 +55,54 @@ class ImageBatch(TensorDecorator):
                 grid whose world space coordinate axes are aligned with the image axes, unit spacing,
                 and origin at the image centers is created. By default, image grid attributes are always
                 stored in CPU memory, regardless of the ``device`` on which the image data is located.
-            device: Device on which to store image data.
+            dtype: Data type of the image data. A copy of the data is only made when the desired ``dtype``
+                is not ``None`` and not the same as ``data.dtype``.
+            device: Device on which to store image data. A copy of the data is only made when the data
+                has to be copied to a different device.
+            requires_grad: If autograd should record operations on the returned image tensor.
+            pin_memory: If set, returned image tensor would be allocated in the pinned memory.
+                Works only for CPU tensors.
 
         """
-        data_ = as_tensor(data, device=device)
-        if data_.ndim < 4:
+        # DataTensor.__new__() creates the tensor subclass given arguments:
+        # data, dtype, device, requires_grad, pin_memory
+        if self.ndim < 4:
             raise ValueError("Image batch tensor must have at least four dimensions")
-        names = image_batch_tensor_names(data_.ndim)
-        if None in data_.names:
-            data_ = data.refine_names(*names)  # type: ignore
-        data_: Tensor = data_.align_to(*names)  # type: ignore
-        data_ = data_.rename(None)  # named tensor support still experimental
-        super().__init__(data_)
         self.grid_(grid)
 
-    @overload
-    def tensor(self: TImageBatch, named: bool = False) -> Tensor:
-        r"""Get image batch tensor."""
-        ...
-
-    @overload
-    def tensor(self: TImageBatch, data: Array, **kwargs) -> TImageBatch:
-        r"""Get instance with specified image batch tensor."""
-        ...
-
-    def tensor(
+    def _make_instance(
         self: TImageBatch,
-        data: Optional[Array] = None,
-        grid: Optional[Union[Grid, Sequence[Grid]]] = None,
-        named: bool = False,
-        device: Optional[Device] = None,
-    ) -> Union[Tensor, TImageBatch]:
-        r"""Get image batch tensor or new batch with specified tensor, respectively."""
-        if data is None:
-            tensor = self._tensor
-            if named:
-                names = image_batch_tensor_names(tensor.ndim)
-                tensor = tensor.refine_names(*names)
-            return tensor
-        other = shallow_copy(self)
-        other.tensor_(data, grid=grid, device=device)
-        return other
-
-    def tensor_(
-        self: TImageBatch,
-        data: Array,
-        grid: Optional[Union[Grid, Sequence[Grid]]] = None,
-        device: Optional[Device] = None,
+        data: Optional[Tensor] = None,
+        grid: Optional[Sequence[Grid]] = None,
+        **kwargs,
     ) -> TImageBatch:
-        r"""Change data tensor of this image batch."""
-        if device is None:
-            device = self.device
-        if isinstance(data, Tensor):
-            data_ = data.to(device)
-        else:
-            data_ = torch.tensor(data, device=device)
-        if data_.ndim < 4:
-            raise ValueError("Image batch tensor must have at least the four dimensions")
-        if not grid:
-            grid_: Tuple[Grid, ...] = self._grid
-        elif isinstance(grid, Grid):
-            grid_ = (grid,) * data_.shape[0]
-        else:
-            grid_ = tuple(grid)
-        if any(g.shape != data_.shape[2:] for g in grid_):
-            raise ValueError("Image grid sizes must match spatial dimensions of image batch tensor")
-        names = image_batch_tensor_names(data_.ndim)
-        if None in data_.names:
-            data_ = data_.refine_names(*names)  # type: ignore
-        data_: Tensor = data_.align_to(*names)  # type: ignore
-        data_ = data_.rename(None)  # named tensor support still experimental
-        self._tensor = data_
-        self._grid = grid_
-        return self
+        r"""Create a new instance while preserving subclass (meta-)data."""
+        kwargs["grid"] = grid or self._grid
+        return super()._make_instance(data, **kwargs)
+
+    def __deepcopy__(self: TImageBatch, memo) -> TImageBatch:
+        if id(self) in memo:
+            return memo[id(self)]
+        result = self._make_instance(
+            self.data.clone(memory_format=torch.preserve_format),
+            grid=tuple(grid.clone() for grid in self._grid),
+            requires_grad=self.requires_grad,
+            pin_memory=self.is_pinned(),
+        )
+        memo[id(self)] = result
+        return result
+
+    def __torch_function__(self, func, types, args=(), kwargs=None):
+        args = [arg.as_subclass(Tensor) if isinstance(arg, Tensor) else arg for arg in args]
+        if kwargs is None:
+            kwargs = {}
+        result = func(*args, **kwargs)
+        if isinstance(result, Tensor) and result.shape == self.shape:
+            grids = self._grid
+            if func.__name__ == "clone":
+                grids = tuple(grid.clone() for grid in grids)
+            result = self._make_instance(result, grids)
+        return result
 
     @overload
     def grid(self: TImageBatch, n: int = 0) -> Grid:
@@ -148,12 +122,11 @@ class ImageBatch(TensorDecorator):
             arg = 0
         if isinstance(arg, int):
             return self._grid[arg]
-        copy = shallow_copy(self)
-        return copy.grid_(arg)
+        return self._make_instance(grid=arg)
 
     def grid_(self: TImageBatch, arg: Union[Grid, Sequence[Grid], None]) -> TImageBatch:
         r"""Change image sampling grid of this image batch."""
-        shape = self._tensor.shape
+        shape = self.shape
         if arg is None:
             arg = (Grid(shape=shape[2:]),) * shape[0]
         elif isinstance(arg, Grid):
@@ -180,34 +153,52 @@ class ImageBatch(TensorDecorator):
         r"""Whether image resizing operations by default preserve corner points or grid extent."""
         return self._grid[0].align_corners()
 
+    def center(self: TImageBatch) -> Tensor:
+        r"""Image centers in world space coordinates as tensor of shape (N, D)."""
+        return torch.cat([grid.center().unsqueeze(0) for grid in self.grids()], dim=0)
+
+    def origin(self: TImageBatch) -> Tensor:
+        r"""Image origins in world space coordinates as tensor of shape (N, D)."""
+        return torch.cat([grid.origin().unsqueeze(0) for grid in self.grids()], dim=0)
+
     def spacing(self: TImageBatch) -> Tensor:
-        r"""Image spacing as tensor of shape (N, D)."""
+        r"""Image spacings in world units as tensor of shape (N, D)."""
         return torch.cat([grid.spacing().unsqueeze(0) for grid in self.grids()], dim=0)
+
+    def direction(self: TImageBatch) -> Tensor:
+        r"""Image direction cosines matrices as tensor of shape (N, D, D)."""
+        return torch.cat([grid.direction().unsqueeze(0) for grid in self.grids()], dim=0)
 
     def __len__(self: TImageBatch) -> int:
         r"""Number of images in batch."""
-        return self._tensor.shape[0]
+        return self.shape[0]
 
     def __getitem__(self: TImageBatch, index: int) -> Image:
         r"""Get image at specified batch index."""
         if index < 0 or index >= len(self):
             raise IndexError(f"Image batch index ({index}) out of range [0, {len(self)}]")
-        return Image(data=self._tensor[index], grid=self._grid[index])
+        # Attention: Tensor.__getitem__ leads to endless recursion!
+        data = self.tensor().narrow(0, index, 1).squeeze(0)
+        return Image(data, self._grid[index])
 
     @property
-    def ndim(self: TImageBatch) -> int:
+    def sdim(self: TImageBatch) -> int:
         r"""Number of spatial dimensions."""
-        return self._tensor.ndim - 2
+        return self.ndim - 2
 
     @property
     def nchannels(self: TImageBatch) -> int:
         r"""Number of image channels."""
-        return self._tensor.shape[1]
+        return self.shape[1]
 
-    def normalize(self: TImageBatch, *args, **kwargs) -> TImageBatch:
+    def normalize(
+        self: TImageBatch,
+        mode: str = "unit",
+        min: Optional[float] = None,
+        max: Optional[float] = None,
+    ) -> TImageBatch:
         r"""Normalize image intensities in [min, max]."""
-        copy = shallow_copy(self)
-        return copy.normalize_(*args, **kwargs)
+        return U.normalize_image(self, mode=mode, min=min, max=max)
 
     def normalize_(
         self: TImageBatch,
@@ -216,17 +207,27 @@ class ImageBatch(TensorDecorator):
         max: Optional[float] = None,
     ) -> TImageBatch:
         r"""Normalize image intensities in [min, max]."""
-        data = self.tensor()
-        data = data.float()
-        data = U.normalize_image(data, mode=mode, min=min, max=max, inplace=True)
-        return self.tensor_(data)
+        return U.normalize_image(self, mode=mode, min=min, max=max, inplace=True)
 
-    def resize(self: TImageBatch, *args, **kwargs) -> TImageBatch:
-        r"""Interpolate images on grid with specified size."""
-        copy = shallow_copy(self)
-        return copy.resize_(*args, **kwargs)
+    def rescale(
+        self: TImageBatch,
+        min: Optional[Scalar] = None,
+        max: Optional[Scalar] = None,
+        data_min: Optional[Scalar] = None,
+        data_max: Optional[Scalar] = None,
+        dtype: Optional[DType] = None,
+    ) -> TImageBatch:
+        r"""Clamp and linearly rescale image values."""
+        return U.rescale(self, min, max, data_min=data_min, data_max=data_max, dtype=dtype)
 
-    def resize_(
+    def narrow(self: TImageBatch, dim: int, start: int, length: int) -> TImageBatch:
+        r"""Narrow image batch along specified tensor dimension."""
+        data = self.tensor().narrow(dim, start, length)
+        if dim > 1:
+            grid = self.grid().narrow(self.ndim - dim - 1, start, length)
+        return self._make_instance(data, grid)
+
+    def resize(
         self: TImageBatch,
         size: Union[int, Array, Size],
         *args: int,
@@ -243,22 +244,17 @@ class ImageBatch(TensorDecorator):
                 If ``None``, the default of the image sampling grid is used.
 
         Returns:
-            This image batch with specified size of spatial dimensions.
+            Image batch with specified size of spatial dimensions.
 
         """
         if align_corners is None:
             align_corners = self.align_corners()
-        size = self._cat_scalars(size, *args)
-        data = U.grid_resize(self._tensor, size, mode=mode, align_corners=align_corners)
-        grid = [grid.resize(size, align_corners=align_corners) for grid in self._grid]
-        return self.tensor_(data, grid=grid)
+        size = cat_scalars(size, *args, num=self.sdim, device=self.device)
+        data = U.grid_resize(self, size, mode=mode, align_corners=align_corners)
+        grid = tuple(grid.resize(size, align_corners=align_corners) for grid in self._grid)
+        return self._make_instance(data, grid)
 
-    def resample(self: TImageBatch, *args, **kwargs) -> TImageBatch:
-        r"""Interpolate images on grid with specified spacing."""
-        copy = shallow_copy(self)
-        return copy.resample_(*args, **kwargs)
-
-    def resample_(
+    def resample(
         self: TImageBatch,
         spacing: Union[float, Array, str],
         *args: float,
@@ -274,13 +270,13 @@ class ImageBatch(TensorDecorator):
             mode: Image data interpolation mode.
 
         Returns:
-            This image batch with given grid spacing.
+            Image batch with given grid spacing.
 
         """
         in_spacing = self._grid[0].spacing()
         if not all(torch.allclose(grid.spacing(), in_spacing) for grid in self._grid):
             raise AssertionError(
-                f"{type(self).__name__}.resample_() requires all images in batch to have the same grid spacing"
+                f"{type(self).__name__}.resample() requires all images in batch to have the same grid spacing"
             )
         if spacing == "min":
             assert not args
@@ -290,19 +286,12 @@ class ImageBatch(TensorDecorator):
             out_spacing = in_spacing.max()
         else:
             out_spacing = spacing
-        out_spacing = self._cat_scalars(out_spacing, *args)
-        data = U.grid_resample(
-            self._tensor, in_spacing=in_spacing, out_spacing=out_spacing, mode=mode
-        )
-        grid = [grid.resample(out_spacing) for grid in self._grid]
-        return self.tensor_(data, grid=grid)
+        out_spacing = cat_scalars(out_spacing, *args, num=self.sdim, device=self.device)
+        data = U.grid_resample(self, in_spacing=in_spacing, out_spacing=out_spacing, mode=mode)
+        grid = tuple(grid.resample(out_spacing) for grid in self._grid)
+        return self._make_instance(data, grid)
 
-    def avg_pool(self: TImageBatch, *args, **kwargs) -> TImageBatch:
-        r"""Average pooling of image data."""
-        copy = shallow_copy(self)
-        return copy.avg_pool_(*args, **kwargs)
-
-    def avg_pool_(
+    def avg_pool(
         self: TImageBatch,
         kernel_size: ScalarOrTuple[int],
         stride: Optional[ScalarOrTuple[int]] = None,
@@ -312,14 +301,14 @@ class ImageBatch(TensorDecorator):
     ) -> TImageBatch:
         r"""Average pooling of image data."""
         data = U.avg_pool(
-            self._tensor,
+            self,
             kernel_size,
             stride=stride,
             padding=padding,
             ceil_mode=ceil_mode,
             count_include_pad=count_include_pad,
         )
-        grid = [
+        grid = tuple(
             grid.avg_pool(
                 kernel_size,
                 stride=stride,
@@ -327,15 +316,10 @@ class ImageBatch(TensorDecorator):
                 ceil_mode=ceil_mode,
             )
             for grid in self._grid
-        ]
-        return self.tensor_(data, grid=grid)
+        )
+        return self._make_instance(data, grid)
 
-    def downsample(self: TImageBatch, levels: int = 1, **kwargs) -> TImageBatch:
-        r"""Downsample images in batch by halving their size the specified number of times."""
-        copy = shallow_copy(self)
-        return copy.downsample_(levels, **kwargs)
-
-    def downsample_(
+    def downsample(
         self: TImageBatch,
         levels: int = 1,
         sigma: Optional[Union[Scalar, Array]] = None,
@@ -353,33 +337,28 @@ class ImageBatch(TensorDecorator):
                 If ``None``, the default of the image sampling grid is used.
 
         Returns:
-            Reference to this image batch.
+            Batch of downsampled images.
 
         """
         if not isinstance(levels, int):
-            raise TypeError("ImageBatch.downsample() 'levels' must be of type int")
+            raise TypeError(f"{type(self).__name__}.downsample() 'levels' must be of type int")
         if align_corners is None:
             align_corners = self.align_corners()
         data = U.downsample(
-            self._tensor,
+            self,
             levels,
             sigma=sigma,
             mode=mode,
             min_size=min_size,
             align_corners=align_corners,
         )
-        grid = [
+        grid = tuple(
             grid.downsample(levels, min_size=min_size, align_corners=align_corners)
             for grid in self._grid
-        ]
-        return self.tensor_(data, grid=grid)
+        )
+        return self._make_instance(data, grid)
 
-    def upsample(self: TImageBatch, levels: int = 1, **kwargs) -> TImageBatch:
-        r"""Upsample image in batch by doubling their size the specified number of times."""
-        copy = shallow_copy(self)
-        return copy.upsample_(levels, **kwargs)
-
-    def upsample_(
+    def upsample(
         self: TImageBatch,
         levels: int = 1,
         sigma: Optional[Union[Scalar, Array]] = None,
@@ -396,16 +375,16 @@ class ImageBatch(TensorDecorator):
                 If ``None``, the default of the image sampling grid is used.
 
         Returns:
-            Reference to this image batch.
+            Batch of upsampled images.
 
         """
         if not isinstance(levels, int):
-            raise TypeError("ImageBatch.upsample() 'levels' must be of type int")
+            raise TypeError(f"{type(self).__name__}.upsample() 'levels' must be of type int")
         if align_corners is None:
             align_corners = self.align_corners()
-        data = U.upsample(self._tensor, levels, sigma=sigma, mode=mode, align_corners=align_corners)
-        grid = [grid.upsample(levels, align_corners=align_corners) for grid in self._grid]
-        return self.tensor_(data, grid=grid)
+        data = U.upsample(self, levels, sigma=sigma, mode=mode, align_corners=align_corners)
+        grid = tuple(grid.upsample(levels, align_corners=align_corners) for grid in self._grid)
+        return self._make_instance(data, grid)
 
     def pyramid(
         self: TImageBatch,
@@ -437,19 +416,23 @@ class ImageBatch(TensorDecorator):
 
         """
         if not isinstance(levels, int):
-            raise TypeError("ImageBatch.pyramid() 'levels' must be int")
+            raise TypeError(f"{type(self).__name__}.pyramid() 'levels' must be int")
         if not isinstance(start, int):
-            raise TypeError("ImageBatch.pyramid() 'start' must be int")
+            raise TypeError(f"{type(self).__name__}.pyramid() 'start' must be int")
         if not isinstance(end, int):
-            raise TypeError("ImageBatch.pyramid() 'end' must be int")
+            raise TypeError(f"{type(self).__name__}.pyramid() 'end' must be int")
         if start < 0:
             start = levels + start
         if start < 0 or start > levels - 1:
-            raise ValueError(f"ImageBatch.pyramid() 'start' must be in [{-levels}, {levels - 1}]")
+            raise ValueError(
+                f"{type(self).__name__}.pyramid() 'start' must be in [{-levels}, {levels - 1}]"
+            )
         if end < 0:
             end = levels + end
         if end < 0 or end > levels - 1:
-            raise ValueError(f"ImageBatch.pyramid() 'end' must be in [{-levels}, {levels - 1}]")
+            raise ValueError(
+                f"{type(self).__name__}.pyramid() 'end' must be in [{-levels}, {levels - 1}]"
+            )
         if start > end:
             return {}
         # Current image grids
@@ -468,30 +451,24 @@ class ImageBatch(TensorDecorator):
         grids = tuple(grid.pyramid(levels, min_size=min_size)[0] for grid in grids)
         assert all(grid.size() == grids[0].size() for grid in grids)
         # Resize image to match finest resolution grid
-        data = self.tensor()
         if torch.allclose(grids[0].cube_extent(), self._grid[0].cube_extent()):
             size = grids[0].size()
-            data = U.grid_resize(data, size, mode=mode, align_corners=align_corners)
+            data = U.grid_resize(self, size, mode=mode, align_corners=align_corners)
         else:
             points = grids[0].coords(device=self.device)
-            data = U.grid_sample(data, points, mode=mode, align_corners=align_corners)
+            data = U.grid_sample(self, points, mode=mode, align_corners=align_corners)
         # Construct image pyramid by repeated downsampling
         pyramid = {}
-        image = self.tensor(data, grid=grids)
+        batch = self._make_instance(data, grids)
         if start == 0:
-            pyramid[0] = image
+            pyramid[0] = batch
         for level in range(1, end + 1):
-            image = image.downsample(sigma=sigma, mode=mode, min_size=min_size)
+            batch = batch.downsample(sigma=sigma, mode=mode, min_size=min_size)
             if level >= start:
-                pyramid[level] = image
+                pyramid[level] = batch
         return pyramid
 
-    def crop(self: TImageBatch, *args, **kwargs) -> TImageBatch:
-        r"""Crop images at boundary."""
-        copy = shallow_copy(self)
-        return copy.crop_(*args, **kwargs)
-
-    def crop_(
+    def crop(
         self: TImageBatch,
         margin: Optional[Union[int, Array]] = None,
         num: Optional[Union[int, Array]] = None,
@@ -512,42 +489,14 @@ class ImageBatch(TensorDecorator):
             value: Constant value used for extrapolation if ``mode=PaddingMode.CONSTANT``.
 
         Returns:
-            This image with modified size, but unchanged spacing.
+            Batch of images with modified size, but unchanged spacing.
 
         """
-        grids: Sequence[Grid] = self._grid
-        data = U.crop(self._tensor, margin=margin, num=num, mode=mode, value=value)
-        grid = [grid.crop(margin=margin, num=num) for grid in grids]
-        return self.tensor_(data, grid=grid)
+        data = U.crop(self, margin=margin, num=num, mode=mode, value=value)
+        grid = tuple(grid.crop(margin=margin, num=num) for grid in self._grid)
+        return self._make_instance(data, grid)
 
-    def center_crop(self: TImageBatch, *args, **kwargs) -> TImageBatch:
-        r"""Crop image to specified maximum size."""
-        copy = shallow_copy(self)
-        return copy.center_crop_(*args, **kwargs)
-
-    def center_crop_(self: TImageBatch, size: Union[int, Array], *args: int) -> TImageBatch:
-        r"""Crop image to specified maximum size.
-
-        Args:
-            size: Maximum output size, where the size of the last tensor
-                dimension must be given first, i.e., ``(X, ...)``.
-                If an ``int`` is given, all spatial output dimensions
-                are cropped to this maximum size. If the length of size
-                is less than the spatial dimensions of the ``data`` tensor,
-                then only the last ``len(size)`` dimensions are modified.
-
-        """
-        size_ = self._cat_scalars(size, *args)
-        data = U.center_crop(self._tensor, size_)
-        grid = [grid.center_crop(size_) for grid in self._grid]
-        return self.tensor_(data, grid=grid)
-
-    def pad(self: TImageBatch, *args, **kwargs) -> TImageBatch:
-        r"""Pad images at boundary."""
-        copy = shallow_copy(self)
-        return copy.pad_(*args, **kwargs)
-
-    def pad_(
+    def pad(
         self: TImageBatch,
         margin: Optional[Union[int, Array]] = None,
         num: Optional[Union[int, Array]] = None,
@@ -567,20 +516,34 @@ class ImageBatch(TensorDecorator):
             value: Constant value used for extrapolation if ``mode=PaddingMode.CONSTANT``.
 
         Returns:
-            This image with modified size, but unchanged spacing.
+            Batch of images with modified size, but unchanged spacing.
 
         """
-        grids: Sequence[Grid] = self._grid
-        data = U.pad(self._tensor, margin=margin, num=num, mode=mode, value=value)
-        grid = [grid.pad(margin=margin, num=num) for grid in grids]
-        return self.tensor_(data, grid=grid)
+        data = U.pad(self, margin=margin, num=num, mode=mode, value=value)
+        grid = tuple(grid.pad(margin=margin, num=num) for grid in self._grid)
+        return self._make_instance(data, grid)
 
-    def center_pad(self: TImageBatch, *args, **kwargs) -> TImageBatch:
-        r"""Pad image to specified minimum size."""
-        copy = shallow_copy(self)
-        return copy.center_pad_(*args, **kwargs)
+    def center_crop(self: TImageBatch, size: Union[int, Array], *args: int) -> TImageBatch:
+        r"""Crop image to specified maximum size.
 
-    def center_pad_(
+        Args:
+            size: Maximum output size, where the size of the last tensor
+                dimension must be given first, i.e., ``(X, ...)``.
+                If an ``int`` is given, all spatial output dimensions
+                are cropped to this maximum size. If the length of size
+                is less than the spatial dimensions of the ``data`` tensor,
+                then only the last ``len(size)`` dimensions are modified.
+
+        Returns:
+            Batch of cropped images.
+
+        """
+        size = cat_scalars(size, *args, num=self.sdim, device=self.device)
+        data = U.center_crop(self, size)
+        grid = tuple(grid.center_crop(size) for grid in self._grid)
+        return self._make_instance(data, grid)
+
+    def center_pad(
         self: TImageBatch,
         size: Union[int, Array],
         *args: int,
@@ -599,18 +562,16 @@ class ImageBatch(TensorDecorator):
             mode: Padding mode (cf. ``torch.nn.functional.pad()``).
             value: Value for padding mode "constant".
 
+        Returns:
+            Batch of images with modified size, but unchanged spacing.
+
         """
-        size_ = self._cat_scalars(size, *args)
-        data = U.center_pad(self._tensor, size_, mode=mode, value=value)
-        grid = [grid.center_pad(size_) for grid in self._grid]
-        return self.tensor_(data, grid=grid)
+        size = cat_scalars(size, *args, num=self.sdim, device=self.device)
+        data = U.center_pad(self, size, mode=mode, value=value)
+        grid = tuple(grid.center_pad(size) for grid in self._grid)
+        return self._make_instance(data, grid)
 
-    def conv(self: TImageBatch, *args, **kwargs) -> TImageBatch:
-        r"""Filter images in batch with a given (separable) kernel."""
-        copy = shallow_copy(self)
-        return copy.conv_(*args, **kwargs)
-
-    def conv_(
+    def conv(
         self: TImageBatch, kernel: Tensor, padding: Union[PaddingMode, str, int] = None
     ) -> TImageBatch:
         r"""Filter images in batch with a given (separable) kernel.
@@ -625,33 +586,16 @@ class ImageBatch(TensorDecorator):
             padding: Image padding mode or margin size. If ``None``, use default mode ``PaddingMode.ZEROS``.
 
         Returns:
-            This image batch with data tensor replaced by result of filtering operation with data
-            type set to the image data type before convolution. If this data type is not a floating
-            point data type, the filtered data is rounded and clamped before cast to this dtype.
+            Result of filtering operation with data type set to the image data type before convolution.
+            If this data type is not a floating point data type, the filtered data is rounded and clamped
+            before it is being cast to the original dtype.
 
         """
-        data = U.conv(self._tensor, kernel, padding=padding)
-        crop = tuple((m - n) // 2 for m, n in zip(self._tensor.shape[2:], data.shape[2:]))
+        data = U.conv(self, kernel, padding=padding)
+        crop = tuple((m - n) // 2 for m, n in zip(self.shape[2:], data.shape[2:]))
         crop = tuple(reversed(crop))
-        grid = [grid.crop(crop) for grid in self._grid]
-        return self.tensor_(data, grid=grid)
-
-    def rescale(self: TImageBatch, *args, **kwargs) -> TImageBatch:
-        r"""Clamp and linearly rescale image values."""
-        copy = shallow_copy(self)
-        return copy.rescale_(*args, **kwargs)
-
-    def rescale_(
-        self: TImageBatch,
-        min: Optional[Scalar] = None,
-        max: Optional[Scalar] = None,
-        data_min: Optional[Scalar] = None,
-        data_max: Optional[Scalar] = None,
-    ) -> TImageBatch:
-        r"""Clamp and linearly rescale image values."""
-        data = self.tensor()
-        data = U.rescale(data, min=min, max=max, data_min=data_min, data_max=data_max)
-        return self.tensor_(data)
+        grid = tuple(grid.crop(crop) for grid in self._grid)
+        return self._make_instance(data, grid)
 
     @overload
     def sample(
@@ -668,8 +612,7 @@ class ImageBatch(TensorDecorator):
             padding: Image extrapolation mode or scalar padding value.
 
         Returns:
-            A new ``ImageBatch`` with the resampled data as tensor attribute and
-            the given sampling grid instance set as grid attribute.
+            A new image batch of the resampled data with the given sampling grids.
 
         """
         ...
@@ -699,7 +642,7 @@ class ImageBatch(TensorDecorator):
         grid: Union[Grid, Tensor],
         mode: Optional[Union[Sampling, str]] = None,
         padding: Optional[Union[PaddingMode, str, Scalar]] = None,
-    ) -> Union[TImageBatch, Tensor]:
+    ) -> TImageBatch:
         r"""Sample images at optionally deformed unit grid points.
 
         Args:
@@ -715,72 +658,37 @@ class ImageBatch(TensorDecorator):
 
         """
         if isinstance(grid, Grid):
-            copy = shallow_copy(self)
-            return copy.sample_(grid, mode=mode, padding=padding)
-        else:
-            align_corners = self.align_corners()
-            return U.grid_sample(
-                self._tensor, grid, mode=mode, padding=padding, align_corners=align_corners
+            if all(grid == g for g in self._grid):
+                return self
+            align_corners = grid.align_corners()
+            axes = Axes.from_align_corners(align_corners)
+            coords = grid.coords(align_corners=align_corners, device=self.device).unsqueeze(0)
+            points = [grid.transform_points(coords, axes, to_grid=g) for g in self._grid]
+            points = torch.cat(points, dim=0)
+            data = U.grid_sample(
+                self,
+                points,
+                mode=mode,
+                padding=padding,
+                align_corners=align_corners,
             )
-
-    def sample_(
-        self: TImageBatch,
-        grid: Grid,
-        mode: Optional[Union[Sampling, str]] = None,
-        padding: Optional[Union[PaddingMode, str, Scalar]] = None,
-    ) -> TImageBatch:
-        r"""Sample images at optionally deformed unit grid points.
-
-        Args:
-            grid: Spatial grid points at which to sample image values.
-            mode: Image interpolation mode.
-            padding: Image extrapolation mode or scalar padding value.
-
-        Returns:
-            A reference to this modified image batch instance.
-
-        """
-        if not isinstance(grid, Grid):
-            raise TypeError(
-                "ImageBatch.sample_() 'grid' must by Grid; maybe try ImageBatch.sample() instead"
-            )
-        if all(grid == g for g in self._grid):
-            return self
-        align_corners = grid.align_corners()
-        axes = Axes.from_align_corners(align_corners)
-        coords = grid.coords(align_corners=align_corners, device=self.device).unsqueeze(0)
-        points = [grid.transform_points(coords, axes, to_grid=g) for g in self._grid]
-        points = torch.cat(points, dim=0)
-        data = U.grid_sample(
-            self._tensor,
-            points,
-            mode=mode,
-            padding=padding,
-            align_corners=align_corners,
-        )
-        return self.tensor_(data, grid=grid)
-
-    def _cat_scalars(self: TImageBatch, arg, *args) -> Tensor:
-        r"""Concatenate or repeat scalar function arguments."""
-        return cat_scalars(arg, *args, num=self.ndim, device=self.device)
-
-    def __torch_function__(self: TImageBatch, func, types, args=(), kwargs=None) -> TImageBatch:
-        r"""Support use of instances of this type with torch.* functions."""
-        if kwargs is None:
-            kwargs = {}
-        args = [getattr(arg, "_tensor", arg) for arg in args]
-        ret = func(*args, **kwargs)
-        cls = type(self)
-        return cls(ret, self._grid)
+            return self._make_instance(data, grid)
+        data = self.tensor()
+        align_corners = self.align_corners()
+        return U.grid_sample(data, grid, mode=mode, padding=padding, align_corners=align_corners)
 
 
-class Image(TensorDecorator):
+class Image(DataTensor):
     r"""Image sampled on oriented grid."""
 
-    __slots__ = ("_grid",)
-
     def __init__(
-        self: TImage, data: Array, grid: Optional[Grid] = None, device: Optional[Device] = None
+        self: TImage,
+        data: Array,
+        grid: Optional[Grid] = None,
+        dtype: Optional[DType] = None,
+        device: Optional[Device] = None,
+        requires_grad: Optional[bool] = None,
+        pin_memory: bool = False,
     ) -> None:
         r"""Initialize image decorator.
 
@@ -791,20 +699,51 @@ class Image(TensorDecorator):
             grid: Sampling grid of image ``data`` oriented in world space.
                 If ``None``, a default grid whose world space coordinate axes are aligned with the
                 image axes, unit spacing, and origin at the image center is created on CPU.
+            dtype: Data type of the image data. A copy of the data is only made when the desired
+                ``dtype`` is not ``None`` and not the same as ``data.dtype``.
             device: Device on which to store image data. A copy of the data is only made when
                 the data has to be copied to a different device.
+            requires_grad: If autograd should record operations on the returned image tensor.
+            pin_memory: If set, returned image tensor would be allocated in the pinned memory.
+                Works only for CPU tensors.
 
         """
-        data_ = as_tensor(data, device=device)
-        if data_.ndim < 3:
+        # DataTensor.__new__() creates the tensor subclass given arguments:
+        # data, dtype, device, requires_grad, pin_memory
+        if self.ndim < 3:
             raise ValueError("Image tensor must have at least three dimensions (C, H, W)")
-        names = image_tensor_names(data_.ndim)
-        if None in data_.names:
-            data_ = data_.refine_names(*names)  # type: ignore
-        data_: Tensor = data_.align_to(*names)  # type: ignore
-        data_ = data_.rename(None)  # named tensor support still experimental
-        super().__init__(data_)
-        self.grid_(grid or Grid(shape=data_.shape[1:]))
+        self.grid_(grid)
+
+    def _make_instance(
+        self: TImage, data: Optional[Tensor] = None, grid: Optional[Grid] = None, **kwargs
+    ) -> TImage:
+        r"""Create a new instance while preserving subclass meta-data."""
+        kwargs["grid"] = grid or self._grid
+        return super()._make_instance(data, **kwargs)
+
+    def __deepcopy__(self: TImage, memo) -> TImage:
+        if id(self) in memo:
+            return memo[id(self)]
+        result = self._make_instance(
+            self.data.clone(memory_format=torch.preserve_format),
+            grid=self._grid.clone(),
+            requires_grad=self.requires_grad,
+            pin_memory=self.is_pinned(),
+        )
+        memo[id(self)] = result
+        return result
+
+    def __torch_function__(self, func, types, args=(), kwargs=None):
+        args = [arg.as_subclass(Tensor) if isinstance(arg, Tensor) else arg for arg in args]
+        if kwargs is None:
+            kwargs = {}
+        result = func(*args, **kwargs)
+        if isinstance(result, Tensor) and result.shape == self.shape:
+            grid = self._grid
+            if func.__name__ == "clone":
+                grid = grid.clone()
+            result = self._make_instance(result, grid)
+        return result
 
     def batch(self: TImage) -> ImageBatch:
         r"""Image batch consisting of this image only.
@@ -816,63 +755,9 @@ class Image(TensorDecorator):
         object reference. No copies are made.
 
         """
-        data: Tensor = self._tensor.rename(None)
-        data = data.unsqueeze(0)
-        return ImageBatch(data=data, grid=self._grid)
-
-    @overload
-    def tensor(self: TImage, named: bool = False) -> Tensor:
-        r"""Get image data tensor."""
-        ...
-
-    @overload
-    def tensor(self: TImage, data: Array, **kwargs) -> Image:
-        r"""Get new image with given data tensor."""
-        ...
-
-    def tensor(
-        self: TImage,
-        data: Optional[Array] = None,
-        grid: Optional[Grid] = None,
-        named: bool = False,
-        device: Optional[Device] = None,
-    ) -> Union[Tensor, TImage]:
-        r"""Get data tensor or new image with given tensor, respectively."""
-        if data is None:
-            tensor = self._tensor
-            if named:
-                names = image_tensor_names(tensor.ndim)
-                tensor = tensor.refine_names(*names)
-            return tensor
-        copy = shallow_copy(self)
-        return copy.tensor_(data, grid=grid, device=device)
-
-    def tensor_(
-        self: TImage,
-        data: Array,
-        grid: Optional[Grid] = None,
-        device: Optional[Device] = None,
-    ) -> TImage:
-        r"""Change data tensor of this image."""
-        if device is None:
-            device = self.device
-        if torch.is_tensor(data):
-            data_ = as_tensor(data).to(device)
-        else:
-            data_ = torch.tensor(data, device=device)
-        if data_.ndim < 3:
-            raise ValueError("Image tensor must have at least three dimensions")
-        if grid is None:
-            grid = self._grid
-        assert data_.shape[1:] == grid.shape
-        names = image_tensor_names(data_.ndim)
-        if None in data_.names:
-            data_ = data_.refine_names(*names)  # type: ignore
-        data_: Tensor = data_.align_to(*names)  # type: ignore
-        data_ = data_.rename(None)  # named tensor support still experimental
-        self._tensor = data_
-        self._grid = grid
-        return self
+        data = self.unsqueeze(0)
+        grid = self._grid
+        return ImageBatch(data, grid)
 
     @overload
     def grid(self: TImage) -> Grid:
@@ -888,12 +773,13 @@ class Image(TensorDecorator):
         r"""Get sampling grid or image with given grid, respectively."""
         if grid is None:
             return self._grid
-        copy = shallow_copy(self)
-        return copy.grid_(grid)
+        return self._make_instance(grid=grid)
 
-    def grid_(self: TImage, grid: Grid) -> TImage:
+    def grid_(self: TImage, grid: Optional[Grid]) -> TImage:
         r"""Change image sampling grid of this image."""
-        if grid.shape != self._tensor.shape[1:]:
+        if grid is None:
+            grid = Grid(shape=self.shape[1:])
+        elif grid.shape != self.shape[1:]:
             raise ValueError("Image grid size does not match spatial dimensions of image tensor")
         self._grid = grid
         return self
@@ -902,15 +788,31 @@ class Image(TensorDecorator):
         r"""Whether image resizing operations by default preserve corner points or grid extent."""
         return self._grid.align_corners()
 
+    def center(self: TImage) -> Tensor:
+        r"""Image center in world space coordinates as tensor of shape (D,)."""
+        return self._grid.center()
+
+    def origin(self: TImage) -> Tensor:
+        r"""Image origin in world space coordinates as tensor of shape (D,)."""
+        return self._grid.origin()
+
+    def spacing(self: TImage) -> Tensor:
+        r"""Image spacing in world units as tensor of shape (D,)."""
+        return self._grid.spacing()
+
+    def direction(self: TImage) -> Tensor:
+        r"""Image direction cosines matrix as tensor of shape (D, D)."""
+        return self._grid.direction()
+
     @property
-    def ndim(self: TImage) -> int:
+    def sdim(self: TImage) -> int:
         r"""Number of spatial dimensions."""
         return self._grid.ndim
 
     @property
     def nchannels(self: TImage) -> int:
         r"""Number of image channels."""
-        return self._tensor.shape[0]
+        return self.shape[0]
 
     @classmethod
     def from_sitk(
@@ -925,7 +827,7 @@ class Image(TensorDecorator):
             raise RuntimeError(f"{cls.__name__}.from_sitk() requires SimpleITK")
         data = tensor_from_image(image, dtype=dtype, device=device)
         grid = Grid.from_sitk(image, align_corners=align_corners)
-        return cls(data=data, grid=grid)
+        return cls(data, grid)
 
     def sitk(self: TImage) -> "sitk.Image":
         r"""Create ``SimpleITK.Image`` from this image."""
@@ -935,7 +837,7 @@ class Image(TensorDecorator):
         origin = grid.origin().tolist()
         spacing = grid.spacing().tolist()
         direction = grid.direction().flatten().tolist()
-        return image_from_tensor(self._tensor, origin=origin, spacing=spacing, direction=direction)
+        return image_from_tensor(self, origin=origin, spacing=spacing, direction=direction)
 
     @classmethod
     def read(
@@ -967,68 +869,56 @@ class Image(TensorDecorator):
     def normalize(self: TImage, *args, **kwargs) -> TImage:
         r"""Normalize image intensities in [min, max]."""
         batch = self.batch()
-        return batch.normalize(*args, **kwargs)[0]
+        batch = batch.normalize(*args, **kwargs)
+        return batch[0]
 
     def normalize_(self: TImage, *args, **kwargs) -> TImage:
         r"""Normalize image intensities in [min, max]."""
         batch = self.batch()
-        other = batch.normalize_(*args, **kwargs)[0]
-        return self.tensor_(other._tensor, grid=other._grid)
+        batch = batch.normalize_(*args, **kwargs)
+        return batch[0]
+
+    def rescale(self: TImage, *args, **kwargs) -> TImage:
+        r"""Clamp and linearly rescale image values."""
+        batch = self.batch()
+        batch = batch.rescale(*args, **kwargs)
+        return batch[0]
+
+    def narrow(self: TImage, dim: int, start: int, length: int) -> TImage:
+        r"""Narrow image along specified dimension."""
+        batch = self.batch()
+        batch = batch.narrow(dim, start, length)
+        return batch[0]
 
     def resize(self: TImage, *args, **kwargs) -> TImage:
         r"""Interpolate image with specified spatial image grid size."""
         batch = self.batch()
-        return batch.resize(*args, **kwargs)[0]
-
-    def resize_(self: TImage, *args, **kwargs) -> TImage:
-        r"""Interpolate image with specified spatial image grid size."""
-        batch = self.batch()
-        other = batch.resize_(*args, **kwargs)[0]
-        return self.tensor_(other._tensor, grid=other._grid)
+        batch = batch.resize(*args, **kwargs)
+        return batch[0]
 
     def resample(self: TImage, *args, **kwargs) -> TImage:
         r"""Interpolate image with specified spacing."""
         batch = self.batch()
-        return batch.resample(*args, **kwargs)[0]
-
-    def resample_(self: TImage, *args, **kwargs) -> TImage:
-        r"""Interpolate image with specified spacing."""
-        batch = self.batch()
-        other = batch.resample_(*args, **kwargs)[0]
-        return self.tensor_(other._tensor, grid=other._grid)
+        batch = batch.resample(*args, **kwargs)
+        return batch[0]
 
     def avg_pool(self: TImage, *args, **kwargs) -> TImage:
         r"""Average pooling of image data."""
         batch = self.batch()
-        return batch.avg_pool(*args, **kwargs)[0]
-
-    def avg_pool_(self: TImage, *args, **kwargs) -> TImage:
-        r"""Average pooling of image data."""
-        batch = self.batch()
-        other = batch.avg_pool_(*args, **kwargs)[0]
-        return self.tensor_(other._tensor, grid=other._grid)
+        batch = batch.avg_pool(*args, **kwargs)
+        return batch[0]
 
     def downsample(self: TImage, *args, **kwargs) -> TImage:
         r"""Downsample image a given number of times."""
         batch = self.batch()
-        return batch.downsample(*args, **kwargs)[0]
-
-    def downsample_(self: TImage, *args, **kwargs) -> TImage:
-        r"""Downsample image a given number of times."""
-        batch = self.batch()
-        other = batch.downsample_(*args, **kwargs)[0]
-        return self.tensor_(other._tensor, grid=other._grid)
+        batch = batch.downsample(*args, **kwargs)
+        return batch[0]
 
     def upsample(self: TImage, *args, **kwargs) -> TImage:
         r"""Upsample image a given number of times."""
         batch = self.batch()
-        return batch.upsample(*args, **kwargs)[0]
-
-    def upsample_(self: TImage, *args, **kwargs) -> TImage:
-        r"""Upsample image a given number of times."""
-        batch = self.batch()
-        other = batch.upsample(*args, **kwargs)[0]
-        return self.tensor_(other._tensor, grid=other._grid)
+        batch = batch.upsample(*args, **kwargs)
+        return batch[0]
 
     def pyramid(self: TImage, levels: int, start: int = 0, **kwargs) -> Dict[int, TImage]:
         r"""Create Gaussian resolution pyramid."""
@@ -1039,68 +929,32 @@ class Image(TensorDecorator):
     def crop(self: TImage, *args, **kwargs) -> TImage:
         r"""Crop image at boundary."""
         batch = self.batch()
-        return batch.crop(*args, **kwargs)[0]
-
-    def crop_(self: TImage, *args, **kwargs) -> TImage:
-        r"""Crop image at boundary."""
-        batch = self.batch()
-        other = batch.crop_(*args, **kwargs)[0]
-        return self.tensor_(other._tensor, grid=other._grid)
-
-    def center_crop(self: TImage, *args, **kwargs) -> TImage:
-        r"""Crop image to specified maximum size."""
-        batch = self.batch()
-        return batch.center_crop(*args, **kwargs)[0]
-
-    def center_crop_(self: TImage, *args, **kwargs) -> TImage:
-        r"""Crop image to specified maximum size."""
-        batch = self.batch()
-        other = batch.center_crop_(*args, **kwargs)[0]
-        return self.tensor_(other._tensor, grid=other._grid)
+        batch = batch.crop(*args, **kwargs)
+        return batch[0]
 
     def pad(self: TImage, *args, **kwargs) -> TImage:
         r"""Pad image at boundary."""
         batch = self.batch()
-        return batch.pad(*args, **kwargs)[0]
+        batch = batch.pad(*args, **kwargs)
+        return batch[0]
 
-    def pad_(self: TImage, *args, **kwargs) -> TImage:
-        r"""Pad image at boundary."""
+    def center_crop(self: TImage, *args, **kwargs) -> TImage:
+        r"""Crop image to specified maximum size."""
         batch = self.batch()
-        other = batch.pad_(*args, **kwargs)[0]
-        return self.tensor_(other._tensor, grid=other._grid)
+        batch = batch.center_crop(*args, **kwargs)
+        return batch[0]
 
     def center_pad(self: TImage, *args, **kwargs) -> TImage:
         r"""Pad image to specified minimum size."""
         batch = self.batch()
-        return batch.center_pad(*args, **kwargs)[0]
-
-    def center_pad_(self: TImage, *args, **kwargs) -> TImage:
-        r"""Pad image to specified minimum size."""
-        batch = self.batch()
-        other = batch.center_pad_(*args, **kwargs)[0]
-        return self.tensor_(other._tensor, grid=other._grid)
+        batch = batch.center_pad(*args, **kwargs)
+        return batch[0]
 
     def conv(self: TImage, *args, **kwargs) -> TImage:
         r"""Filter image with a given (separable) kernel."""
         batch = self.batch()
-        return batch.conv(*args, **kwargs)[0]
-
-    def conv_(self: TImage, *args, **kwargs) -> TImage:
-        r"""Filter image with a given (separable) kernel."""
-        batch = self.batch()
-        other = batch.conv_(*args, **kwargs)[0]
-        return self.tensor_(other._tensor, grid=other._grid)
-
-    def rescale(self: TImage, *args, **kwargs) -> TImage:
-        r"""Clamp and linearly rescale image values."""
-        batch = self.batch()
-        return batch.rescale(*args, **kwargs)[0]
-
-    def rescale_(self: TImage, *args, **kwargs) -> TImage:
-        r"""Clamp and linearly rescale image values."""
-        batch = self.batch()
-        other = batch.rescale_(*args, **kwargs)[0]
-        return self.tensor_(other._tensor, grid=other._grid)
+        batch = batch.conv(*args, **kwargs)
+        return batch[0]
 
     @overload
     def sample(self: TImage, grid: Tensor, *args, **kwargs) -> Tensor:
@@ -1116,38 +970,21 @@ class Image(TensorDecorator):
         r"""Sample image at optionally deformed unit grid points."""
         batch = self.batch()
         if isinstance(grid, Tensor):
-            if grid.ndim == self._tensor.ndim:
+            if grid.ndim == self.sdim:
                 grid = grid.unsqueeze(0)
                 data = batch.sample(grid, *args, **kwargs)
                 assert isinstance(data, Tensor)
                 assert data.shape[0] == 1
                 data = data.squeeze(0)
-            elif grid.ndim == self._tensor.ndim + 1:
+            elif grid.ndim == self.ndim:
                 data = batch.sample(grid, *args, **kwargs)
                 assert isinstance(data, Tensor)
             else:
                 raise ValueError(
-                    f"Image.sample() 'grid' tensor must be {self._tensor.ndim}-"
-                    f" or {self._tensor.ndim + 1}-dimensional"
+                    f"{type(self).__name__}.sample() 'grid' tensor must be {self.sdim}- or {self.ndim}-dimensional"
                 )
+            assert type(data) is Tensor
             return data
-        return batch.sample(grid, *args, **kwargs)[0]
-
-    def sample_(self: TImage, grid: Grid, *args, **kwargs) -> TImage:
-        r"""Sample image at optionally deformed unit grid points."""
-        if not isinstance(grid, Grid):
-            raise TypeError(
-                "Image.sample_() 'grid' must be a Grid; maybe try Image.sample() instead"
-            )
-        batch = self.batch()
-        other = batch.sample(grid, *args, **kwargs)[0]
-        return self.tensor_(other._tensor, grid=other._grid)
-
-    def __torch_function__(self: TImage, func, types, args=(), kwargs=None) -> TImage:
-        r"""Support use of instances of this type with torch.* functions."""
-        if kwargs is None:
-            kwargs = {}
-        args = [getattr(arg, "_tensor", arg) for arg in args]
-        ret = func(*args, **kwargs)
-        cls = type(self)
-        return cls(ret, self._grid)
+        batch = batch.sample(grid, *args, **kwargs)
+        assert isinstance(batch, ImageBatch)
+        return batch[0]

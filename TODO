@@ -1,5 +1,9 @@
 Core:
+- [ ] Add `Domain` which is the oriented bounding box of the `Grid` extent ("world", "cube"/"cube_corners"; cf. `Grid.cube_extent()` which should then be `Grid.domain()`).
 - [ ] Enable `Grid` to represent a batch of sampling grids, or add `GridBatch` (cf. `Image` <-> `ImageBatch`).
+
+Data:
+- [ ] `Image.sample` function with arbitrarily shaped point set tensor (..., D).
 
 Transforms:
 - [ ] Basic data augmentations.

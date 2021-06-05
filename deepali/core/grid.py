@@ -1150,24 +1150,6 @@ class Grid(object):
             device=self.device,
         )
 
-    def center_crop(self, size: Union[int, Array], *args: int) -> Grid:
-        r"""Crop grid to specified maximum size."""
-        size_ = self._cat_scalars(size, *args)
-        if not is_int_dtype(size_.dtype):
-            raise TypeError(
-                f"Grid.center_crop() expected scalar or array of integer values, got dtype={size_.dtype}"
-            )
-        size_ = [min(m, n) for m, n in zip(self.size(), size_.tolist())]
-        origin = [(m - n) // 2 for m, n in zip(self.size(), size_)]
-        return Grid(
-            size=size_,
-            origin=self.index_to_world(origin),
-            spacing=self.spacing(),
-            direction=self.direction(),
-            align_corners=self.align_corners,
-            device=self.device,
-        )
-
     def pad(
         self,
         *args: int,
@@ -1224,6 +1206,24 @@ class Grid(object):
             device=self.device,
         )
 
+    def center_crop(self, size: Union[int, Array], *args: int) -> Grid:
+        r"""Crop grid to specified maximum size."""
+        size_ = self._cat_scalars(size, *args)
+        if not is_int_dtype(size_.dtype):
+            raise TypeError(
+                f"Grid.center_crop() expected scalar or array of integer values, got dtype={size_.dtype}"
+            )
+        size_ = [min(m, n) for m, n in zip(self.size(), size_.tolist())]
+        origin = [(m - n) // 2 for m, n in zip(self.size(), size_)]
+        return Grid(
+            size=size_,
+            origin=self.index_to_world(origin),
+            spacing=self.spacing(),
+            direction=self.direction(),
+            align_corners=self.align_corners,
+            device=self.device,
+        )
+
     def center_pad(self, size: Union[int, Array], *args: int) -> Grid:
         r"""Pad grid to specified minimum size."""
         size_ = self._cat_scalars(size, *args)
@@ -1235,6 +1235,21 @@ class Grid(object):
         origin = [-((n - m) // 2) for m, n in zip(self.size(), size_)]
         return Grid(
             size=size_,
+            origin=self.index_to_world(origin),
+            spacing=self.spacing(),
+            direction=self.direction(),
+            align_corners=self.align_corners,
+            device=self.device,
+        )
+
+    def narrow(self, dim: int, start: int, length: int) -> Grid:
+        r"""Narrow grid along specified dimension."""
+        if dim < 0 or dim > self.ndim:
+            raise IndexError("Grid.narrow() 'dim' is out of bounds")
+        size = tuple(length if d == dim else n for d, n in enumerate(self.size()))
+        origin = tuple(start if d == dim else 0 for d in range(self.ndim))
+        return Grid(
+            size=size,
             origin=self.index_to_world(origin),
             spacing=self.spacing(),
             direction=self.direction(),
