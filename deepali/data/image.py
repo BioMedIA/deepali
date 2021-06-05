@@ -16,7 +16,7 @@ except ImportError:
     sitk = None
 
 from ..core.enum import PaddingMode, Sampling
-from ..core.grid import ALIGN_CORNERS, Domain, Grid
+from ..core.grid import ALIGN_CORNERS, Axes, Grid
 from ..core import image as U
 from ..core.names import image_batch_tensor_names, image_tensor_names
 from ..core.path import unlink_or_mkdir
@@ -747,9 +747,9 @@ class ImageBatch(TensorDecorator):
         if all(grid == g for g in self._grid):
             return self
         align_corners = grid.align_corners()
-        domain = Domain.from_align_corners(align_corners)
+        axes = Axes.from_align_corners(align_corners)
         coords = grid.coords(align_corners=align_corners, device=self.device).unsqueeze(0)
-        points = [grid.transform_points(coords, domain=domain, grid=g) for g in self._grid]
+        points = [grid.transform_points(coords, axes, to_grid=g) for g in self._grid]
         points = torch.cat(points, dim=0)
         data = U.grid_sample(
             self._tensor,

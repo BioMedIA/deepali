@@ -114,7 +114,7 @@ class BSplineTransform(ParametricTransform, NonRigidTransform):
                 raise ValueError("BSplineTransform() requires 'grid.align_corners() == True'")
             if not grid.same_domain_as(current_grid):
                 raise ValueError(
-                    "{type(self).__name__}.grid_() argument must define same grid domain as current grid"
+                    f"{type(self).__name__}.grid_() argument must define same grid domain as current grid"
                 )
             subdivide_dims = []
             for i in range(grid.ndim):
@@ -122,7 +122,7 @@ class BSplineTransform(ParametricTransform, NonRigidTransform):
                     subdivide_dims.append(2 + i)
                 elif grid.shape[i] != current_grid.shape[i]:
                     raise ValueError(
-                        "{type(self).__name__}.grid_() argument must have same size or new size '2n - 1'"
+                        f"{type(self).__name__}.grid_() argument must have same size or new size '2n - 1'"
                     )
             if subdivide_dims:
                 self.data_(U.subdivide_cubic_bspline(params, dims=subdivide_dims))

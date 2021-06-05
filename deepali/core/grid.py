@@ -32,8 +32,8 @@ DTYPE = torch.float
 DEVICE = torch.device("cpu")
 
 
-class Domain(Enum):
-    r"""Enumeration of grid domains with respect to which grid coordinates are defined."""
+class Axes(Enum):
+    r"""Enumeration of grid axes with respect to which grid coordinates are defined."""
 
     # Oriented along grid axes with units corresponding to voxel units with origin
     # with respect to world space at grid/image point with zero indices.
@@ -53,19 +53,19 @@ class Domain(Enum):
     WORLD = "world"
 
     @classmethod
-    def from_arg(cls, arg: Union[Domain, str, None]) -> Domain:
+    def from_arg(cls, arg: Union[Axes, str, None]) -> Axes:
         r"""Create enumeration value from function argument."""
         if arg is None or arg == "default":
             return cls.CUBE
         return cls(arg)
 
     @classmethod
-    def from_grid(cls, grid) -> Domain:
+    def from_grid(cls, grid) -> Axes:
         r"""Create enumeration value from sampling grid object."""
         return cls.from_align_corners(grid.align_corners())
 
     @classmethod
-    def from_align_corners(cls, align_corners: bool) -> Domain:
+    def from_align_corners(cls, align_corners: bool) -> Axes:
         r"""Create enumeration value from sampling grid object."""
         return cls.CUBE_CORNERS if align_corners else cls.CUBE
 
@@ -89,7 +89,7 @@ class Grid(object):
     In addition, ``Grid.points()``, ``Grid.transform()`` and ``Grid.transform_points()`` support point
     coordinates with respect to different domains, i.e., (continuous) grid indices as used for example
     by SimpleITK, world space coordinates, and the grid-aligned unit cube with side length 2 with cube
-    center at the ``Grid.center()``. This ``Domain.CUBE`` makes grid point coordinates independent of
+    center at the ``Grid.center()``. This ``Axes.CUBE`` makes grid point coordinates independent of
     ``Grid.size()`` and ``Grid.spacing()``. These normalized grid coordinates are furthermore compatible
     with the ``grid`` argument of ``torch.nn.functional.grid_sample()``.
 
@@ -269,9 +269,9 @@ class Grid(object):
         self._align_corners = bool(arg)
         return self
 
-    def domain(self) -> Domain:
-        r"""Grid domain."""
-        return Domain.from_grid(self)
+    def axes(self) -> Axes:
+        r"""Grid axes."""
+        return Axes.from_grid(self)
 
     def dim(self) -> int:
         r"""Number of spatial grid dimensions."""
@@ -421,27 +421,27 @@ class Grid(object):
         return self
 
     def affine(self) -> Tensor:
-        r"""Affine transformation from ``Domain.GRID`` to ``Domain.WORLD``, excluding translation of origin."""
+        r"""Affine transformation from ``Axes.GRID`` to ``Axes.WORLD``, excluding translation of origin."""
         return torch.mm(self.direction(), torch.diag(self.spacing()))
 
     def inverse_affine(self) -> Tensor:
-        r"""Affine transformation from ``Domain.WORLD`` to ``Domain.GRID``, excluding translation of origin."""
+        r"""Affine transformation from ``Axes.WORLD`` to ``Axes.GRID``, excluding translation of origin."""
         one = torch.tensor(1, dtype=self.dtype, device=self.device)
         return torch.mm(torch.diag(one / self.spacing()), self.direction().t())
 
     def transform(
         self,
-        domain: Domain,
-        codomain: Optional[Domain] = None,
-        grid: Optional[Grid] = None,
+        axes: Axes,
+        to_axes: Optional[Axes] = None,
+        to_grid: Optional[Grid] = None,
         vectors: bool = False,
     ) -> Tensor:
         r"""Transformation from one grid domain to another.
 
         Args:
-            domain: Target domain defined by this grid.
-            codomain: Source domain defined by ``grid``. If ``None``, use ``domain``.
-            grid: Grid of ``codomain``. If ``None``, ``grid=self``.
+            axes: Target coordinate axes defined by this grid.
+            to_axes: Source coordinate axes defined by ``grid``. If ``None``, use ``axes``.
+            to_grid: Grid of ``to_axes``. If ``None``, ``to_grid=self``.
             vectors: Whether transformation is used to rescale and reorient vectors.
 
         Returns:
@@ -450,132 +450,130 @@ class Grid(object):
 
         """
         matrix = None
-        domain = Domain(domain)
-        codomain = domain if codomain is None else Domain(codomain)
-        if grid is None or grid == self:
-            if domain == codomain:
+        axes = Axes(axes)
+        to_axes = axes if to_axes is None else Axes(to_axes)
+        if to_grid is None or to_grid == self:
+            if axes is to_axes:
                 matrix = torch.eye(self.ndim, dtype=self.dtype, device=self.device)
                 if not vectors:
                     offset = torch.zeros(self.ndim, dtype=self.dtype, device=self.device)
                     matrix = homogeneous_matrix(matrix, offset=offset)
-            elif domain == Domain.GRID:
-                if codomain == Domain.CUBE:
+            elif axes is Axes.GRID:
+                if to_axes is Axes.CUBE:
                     size = self.size_tensor()
                     matrix = torch.diag(2 / size)
                     if not vectors:
                         one = torch.tensor(1, dtype=size.dtype, device=size.device)
                         matrix = homogeneous_matrix(matrix, offset=one / size - one)
-                elif codomain == Domain.CUBE_CORNERS:
+                elif to_axes is Axes.CUBE_CORNERS:
                     size = self.size_tensor()
                     matrix = torch.diag(2 / (size - 1))
                     if not vectors:
                         offset = torch.tensor(-1, dtype=size.dtype, device=size.device)
                         matrix = homogeneous_matrix(matrix, offset=offset)
-                elif codomain == Domain.WORLD:
+                elif to_axes is Axes.WORLD:
                     matrix = self.affine()
                     if not vectors:
                         matrix = homogeneous_matrix(matrix, offset=self.origin())
-            elif domain == Domain.CUBE:
-                if codomain == Domain.CUBE_CORNERS:
+            elif axes is Axes.CUBE:
+                if to_axes is Axes.CUBE_CORNERS:
                     size = self.size_tensor()
                     matrix = torch.diag(size / (size - 1))
-                elif codomain == Domain.GRID:
+                elif to_axes is Axes.GRID:
                     half_size = 0.5 * self.size_tensor()
                     matrix = torch.diag(half_size)
                     if not vectors:
                         matrix = homogeneous_matrix(matrix, offset=half_size - 0.5)
-                elif codomain == Domain.WORLD:
-                    cube_to_grid = self.transform(domain, Domain.GRID, vectors=vectors)
-                    grid_to_world = self.transform(Domain.GRID, Domain.WORLD, vectors=vectors)
+                elif to_axes is Axes.WORLD:
+                    cube_to_grid = self.transform(axes, Axes.GRID, vectors=vectors)
+                    grid_to_world = self.transform(Axes.GRID, Axes.WORLD, vectors=vectors)
                     if vectors:
                         matrix = torch.mm(grid_to_world, cube_to_grid)
                     else:
                         matrix = hmm(grid_to_world, cube_to_grid)
-            elif domain == Domain.CUBE_CORNERS:
-                if codomain == Domain.CUBE:
+            elif axes is Axes.CUBE_CORNERS:
+                if to_axes is Axes.CUBE:
                     size = self.size_tensor()
                     matrix = torch.diag((size - 1) / size)
-                elif codomain == Domain.GRID:
+                elif to_axes is Axes.GRID:
                     scales = 0.5 * (self.size_tensor() - 1)
                     matrix = torch.diag(scales)
                     if not vectors:
                         matrix = homogeneous_matrix(matrix, offset=scales)
-                elif codomain == Domain.WORLD:
-                    interim = Domain.GRID
-                    cube_to_grid = self.transform(domain, interim, vectors=vectors)
-                    grid_to_world = self.transform(interim, codomain, vectors=vectors)
+                elif to_axes is Axes.WORLD:
+                    interim = Axes.GRID
+                    cube_to_grid = self.transform(axes, interim, vectors=vectors)
+                    grid_to_world = self.transform(interim, to_axes, vectors=vectors)
                     if vectors:
                         matrix = torch.mm(grid_to_world, cube_to_grid)
                     else:
                         matrix = hmm(grid_to_world, cube_to_grid)
-            elif domain == Domain.WORLD:
-                if codomain == Domain.CUBE or codomain == Domain.CUBE_CORNERS:
-                    interim = Domain.GRID
-                    world_to_grid = self.transform(domain, interim, vectors=vectors)
-                    grid_to_cube = self.transform(interim, codomain, vectors=vectors)
+            elif axes is Axes.WORLD:
+                if to_axes is Axes.CUBE or to_axes is Axes.CUBE_CORNERS:
+                    interim = Axes.GRID
+                    world_to_grid = self.transform(axes, interim, vectors=vectors)
+                    grid_to_cube = self.transform(interim, to_axes, vectors=vectors)
                     if vectors:
                         matrix = torch.mm(grid_to_cube, world_to_grid)
                     else:
                         matrix = hmm(grid_to_cube, world_to_grid)
-                elif codomain == Domain.GRID:
+                elif to_axes is Axes.GRID:
                     matrix = self.inverse_affine()
                     if not vectors:
                         matrix = hmm(matrix, -self.origin())
-        elif grid.ndim != self.ndim:
-            raise ValueError(f"Grid.transform() 'grid' must have {self.ndim} spatial dimensions")
+        elif to_grid.ndim != self.ndim:
+            raise ValueError(f"Grid.transform() 'to_grid' must have {self.ndim} spatial dimensions")
         else:
-            target_to_world = self.transform(domain, Domain.WORLD, vectors=vectors)
-            world_to_source = grid.transform(Domain.WORLD, codomain, vectors=vectors)
+            target_to_world = self.transform(axes, Axes.WORLD, vectors=vectors)
+            world_to_source = to_grid.transform(Axes.WORLD, to_axes, vectors=vectors)
             if vectors:
                 matrix = torch.mm(world_to_source, target_to_world)
             else:
                 matrix = hmm(world_to_source, target_to_world)
         if matrix is None:
-            raise NotImplementedError(
-                f"Grid.transform() for domain={domain} and codomain={codomain}"
-            )
+            raise NotImplementedError(f"Grid.transform() for axes={axes} and to_axes={to_axes}")
         return matrix
 
     def transform_points(
         self,
         points: Array,
-        domain: Domain,
-        codomain: Optional[Domain] = None,
-        grid: Optional[Grid] = None,
+        axes: Axes,
+        to_axes: Optional[Axes] = None,
+        to_grid: Optional[Grid] = None,
         decimals: Optional[int] = -1,
     ) -> Tensor:
         r"""Map point coordinates from one grid domain to another.
 
         Args:
             points: List of points to transform as tensor of shape ``(..., D)``.
-            domain: Coordinate system with respect to which ``points`` are defined.
-            codomain: Coordinate system to which ``points`` should be mapped to. If ``None``, use ``domain``.
-            grid: Grid with respect to which ``codomain`` is defined. If ``None``, the target
+            axes: Coordinate axes with respect to which ``points`` are defined.
+            to_axes: Coordinate axes to which ``points`` should be mapped to. If ``None``, use ``axes``.
+            to_grid: Grid with respect to which the codomain to defined. If ``None``, the target
                 and source sampling grids are assumed to be identical.
             decimals: If positive or zero, number of digits right of the decimal point to round to.
-                When mapping points to codomain ``Domain.GRID``, ``Domain.CUBE``, or ``Domain.CUBE_CORNERS``,
+                When mapping points to codomain ``Axes.GRID``, ``Axes.CUBE``, or ``Axes.CUBE_CORNERS``,
                 this function by default (``decimals=-1``) rounds the transformed coordinates.
                 Explicitly set ``decimals=None`` to suppress this default rounding.
 
         Returns:
-            Point coordinates in ``domain`` mapped to coordinates with respect to ``codomain``.
+            Point coordinates in ``axes`` mapped to coordinates with respect to ``to_axes``.
 
         """
-        domain = Domain(domain)
-        codomain = domain if codomain is None else Domain(codomain)
+        axes = Axes(axes)
+        to_axes = axes if to_axes is None else Axes(to_axes)
         points_ = as_tensor(points)
         if not torch.is_floating_point(points_):
             points_ = points_.type(self.dtype)
-        if (grid is not None and grid != self) or domain != codomain:
-            matrix = self.transform(domain, codomain, grid=grid, vectors=False)
+        if (to_grid is not None and to_grid != self) or axes is not to_axes:
+            matrix = self.transform(axes, to_axes, to_grid=to_grid, vectors=False)
             matrix = matrix.unsqueeze(0).to(device=points_.device)
             result = homogeneous_transform(matrix, points_)
         else:
             result = points_
         if decimals == -1:
-            if codomain == Domain.CUBE or codomain == Domain.CUBE_CORNERS:
+            if to_axes is Axes.CUBE or to_axes is Axes.CUBE_CORNERS:
                 decimals = 12
-            elif codomain == Domain.GRID:
+            elif to_axes is Axes.GRID:
                 decimals = 6
         if decimals is not None and decimals >= 0:
             result = round_decimals(result, decimals=decimals)
@@ -584,55 +582,55 @@ class Grid(object):
     def transform_vectors(
         self,
         vectors: Array,
-        domain: Domain,
-        codomain: Optional[Domain] = None,
-        grid: Optional[Grid] = None,
+        axes: Axes,
+        to_axes: Optional[Axes] = None,
+        to_grid: Optional[Grid] = None,
     ) -> Tensor:
         r"""Rescale and reorient flow vectors.
 
         Args:
             vectors: Batch of displacement vectors of shape ``(..., D)``.
-            domain: Coordinate system with respect to which ``vectors`` are defined.
-            codomain: Coordinate system to which ``vectors`` should be mapped to. If ``None``, use ``domain``.
-            grid: Grid with respect to which ``codomain`` is defined. If ``None``, the target
+            axes: Coordinate axes with respect to which ``vectors`` are defined.
+            to_axes: Coordinate axes to which ``vectors`` should be mapped to. If ``None``, use ``axes``.
+            to_grid: Grid with respect to which ``to_axes`` is defined. If ``None``, the target
                 and source sampling grids are assumed to be identical.
 
         Returns:
-            Rescaled and reoriented vectors. If ``grid == self`` and ``domain == codomain``,
+            Rescaled and reoriented vectors. If ``to_grid == self`` and ``to_axes == axes``,
             a reference to the unmodified input ``vectors`` tensor is returned.
 
         """
-        domain = Domain(domain)
-        codomain = domain if codomain is None else Domain(codomain)
+        axes = Axes(axes)
+        to_axes = axes if to_axes is None else Axes(to_axes)
         vectors_ = as_tensor(vectors)
         if not torch.is_floating_point(vectors_):
             vectors_ = vectors_.type(self.dtype)
-        if domain == Domain.WORLD and codomain == Domain.WORLD:
+        if axes is Axes.WORLD and to_axes is Axes.WORLD:
             return vectors_
-        if grid is None or grid == self:
-            if domain != codomain:
+        if to_grid is None or to_grid == self:
+            if axes is not to_axes:
                 affine = None  # affine transform required if reorientation needed
                 scales = None  # otherwise, just scaling of displacements suffices
-                if domain == Domain.WORLD:
+                if axes is Axes.WORLD:
                     affine = self.inverse_affine()
-                elif domain == Domain.CUBE:
+                elif axes is Axes.CUBE:
                     scales = self.size_tensor() / 2
-                elif domain == Domain.CUBE_CORNERS:
+                elif axes is Axes.CUBE_CORNERS:
                     scales = (self.size_tensor() - 1) / 2
-                elif domain != Domain.GRID:
+                elif axes is not Axes.GRID:
                     raise NotImplementedError(
-                        f"Grid.transform_vectors() for domain={domain} and codomain={codomain}"
+                        f"Grid.transform_vectors() for axes={axes} and to_axes={to_axes}"
                     )
-                if codomain == Domain.WORLD:
+                if to_axes is Axes.WORLD:
                     grid_to_world = self.affine()
                     if scales is None:
                         assert affine is None
                         affine = grid_to_world
                     else:
                         affine = torch.mm(grid_to_world, torch.diag(scales))
-                elif codomain == Domain.CUBE or codomain == Domain.CUBE_CORNERS:
+                elif to_axes is Axes.CUBE or to_axes is Axes.CUBE_CORNERS:
                     num = self.size_tensor()
-                    if codomain == Domain.CUBE_CORNERS:
+                    if to_axes is Axes.CUBE_CORNERS:
                         num -= 1
                     grid_to_cube = 2 / num
                     if affine is None:
@@ -642,9 +640,9 @@ class Grid(object):
                             scales *= grid_to_cube
                     else:
                         affine = torch.mm(torch.diag(grid_to_cube), affine)
-                elif codomain != Domain.GRID:
+                elif to_axes is not Axes.GRID:
                     raise NotImplementedError(
-                        f"Grid.transform_vectors() for domain={domain} and codomain={codomain}"
+                        f"Grid.transform_vectors() for axes={axes} and to_axes={to_axes}"
                     )
                 if affine is None:
                     assert scales is not None
@@ -655,7 +653,7 @@ class Grid(object):
                     tensor = vectors_.reshape(-1, vectors_.shape[-1])
                     vectors_ = F.linear(tensor, affine).reshape(vectors_.shape)
         else:
-            matrix = self.transform(domain, codomain, grid=grid, vectors=True)
+            matrix = self.transform(axes, to_axes, to_grid=to_grid, vectors=True)
             matrix = matrix.to(dtype=vectors_.dtype, device=vectors_.device)
             vectors_ = homogeneous_transform(matrix, vectors_, vectors=True)
         return vectors_
@@ -669,7 +667,7 @@ class Grid(object):
             indices: List of grid point indices to transform as tensor of shape ``(N, D)``.
             decimals: If positive or zero, number of digits right of the decimal point to round to.
             align_corners: Whether output cube coordinates should be with respect to
-                ``Domain.CUBE_CORNERS`` (True) or ``Domain.CUBE`` (False), respectively.
+                ``Axes.CUBE_CORNERS`` (True) or ``Axes.CUBE`` (False), respectively.
                 If ``None``, use default ``self.align_corners()``.
 
         Returns:
@@ -678,8 +676,8 @@ class Grid(object):
         """
         if align_corners is None:
             align_corners = self._align_corners
-        codomain = Domain.CUBE_CORNERS if align_corners else Domain.CUBE
-        return self.transform_points(indices, Domain.GRID, codomain, decimals=decimals)
+        to_axes = Axes.from_align_corners(align_corners)
+        return self.transform_points(indices, axes=Axes.GRID, to_axes=to_axes, decimals=decimals)
 
     def cube_to_index(
         self, coords: Array, decimals: int = -1, align_corners: Optional[bool] = None
@@ -689,8 +687,8 @@ class Grid(object):
         Args:
             coords: List of unit grid points to transform as tensor of shape ``(N, D)``.
             decimals: If positive or zero, number of digits right of the decimal point to round to.
-            align_corners: Whether ``coords`` are with respect to ``Domain.CUBE_CORNERS`` (True)
-                or ``Domain.CUBE`` (False), respectively. If ``None``, use default ``self.align_corners()``.
+            align_corners: Whether ``coords`` are with respect to ``Axes.CUBE_CORNERS`` (True)
+                or ``Axes.CUBE`` (False), respectively. If ``None``, use default ``self.align_corners()``.
 
         Returns:
             Points in grid-aligned unit cube transformed to grid indices.
@@ -698,8 +696,8 @@ class Grid(object):
         """
         if align_corners is None:
             align_corners = self._align_corners
-        domain = Domain.CUBE_CORNERS if align_corners else Domain.CUBE
-        return self.transform_points(coords, domain, Domain.GRID, decimals=decimals)
+        axes = Axes.from_align_corners(align_corners)
+        return self.transform_points(coords, axes=axes, to_axes=Axes.GRID, decimals=decimals)
 
     def index_to_world(self, indices: Array, decimals: int = -1) -> Tensor:
         r"""Map points from grid indices to world coordinates.
@@ -712,7 +710,7 @@ class Grid(object):
             Grid point indices transformed to points in world space.
 
         """
-        return self.transform_points(indices, Domain.GRID, Domain.WORLD, decimals=decimals)
+        return self.transform_points(indices, axes=Axes.GRID, to_axes=Axes.WORLD, decimals=decimals)
 
     def world_to_index(self, points: Array, decimals: int = -1) -> Tensor:
         r"""Map points from world coordinates to grid point indices.
@@ -725,7 +723,7 @@ class Grid(object):
             Points in world space transformed to grid indices.
 
         """
-        return self.transform_points(points, Domain.WORLD, Domain.GRID, decimals=decimals)
+        return self.transform_points(points, axes=Axes.WORLD, to_axes=Axes.GRID, decimals=decimals)
 
     def cube_to_world(
         self, coords: Array, decimals: int = -1, align_corners: Optional[bool] = None
@@ -735,8 +733,8 @@ class Grid(object):
         Args:
             coords: List of unit grid points to transform as tensor of shape ``(N, D)``.
             decimals: If positive or zero, number of digits right of the decimal point to round to.
-            align_corners: Whether ``coords`` are with respect to ``Domain.CUBE_CORNERS`` (True)
-                or ``Domain.CUBE`` (False), respectively. If ``None``, use default ``self.align_corners()``.
+            align_corners: Whether ``coords`` are with respect to ``Axes.CUBE_CORNERS`` (True)
+                or ``Axes.CUBE`` (False), respectively. If ``None``, use default ``self.align_corners()``.
 
         Returns:
             Unit grid coordinates transformed to points in world space.
@@ -744,8 +742,8 @@ class Grid(object):
         """
         if align_corners is None:
             align_corners = self._align_corners
-        domain = Domain.CUBE_CORNERS if align_corners else Domain.CUBE
-        return self.transform_points(coords, domain, Domain.WORLD, decimals=decimals)
+        axes = Axes.from_align_corners(align_corners)
+        return self.transform_points(coords, axes=axes, to_axes=Axes.WORLD, decimals=decimals)
 
     def world_to_cube(
         self, points: Array, decimals: int = -1, align_corners: Optional[bool] = None
@@ -756,7 +754,7 @@ class Grid(object):
             points: List of points to transform as tensor of shape ``(N, D)``.
             decimals: If positive or zero, number of digits right of the decimal point to round to.
             align_corners: Whether output cube coordinates should be with respect to
-                ``Domain.CUBE_CORNERS`` (True) or ``Domain.CUBE`` (False), respectively.
+                ``Axes.CUBE_CORNERS`` (True) or ``Axes.CUBE`` (False), respectively.
                 If ``None``, use default ``self.align_corners()``.
 
         Returns:
@@ -765,12 +763,12 @@ class Grid(object):
         """
         if align_corners is None:
             align_corners = self._align_corners
-        codomain = Domain.CUBE_CORNERS if align_corners else Domain.CUBE
-        return self.transform_points(points, Domain.WORLD, codomain, decimals=decimals)
+        to_axes = Axes.from_align_corners(align_corners)
+        return self.transform_points(points, axes=Axes.WORLD, to_axes=to_axes, decimals=decimals)
 
     def coords(
         self,
-        axis: Optional[int] = None,
+        dim: Optional[int] = None,
         center: bool = False,
         normalize: bool = True,
         align_corners: Optional[bool] = None,
@@ -781,9 +779,9 @@ class Grid(object):
         r"""Get tensor of grid point coordinates.
 
         Args:
-            axis: Return coordinates for specified dimension, where ``axis=0`` refers to
-                the first grid dimension, the ``x`` axis.
-            center: Whether to center ``Domain.GRID`` coordinates when ``normalize=False``.
+            dim: Return coordinates for specified dimension, where ``dim=0`` refers to
+                the first grid dimension, i.e., the ``x`` axis.
+            center: Whether to center ``Axes.GRID`` coordinates when ``normalize=False``.
             normalize: Normalize coordinates to grid-aligned unit cube with side length 2.
                 The normalized grid point coordinates are in the closed interval ``[-1, +1]``.
             align_corners: If ``normalize=True``, specifies whether the extrema ``(-1, 1)``
@@ -799,7 +797,7 @@ class Grid(object):
             device: Device on which to create PyTorch tensor. If ``None``, use ``self.device``.
 
         Returns:
-            If ``axis`` is ``None``, returns a tensor of shape (...X, C), where C is the number of
+            If ``dim`` is ``None``, returns a tensor of shape (...X, C), where C is the number of
                 spatial grid dimensions. If ``normalize=Falze`` and ``center=False``, the tensor values
                 are the multi-dimensional indices in the closed-open interval [0, n) for each grid dimension,
                 where n is the number of points in the respective dimension. The first channel with index 0
@@ -807,7 +805,7 @@ class Grid(object):
                 such that index 0 corresponds to the grid center point. If ``normalize=True``, the centered
                 coordinates are normalized to ``(-1, 1)``, where the extrema either correspond to the corner
                 points of the grid (``align_corners=True``) or the grid boundary edges (``align_cornes=False``).
-            If ``axis`` is not ``None``, a 1D tensor with the coordinates for this grid axis is returned.
+            If ``dim`` is not ``None``, a 1D tensor with the coordinates for this grid axis is returned.
 
         """
         if align_corners is None:
@@ -819,14 +817,14 @@ class Grid(object):
                 dtype = torch.int32
         if device is None:
             device = self.device
-        if axis is None:
+        if dim is None:
             shape = self.shape  # order (...X), do NOT use self.size() here!
         else:
-            shape = torch.Size((self.size()[axis],))  # axis may be negative
+            shape = torch.Size((self.size()[dim],))  # dim may be negative
         if shape.numel() == 0:
             return torch.empty(shape, dtype=dtype, device=device)
         coords = []
-        for i, n in enumerate(shape):
+        for n in shape:
             if n == 1:
                 coord = torch.tensor([0], dtype=dtype, device=device)
             elif normalize:
@@ -850,19 +848,20 @@ class Grid(object):
 
     def points(
         self,
-        domain: Domain = Domain.WORLD,
+        axes: Axes = Axes.WORLD,
         dtype: Optional[torch.dtype] = None,
         device: Optional[Device] = None,
     ) -> Tensor:
-        r"""Tensor of grid point coordinates with respect to specified domain."""
+        r"""Tensor of grid point coordinates with respect to specified coordinate axes."""
+        axes = Axes(axes)
         coords = self.coords(
-            normalize=(domain == Domain.CUBE),
+            normalize=(axes is Axes.CUBE),
             align_corners=False,
             dtype=dtype,
             device=device,
         )
-        if domain != Domain.CUBE and domain != Domain.GRID:
-            coords = self.transform_points(coords, Domain.GRID, domain)
+        if axes is not Axes.CUBE and axes is not Axes.GRID:
+            coords = self.transform_points(coords, Axes.GRID, to_axes=axes)
         return coords
 
     def _resize(self, size: Tensor, align_corners: Optional[bool] = None) -> Grid:
@@ -1300,57 +1299,53 @@ class Grid(object):
         )
 
 
-def grid_points_transform(
-    target: Grid, domain: Domain, source: Grid, codomain: Optional[Domain] = None
-):
+def grid_points_transform(grid: Grid, axes: Axes, to_grid: Grid, to_axes: Optional[Axes] = None):
     r"""Get linear transformation of points from one grid domain to another.
 
     Args:
-        target: Sampling grid with respect to which input points are defined.
-        domain: Domain of ``target`` grid with respect to which input points are defined.
-        source: Sampling grid with respect to which output points are defined.
-        codomain: Domain of ``source`` grid with respect to which output points are defined.
+        grid: Sampling grid with respect to which input points are defined.
+        axes: Grid axes with respect to which input points are defined.
+        to_grid: Sampling grid with respect to which output points are defined.
+        to_axes: Grid axes with respect to which output points are defined.
 
     Returns:
         Homogeneous coordinate transformation matrix as tensor of shape ``(D, D + 1)``.
 
     """
-    return target.transform(domain=domain, codomain=codomain, grid=source, vectors=False)
+    return grid.transform(axes=axes, to_axes=to_axes, to_grid=to_grid, vectors=False)
 
 
-def grid_vectors_transform(
-    target: Grid, domain: Domain, source: Grid, codomain: Optional[Domain] = None
-):
+def grid_vectors_transform(grid: Grid, axes: Axes, to_grid: Grid, to_axes: Optional[Axes] = None):
     r"""Get affine transformation which maps vectors with respect to one grid domain to another.
 
     Args:
-        target: Sampling grid with respect to which input vectors are defined.
-        domain: Domain of ``target`` grid with respect to which input vectors are defined.
-        source: Sampling grid with respect to which output vectors are defined.
-        codomain: Domain of ``source`` grid with respect to which output vectors are defined.
+        grid: Sampling grid with respect to which input vectors are defined.
+        axes: Grid axes with respect to which input vectors are defined.
+        to_grid: Sampling grid with respect to which output vectors are defined.
+        to_axes: Grid axes with respect to which output vectors are defined.
 
     Returns:
         Affine transformation matrix as tensor of shape ``(D, D)``.
 
     """
-    return target.transform(domain=domain, codomain=codomain, grid=source, vectors=True)
+    return grid.transform(axes=axes, to_axes=to_axes, to_grid=to_grid, vectors=True)
 
 
 def grid_transform_points(
     points: Tensor,
-    target: Grid,
-    domain: Domain,
-    source: Grid,
-    codomain: Optional[Domain] = None,
+    grid: Grid,
+    axes: Axes,
+    to_grid: Grid,
+    to_axes: Optional[Axes] = None,
 ):
-    return target.transform_points(points, domain=domain, codomain=codomain, grid=source)
+    return grid.transform_points(points, axes=axes, to_axes=to_axes, to_grid=to_grid)
 
 
 def grid_transform_vectors(
     vectors: Tensor,
-    target: Grid,
-    domain: Domain,
-    source: Grid,
-    codomain: Optional[Domain] = None,
+    grid: Grid,
+    axes: Axes,
+    to_grid: Grid,
+    to_axes: Optional[Axes] = None,
 ):
-    return target.transform_vectors(vectors, domain=domain, codomain=codomain, grid=source)
+    return grid.transform_vectors(vectors, axes=axes, to_axes=to_axes, to_grid=to_grid)

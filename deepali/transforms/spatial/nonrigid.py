@@ -9,7 +9,7 @@ import torch
 from torch import Tensor
 from torch.nn import init
 
-from ...core.grid import Domain, Grid
+from ...core.grid import Axes, Grid
 from ...data.flow import FlowFields
 from ...modules import ExpFlow
 
@@ -78,12 +78,12 @@ class DenseVectorFieldTransform(ParametricTransform, NonRigidTransform):
         params = self.params
         if isinstance(params, Tensor):
             prev_grid = self._grid
-            grid_domain = Domain.from_grid(grid)
-            flow_domain = self.domain()
+            grid_axes = Axes.from_grid(grid)
+            flow_axes = self.axes()
             flow_grid = prev_grid.reshape(params.shape[2:])
-            flow = FlowFields(params, domain=flow_domain, grid=flow_grid)
+            flow = FlowFields(params, grid=flow_grid, axes=flow_axes)
             flow = flow.sample(grid)
-            flow = flow.domain(grid_domain)
+            flow = flow.axes(grid_axes)
             # Change self._grid before self.data_() as it defines self.data_shape
             super().grid_(grid)
             try:
@@ -121,7 +121,7 @@ class DisplacementFieldTransform(DenseVectorFieldTransform):
             grid = self.grid().resize(self.data_shape[:1:-1])
         flow = flow.to(self.device)
         flow = flow.sample(grid)
-        flow = flow.domain(Domain.from_grid(grid))
+        flow = flow.axes(Axes.from_grid(grid))
         if callable(params):
             self._fit(flow, **kwargs)
         else:

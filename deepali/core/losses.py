@@ -489,13 +489,13 @@ def inverse_consistency_loss(
     r"""Evaluate inverse consistency error.
 
     This function expects forward and inverse coordinate maps to be with respect to the unit cube
-    of side length 2 as defined by the domain and codomain ``grid`` (cf. ``Grid.domain()``).
+    of side length 2 as defined by the domain and codomain ``grid`` (see also ``Grid.axes()``).
 
     Args:
         forward: Tensor representation of spatial transformation.
         inverse: Tensor representation of inverse transformation.
         grid: Coordinate domain and codomain of forward transformation.
-        margin: Number of ``domain`` points to ignore when computing mean error. If type of the
+        margin: Number of ``grid`` points to ignore when computing mean error. If type of the
             argument is ``int``, this number of points are dropped at each boundary in each dimension.
             If a ``float`` value is given, it must be in [0, 1) and denote the percentage of sampling
             points to drop at each border. Inverse consistency of points near the domain boundary is

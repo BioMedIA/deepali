@@ -236,7 +236,7 @@ def transform_grid(transform: Tensor, grid: Tensor, align_corners: bool = ALIGN_
             If batch size is one, but multiple flow fields are given, this single point set is
             transformed by each non-rigid transformation to produce ``N`` output point sets.
         align_corners: Whether flow vectors in case of a non-rigid transformation are with respect to
-            ``Domain.CUBE`` (False) or ``Domain.CUBE_CORNERS`` (True). The input ``grid`` points must be
+            ``Axes.CUBE`` (False) or ``Axes.CUBE_CORNERS`` (True). The input ``grid`` points must be
             with respect to the same spatial grid domain as the input flow fields. This option is in
             particular passed on to the ``grid_reshape()`` function used to resize the flow fields to
             the shape of the input grid.
@@ -284,7 +284,7 @@ def transform_points(
             If batch size is one, but multiple flow fields are given, this single point set is
             transformed by each non-rigid transformation to produce ``N`` output point sets.
         align_corners: Whether flow vectors in case of a non-rigid transformation are with respect to
-            ``Domain.CUBE`` (False) or ``Domain.CUBE_CORNERS`` (True). The input ``points`` must be
+            ``Axes.CUBE`` (False) or ``Axes.CUBE_CORNERS`` (True). The input ``points`` must be
             with respect to the same spatial grid domain as the input flow fields. This option is in
             particular passed on to the ``grid_sample()`` function used to sample the flow vectors at
             the input points.

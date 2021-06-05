@@ -14,7 +14,7 @@ from torch.nn import Module
 import torch.nn.functional as F
 
 from ...core import functional as U
-from ...core.grid import Domain, Grid
+from ...core.grid import Axes, Grid
 from ...core.linalg import as_homogeneous_matrix
 from ...core.types import Device
 from ...data.flow import FlowFields
@@ -53,8 +53,8 @@ class SpatialTransform(DeviceProperty, Module, metaclass=ABCMeta):
     of the transformation. In this special case, a simple interpolation to resize the vector field
     to the size of the input tensor is used. In case of a ``LinearTransform``, ``y = Ax + t``.
 
-    The unit cube domain is ``Domain.CUBE`` if ``grid.align_corners() == False``,
-    and ``Domain.CUBE_CORNERS`` otherwise.
+    The unit cube domain is ``Axes.CUBE`` if ``grid.align_corners() == False``,
+    and ``Axes.CUBE_CORNERS`` otherwise.
 
     """
 
@@ -127,14 +127,14 @@ class SpatialTransform(DeviceProperty, Module, metaclass=ABCMeta):
         r"""Whether extrema -1 and 1 coincide with grid border (False) or corner points (True)."""
         return self._grid.align_corners()
 
-    def domain(self) -> Domain:
-        """Domain with respect to which transformation is defined.
+    def axes(self) -> Axes:
+        """Axes with respect to which transformation is defined.
 
         Returns:
-            ``Domain.CUBE_CORNERS if self.align_corners() else Domain.CUBE``.
+            ``Axes.CUBE_CORNERS if self.align_corners() else Axes.CUBE``.
 
         """
-        return Domain.from_align_corners(self.align_corners())
+        return Axes.from_align_corners(self.align_corners())
 
     @overload
     def grid(self) -> Grid:
@@ -196,7 +196,7 @@ class SpatialTransform(DeviceProperty, Module, metaclass=ABCMeta):
         grid = self.grid()
         flow = flow.to(self.device)
         flow = flow.sample(grid)
-        flow = flow.domain(Domain.from_grid(grid))
+        flow = flow.axes(Axes.from_grid(grid))
         self._fit(flow, **kwargs)
         return self
 
@@ -209,7 +209,7 @@ class SpatialTransform(DeviceProperty, Module, metaclass=ABCMeta):
 
         Args:
             flow: Batch of flow vector fields sampled on ``self.grid()`` and
-                defined with respect to either ``Domain.CUBE`` or ``Domain.CUBE_CORNERS``
+                defined with respect to either ``Axes.CUBE`` or ``Axes.CUBE_CORNERS``
                 depending on flag ``self.grid().align_corners()``. These displacement vector
                 fields will be approximated by this transformation.
             kwargs: Keyword arguments of iterative optimization. Unused arguments are ignored.
@@ -326,8 +326,8 @@ class SpatialTransform(DeviceProperty, Module, metaclass=ABCMeta):
     def tensor(self) -> Tensor:
         r"""Get tensor representation of this transformation.
 
-        The tensor representation of a transformation is with respect to the unit cube domain defined
-        by its sampling grid as specified by ``self.domain()``. For a non-rigid transformation, and
+        The tensor representation of a transformation is with respect to the unit cube axes defined
+        by its sampling grid as specified by ``self.axes()``. For a non-rigid transformation, and
         is a displacement vector field. For linear transformations, it is a batch of homogeneous
         transformation tensors whose shape determines the type of linear transformation.
 
@@ -440,7 +440,7 @@ class NonRigidTransform(SpatialTransform):
     or a single displacement field used to deform all images in an input batch. The parameterization, and
     thereby the set of optimizable parameters, is defined by subclasses. The ``tensor()`` function must be
     implemented by subclasses to evaluate the non-parametric dense displacement field given the current model
-    parameters. The flow vectors must be with respect to the grid ``Domain.CUBE``, i.e., where coordinate
+    parameters. The flow vectors must be with respect to the grid ``Axes.CUBE``, i.e., where coordinate
     -1 corresponds to the left edge of the unit cube with side length 2, and coordinate 1 the right edge of
     this unit cube, respectively. Note that this corresponds to option ``align_corners=False`` of
     ``torch.nn.functional.grid_sample``.

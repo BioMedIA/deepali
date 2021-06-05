@@ -10,7 +10,7 @@ import torch
 from torch import Tensor
 from torch.nn import ModuleDict
 
-from ...core.grid import Domain, Grid, grid_transform_points
+from ...core.grid import Axes, Grid, grid_transform_points
 from ...core.linalg import as_homogeneous_matrix, homogeneous_matmul
 from ...core.tensor import move_dim
 
@@ -166,14 +166,14 @@ class CompositeTransform(SpatialTransform):
         """
         if grid is None:
             grid = self.grid()
-        domain = Domain.from_grid(grid)
+        axes = Axes.from_grid(grid)
         x = grid.coords(device=self.device).unsqueeze(0)
         if grid.same_domain_as(self.grid()):
             y = self.forward(x)
         else:
-            y = grid_transform_points(x, grid, domain, self.grid(), self.domain())
+            y = grid_transform_points(x, grid, axes, self.grid(), self.axes())
             y = self.forward(y)
-            y = grid_transform_points(y, self.grid(), self.domain(), grid, domain)
+            y = grid_transform_points(y, self.grid(), self.axes(), grid, axes)
         u = y - x
         u = move_dim(u, -1, 1)
         return u
@@ -218,8 +218,8 @@ class MultiLevelTransform(CompositeTransform):
     def tensor(self) -> Tensor:
         r"""Get tensor representation of this transformation.
 
-        The tensor representation of a transformation is with respect to the unit cube domain defined
-        by its sampling grid as specified by ``self.domain()``.
+        The tensor representation of a transformation is with respect to the unit cube axes defined
+        by its sampling grid as specified by ``self.axes()``.
 
         Returns:
             In case of a composition of linear transformations, returns a batch of homogeneous transformation
@@ -267,8 +267,8 @@ class SequentialTransform(CompositeTransform):
     def tensor(self) -> Tensor:
         r"""Get tensor representation of this transformation.
 
-        The tensor representation of a transformation is with respect to the unit cube domain defined
-        by its sampling grid as specified by ``self.domain()``.
+        The tensor representation of a transformation is with respect to the unit cube axes defined
+        by its sampling grid as specified by ``self.axes()``.
 
         Returns:
             In case of a composition of linear transformations, returns a batch of homogeneous transformation

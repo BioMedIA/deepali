@@ -26,8 +26,8 @@ class ExpFlow(Module):
         Args:
             scale: Constant scaling factor of input velocities (e.g., -1 for inverse). Default is 1.
             steps: Number of squaring steps.
-            align_corners: Whether input vectors are with respect to ``Domain.CUBE`` (False)
-                or ``Domain.CUBE_CORNERS`` (True). This flag is passed on to ``grid_sample()``.
+            align_corners: Whether input vectors are with respect to ``Axes.CUBE`` (False)
+                or ``Axes.CUBE_CORNERS`` (True). This flag is passed on to ``grid_sample()``.
 
         """
         super().__init__()

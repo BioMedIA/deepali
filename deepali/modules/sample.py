@@ -7,7 +7,7 @@ from torch.nn import Module
 
 from ..core import functional as U
 from ..core.enum import PaddingMode, Sampling
-from ..core.grid import Domain, Grid, grid_points_transform
+from ..core.grid import Axes, Grid, grid_points_transform
 from ..core.linalg import homogeneous_matmul, homogeneous_transform
 from ..core.types import Scalar
 
@@ -19,7 +19,7 @@ class SampleImage(Module):
         self,
         target: Grid,
         source: Optional[Grid] = None,
-        domain: Optional[Union[Domain, str]] = None,
+        axes: Optional[Union[Axes, str]] = None,
         sampling: Optional[Union[Sampling, str]] = None,
         padding: Optional[Union[PaddingMode, str, Scalar]] = None,
         align_centers: bool = False,
@@ -29,8 +29,8 @@ class SampleImage(Module):
         Args:
             target: Grid on which to sample transformed images.
             source: Grid on which input source images are sampled.
-            domain: Domain with respect to which grid coordinates are defined.
-                If ``None``, use cube domain corresponding to ``target.align_corners()`` setting.
+            axes: Axes with respect to which grid coordinates are defined.
+                If ``None``, use cube axes corresponding to ``target.align_corners()`` setting.
             sampling: Image interpolation mode.
             padding: Image extrapolation mode.
             align_centers: Whether to implicitly align the ``target`` and ``source`` centers.
@@ -41,9 +41,9 @@ class SampleImage(Module):
         super().__init__()
         self._target = target
         self._source = source or target
-        if domain is None:
-            domain = Domain.from_grid(target)
-        self._domain = Domain.from_arg(domain)
+        if axes is None:
+            axes = Axes.from_grid(target)
+        self._axes = Axes(axes)
         self._sampling = Sampling.from_arg(sampling)
         if padding is None or isinstance(padding, (PaddingMode, str)):
             self._padding = PaddingMode.from_arg(padding)
@@ -61,9 +61,9 @@ class SampleImage(Module):
         r"""Source sampling grid."""
         return self._source
 
-    def domain(self) -> Domain:
-        r"""Domain with respect to which target grid points and transformations thereof are defined."""
-        return self._domain
+    def axes(self) -> Axes:
+        r"""Axes with respect to which target grid points and transformations thereof are defined."""
+        return self._axes
 
     def sampling(self) -> Sampling:
         r"""Image sampling mode."""
@@ -92,8 +92,8 @@ class SampleImage(Module):
     def _matrix(self) -> Tensor:
         r"""Homogeneous coordinate transformation from target grid points to source grid cube."""
         align_corners = self.align_corners()
-        codomain = Domain.from_align_corners(align_corners)
-        matrix = grid_points_transform(self._target, self._domain, self._source, codomain)
+        to_axes = Axes.from_align_corners(align_corners)
+        matrix = grid_points_transform(self._target, self._axes, self._source, to_axes)
         if self._align_centers:
             offset = self._target.world_to_cube(self._source.center(), align_corners=align_corners)
             matrix = homogeneous_matmul(matrix, offset)
@@ -101,8 +101,7 @@ class SampleImage(Module):
 
     def _transform_target_to_source(self, grid: Tensor) -> Tensor:
         r"""Transform target grid points to source cube."""
-        matrix = self.matrix
-        assert isinstance(matrix, Tensor)
+        matrix: Tensor = self.matrix
         return homogeneous_transform(matrix, grid)
 
     def _sample_source_image(
@@ -212,7 +211,7 @@ class SampleImage(Module):
         return (
             f"target={repr(self._target)}"
             + f", source={repr(self._source)}"
-            + f", domain={repr(self._domain.value)}"
+            + f", axes={repr(self._axes.value)}"
             + f", sampling={repr(self._sampling.value)}"
             + f", padding={repr(self._padding.value if isinstance(self._padding, PaddingMode) else self._padding)}"
             + f", align_centers={repr(self._align_centers)}"
@@ -231,7 +230,7 @@ class TransformImage(SampleImage):
         self,
         target: Grid,
         source: Optional[Grid] = None,
-        domain: Optional[Union[Domain, str]] = None,
+        axes: Optional[Union[Axes, str]] = None,
         sampling: Union[Sampling, str] = Sampling.LINEAR,
         padding: Union[PaddingMode, str, Scalar] = PaddingMode.BORDER,
         align_centers: bool = False,
@@ -241,8 +240,8 @@ class TransformImage(SampleImage):
         Args:
             target: Grid on which to sample transformed images.
             source: Grid on which input source images are sampled.
-            domain: Domain with respect to which transformations are defined.
-                Use ``Domain.from_grid(target)`` if ``None``.
+            axes: Axes with respect to which transformations are defined.
+                Use ``Axes.from_grid(target)`` if ``None``.
             sampling: Image interpolation mode.
             padding: Image extrapolation mode.
             align_centers: Whether to implicitly align the ``target`` and ``source`` centers.
@@ -253,7 +252,7 @@ class TransformImage(SampleImage):
         super().__init__(
             target,
             source,
-            domain=domain,
+            axes=axes,
             sampling=sampling,
             padding=padding,
             align_centers=align_centers,
@@ -262,7 +261,7 @@ class TransformImage(SampleImage):
 
     def _grid(self) -> Tensor:
         r"""Target grid points before spatial transformation."""
-        return self._target.points(self._domain).unsqueeze(0)
+        return self._target.points(self._axes).unsqueeze(0)
 
     def forward(
         self,
@@ -293,7 +292,7 @@ class AlignImage(SampleImage):
         self,
         target: Grid,
         source: Optional[Grid] = None,
-        domain: Optional[Union[Domain, str]] = None,
+        axes: Optional[Union[Axes, str]] = None,
         sampling: Union[Sampling, str] = Sampling.LINEAR,
         padding: Union[PaddingMode, str, Scalar] = PaddingMode.BORDER,
         align_centers: bool = False,
@@ -303,8 +302,8 @@ class AlignImage(SampleImage):
         Args:
             target: Grid on which to sample transformed images.
             source: Grid on which input source images are sampled.
-            domain: Domain with respect to which transformations are defined.
-                Use ``Domain.from_grid(target)`` if ``None``.
+            axes: Axes with respect to which transformations are defined.
+                Use ``Axes.from_grid(target)`` if ``None``.
             sampling: Image interpolation mode.
             padding: Image extrapolation mode.
             align_centers: Whether to implicitly align the ``target`` and ``source`` centers.
@@ -315,7 +314,7 @@ class AlignImage(SampleImage):
         super().__init__(
             target,
             source,
-            domain=domain,
+            axes=axes,
             sampling=sampling,
             padding=padding,
             align_centers=align_centers,
@@ -324,7 +323,7 @@ class AlignImage(SampleImage):
 
     def _grid(self) -> Tensor:
         r"""Target grid points before spatial transformation."""
-        return self._target.points(self._domain).unsqueeze(0)
+        return self._target.points(self._axes).unsqueeze(0)
 
     def forward(
         self,

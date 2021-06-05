@@ -25,7 +25,7 @@ def affine_flow(matrix: Tensor, grid: Union[Grid, Tensor], channels_last: bool =
         grid: Image sampling ``Grid`` or tensor of shape ``(N, ..., X, D)`` of points at
             which to sample flow fields. If an object of type ``Grid`` is given, the value
             of ``grid.align_corners()`` determines if output flow vectors are with respect to
-            ``Domain.CUBE`` (False) or ``Domain.CUBE_CORNERS`` (True), respectively.
+            ``Axes.CUBE`` (False) or ``Axes.CUBE_CORNERS`` (True), respectively.
         channels_last: If ``True``, flow vector components are stored in the last dimension
             of the output tensor, and first dimension otherwise.
 
@@ -117,7 +117,7 @@ def expv(
         sampling: Flow field interpolation mode.
         padding: Flow field extrapolation mode.
         align_corners: Whether ``flow`` vectors are defined with respect to
-            ``Domain.CUBE`` (False) or ``Domain.CUBE_CORNERS`` (True).
+            ``Axes.CUBE`` (False) or ``Axes.CUBE_CORNERS`` (True).
 
     Returns:
         Exponential map of input flow field. If ``steps=0``, a reference to ``flow`` is returned.
@@ -229,8 +229,8 @@ def sample_flow(transform: Tensor, points: Tensor, align_corners: bool = ALIGN_C
         points: Coordinates of points given as tensor of shape ``(N, ..., D)`` or ``(1, ..., D)``.
             If batch size is one, but multiple flow fields are given, this single point set is
             transformed by each non-rigid transformation to produce ``N`` output point sets.
-        align_corners: Whether points and flow vectors are with respect to ``Domain.CUBE`` (False)
-            or ``Domain.CUBE_CORNERS`` (True). This option is in particular passed on to the
+        align_corners: Whether points and flow vectors are with respect to ``Axes.CUBE`` (False)
+            or ``Axes.CUBE_CORNERS`` (True). This option is in particular passed on to the
             ``grid_sample()`` function used to sample the flow vectors at the input points.
 
     Returns:
@@ -283,8 +283,8 @@ def warp_grid(transform: Tensor, grid: Tensor, align_corners: bool = ALIGN_CORNE
         grid: Coordinates of points given as tensor of shape ``(N, ..., D)`` or ``(1, ..., D)``.
             If batch size is one, but multiple flow fields are given, this single point set is
             transformed by each non-rigid transformation to produce ``N`` output point sets.
-        align_corners: Whether grid points and flow vectors are with respect to ``Domain.CUBE``
-            (False) or ``Domain.CUBE_CORNERS`` (True). This option is in particular passed on to
+        align_corners: Whether grid points and flow vectors are with respect to ``Axes.CUBE``
+            (False) or ``Axes.CUBE_CORNERS`` (True). This option is in particular passed on to
             the ``grid_reshape()`` function used to resize the flow fields to the ``grid`` shape.
 
     Returns:
@@ -334,8 +334,8 @@ def warp_points(transform: Tensor, points: Tensor, align_corners: bool = ALIGN_C
         points: Coordinates of points given as tensor of shape ``(N, ..., D)`` or ``(1, ..., D)``.
             If batch size is one, but multiple flow fields are given, this single point set is
             transformed by each non-rigid transformation to produce ``N`` output point sets.
-        align_corners: Whether points and flow vectors are with respect to ``Domain.CUBE`` (False)
-            or ``Domain.CUBE_CORNERS`` (True). This option is in particular passed on to the
+        align_corners: Whether points and flow vectors are with respect to ``Axes.CUBE`` (False)
+            or ``Axes.CUBE_CORNERS`` (True). This option is in particular passed on to the
             ``grid_sample()`` function used to sample the flow vectors at the input points.
 
     Returns:
@@ -361,7 +361,7 @@ def warp_image(
     Args:
         data: Image batch tensor of shape ``(1, C, ..., X)`` or ``(N, C, ..., X)``.
         grid: Grid points tensor of shape  ``(..., X, D)``, ``(1, ..., X, D)``, or``(N, ..., X, D)``.
-            Coordinates of points at which to sample ``data`` must be with respect to ``Domain.CUBE``.
+            Coordinates of points at which to sample ``data`` must be with respect to ``Axes.CUBE``.
         flow: Batch of flow fields of shape  ``(..., X, D)``, ``(1, ..., X, D)``, or``(N, ..., X, D)``.
             If specified, the flow field(s) are added to ``grid`` in order to displace the grid points.
         mode: Image interpolate mode.

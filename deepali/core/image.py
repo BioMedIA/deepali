@@ -9,7 +9,7 @@ from torch import Tensor
 
 from .convutils import same_padding, stride_minus_kernel_padding
 from .enum import PaddingMode, Sampling, SpatialDim, SpatialDimArg, SpatialDerivativeKeys
-from .grid import ALIGN_CORNERS, Domain, Grid, grid_transform_points
+from .grid import ALIGN_CORNERS, Axes, Grid, grid_transform_points
 from .kernels import gaussian1d, gaussian1d_I
 from .names import image_batch_tensor_names
 from .tensor import as_tensor, cat_scalars, move_dim
@@ -882,9 +882,9 @@ def grid_resample(
     if output_grid.shape == input_grid.shape:
         return data
     align_corners = input_grid.align_corners()
-    domain = Domain.from_align_corners(align_corners)
+    axes = Axes.from_align_corners(align_corners)
     coords = output_grid.coords(align_corners=align_corners, device=data.device)
-    coords = grid_transform_points(coords, output_grid, domain, input_grid, domain)
+    coords = grid_transform_points(coords, output_grid, axes, input_grid, axes)
     return grid_sample(data, coords, mode=mode, padding=padding, align_corners=align_corners)
 
 
@@ -998,7 +998,7 @@ def grid_sample(
     Args:
         data: Image batch tensor of shape ``(1, C, ..., X)`` or ``(N, C, ..., X)``.
         grid: Grid points tensor of shape  ``(..., X, D)``, ``(1, ..., X, D)``, or ``(N, ..., X, D)``.
-            Coordinates of points at which to sample ``data`` must be with respect to ``Domain.CUBE``.
+            Coordinates of points at which to sample ``data`` must be with respect to ``Axes.CUBE``.
         mode: Image interpolate mode.
         padding: Image extrapolation mode or constant by which to pad input ``data``.
         align_corners: Whether ``grid`` extrema ``(-1, 1)`` refer to the grid boundary
@@ -1047,7 +1047,7 @@ def grid_sample_mask(
     Args:
         data: Image batch tensor of shape ``(N, 1, ..., X)``.
         grid: Grid points tensor of shape  ``(..., X, D)``, ``(1, ..., X, D)``, or``(N, ..., X, D)``.
-            Coordinates of points at which to sample ``data`` must be with respect to ``Domain.CUBE``.
+            Coordinates of points at which to sample ``data`` must be with respect to ``Axes.CUBE``.
         threshold: Scalar value used to binarize input mask. Values above this threshold are assigned
             value 1, and values below this threshold are assigned value 0.
         align_corners: Whether ``grid`` extrema ``(-1, 1)`` refer to the grid boundary edges (``False``)

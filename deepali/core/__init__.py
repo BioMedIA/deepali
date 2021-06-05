@@ -31,7 +31,7 @@ from .enum import PaddingMode
 from .enum import Sampling
 
 from .grid import ALIGN_CORNERS
-from .grid import Domain
+from .grid import Axes
 from .grid import Grid
 from .grid import grid_points_transform
 from .grid import grid_vectors_transform
@@ -80,7 +80,7 @@ __all__ = (
     "DataclassConfig",
     "Device",
     "DType",
-    "Domain",
+    "Axes",
     "Grid",
     "ItemTransform",
     "ItemwiseTransform",
