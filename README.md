@@ -11,8 +11,8 @@ At a granular level, *deepali* is a library that consists of the following compo
 
 | **Component**  | **Description** |
 | -------------- | --------------- |
-| [deepali.core] | Common types, coordinate spaces, and functional tensor operations. |
-| [deepali.data] | PyTorch tensor wrappers, data loader utilities, and datasets. |
+| [deepali.core] | Common types, coordinate spaces, and tensor functions. |
+| [deepali.data] | PyTorch tensor subclasses, data loader utilities, and datasets. |
 | [deepali.losses] | Loss terms and evaluation metrics for image, point set, and surface registration. |
 | [deepali.modules] | PyTorch modules without optimizable parameters built on core functions. |
 | [deepali.networks] | Common building blocks of machine learning based registration models. We expect that most users may want to develop their own task-specific models and associated training procedures. For this, the neural network components defined here may be used alongside ``torch.nn`` to define these custom models. |
