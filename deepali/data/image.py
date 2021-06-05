@@ -929,13 +929,6 @@ class Image(TensorDecorator):
         return image_from_tensor(self._tensor, origin=origin, spacing=spacing, direction=direction)
 
     @classmethod
-    def _read_sitk(cls, path: PathStr) -> "sitk.Image":
-        r"""Read SimpleITK.Image from file path."""
-        if sitk is None:
-            raise RuntimeError(f"{cls.__name__}.read() requires SimpleITK")
-        return read_image(path)
-
-    @classmethod
     def read(
         cls: Type[TImage],
         path: PathStr,
@@ -946,6 +939,13 @@ class Image(TensorDecorator):
         r"""Read image data from file."""
         image = cls._read_sitk(path)
         return cls.from_sitk(image, align_corners=align_corners, dtype=dtype, device=device)
+
+    @classmethod
+    def _read_sitk(cls, path: PathStr) -> "sitk.Image":
+        r"""Read SimpleITK.Image from file path."""
+        if sitk is None:
+            raise RuntimeError(f"{cls.__name__}.read() requires SimpleITK")
+        return read_image(path)
 
     def write(self: TImage, path: PathStr, compress: bool = True) -> None:
         r"""Write image data to file."""
