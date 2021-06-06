@@ -196,7 +196,29 @@ def named_dims(tensor: Tensor, *names: str) -> Tuple[int, ...]:
     return tuple(indices)
 
 
-def unravel_coords(indices: Tensor, shape: Tuple[int, ...]) -> Tensor:
+def unravel_coords(indices: Tensor, size: Tuple[int, ...]) -> Tensor:
+    r"""Converts flat indices into unraveled grid coordinates.
+
+    Args:
+        indices: A tensor of flat indices with shape ``(..., N)``.
+        size: Sampling grid size with order ``(X, ...)``.
+
+    Returns:
+        Grid coordinates of corresponding grid points.
+
+    """
+    size = torch.Size(size)
+    numel = size.numel()
+    if indices.ge(numel).any():
+        raise ValueError(f"unravel_coords() indices must be smaller than {numel}")
+    coords = torch.zeros(indices.size() + (len(size),), dtype=indices.dtype, device=indices.device)
+    for i, n in enumerate(size):
+        coords[..., i] = indices % n
+        indices = indices // n
+    return coords
+
+
+def unravel_index(indices: Tensor, shape: Tuple[int, ...]) -> Tensor:
     r"""Converts flat indices into unraveled coordinates in a target shape.
 
     This is a `torch` implementation of `numpy.unravel_index`, but returning a
@@ -205,7 +227,7 @@ def unravel_coords(indices: Tensor, shape: Tuple[int, ...]) -> Tensor:
 
     Args:
         indices: A tensor of indices with shape (..., N).
-        shape: The targeted tensor shape or image size, respectively (D,).
+        shape: The targeted tensor shape of length D.
 
     Returns:
         Unraveled coordinates as tensor of shape (..., N, D) with coordinates
@@ -215,7 +237,7 @@ def unravel_coords(indices: Tensor, shape: Tuple[int, ...]) -> Tensor:
     shape = torch.Size(shape)
     numel = shape.numel()
     if indices.ge(numel).any():
-        raise ValueError(f"unravel_index() indices must be smaller than {numel}")
+        raise ValueError(f"unravel_coords() indices must be smaller than {numel}")
     coords = torch.zeros(indices.size() + (len(shape),), dtype=indices.dtype, device=indices.device)
     for i, n in enumerate(reversed(shape)):
         coords[..., i] = indices % n

@@ -24,6 +24,7 @@ from .tensor import batched_index_select
 from .tensor import move_dim
 from .tensor import named_dims
 from .tensor import unravel_coords
+from .tensor import unravel_index
 
 # Linear algebra/geometry
 from .affine import apply_transform as apply_affine_transform
@@ -127,6 +128,7 @@ __all__ = (
     "round_decimals",
     "threshold",
     "unravel_coords",
+    "unravel_index",
     # Linear algebra/geometry
     "affine_flow",
     "affine_transform_points",
