@@ -1006,7 +1006,9 @@ def grid_sample(
 
     Returns:
         Image batch tensor of sampled data with spatial shape determined by ``grid``, and batch
-        size ``N`` based on ``data.shape[0]`` or ``grid.shape[0]``, respectively.
+        size ``N`` based on ``data.shape[0]`` or ``grid.shape[0]``, respectively. The data type
+        of the returned tensor is ``data.dtype`` if it is a floating point type or ``mode="nearest"``.
+        Otherwise, the output data type matches ``grid.dtype``, which must be a floating point type.
 
     """
     grid = check_sample_grid("grid_sample", data, grid)
@@ -1030,10 +1032,9 @@ def grid_sample(
     )
     if padding_mode == "zeros" and padding_value != 0:
         out += padding_value
-    if mode != "nearest" and not torch.is_floating_point(data):
-        out.round_()
-        out.clamp_(min=data.min(), max=data.max())
-    return out.type_as(data)
+    if mode == "nearest" or data.is_floating_point():
+        out = out.type_as(data)
+    return out
 
 
 def grid_sample_mask(
@@ -1055,7 +1056,7 @@ def grid_sample_mask(
 
     Returns:
         Batch tensor of sampled mask with spatial shape determined by ``grid``, and floating point values
-        in the closed interval ``[0, 1]`` as obtained by linear interpolation of boolean mask.
+        in the closed interval ``[0, 1]`` as obtained by linear interpolation of the binarized input mask.
 
     """
     grid = check_sample_grid("grid_sample_mask", data, grid)
