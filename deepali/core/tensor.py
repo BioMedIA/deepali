@@ -123,26 +123,23 @@ def cat_scalars(
 
     """
     if args:
-        if isinstance(arg, (tuple, list)) or torch.is_tensor(arg):
+        if isinstance(arg, (tuple, list)) or isinstance(arg, Tensor):
             raise ValueError("arg and args must either be all scalars, or args empty")
-        arg_ = torch.tensor((arg,) + args, dtype=dtype, device=device)
+        arg = torch.tensor((arg,) + args, dtype=dtype, device=device)
     else:
-        arg_ = as_tensor(arg)
-        if torch.is_tensor(arg):
-            arg_ = arg_.clone().detach()
-    arg_ = arg_.to(dtype=dtype, device=device)
-    if arg_.ndim == 0:
-        arg_ = arg_.unsqueeze(0)
-    if arg_.ndim != 1:
+        arg = as_tensor(arg, dtype=dtype, device=device)
+    if arg.ndim == 0:
+        arg = arg.unsqueeze(0)
+    if arg.ndim != 1:
         if num > 0:
             raise ValueError(f"Expected one scalar, a sequence of length {num}, or {num} args")
         raise ValueError("Expected one scalar, a sequence of scalars, or multiple scalars")
     if num > 0:
-        if len(arg_) == 1:
-            arg_ = arg_.repeat(num)
-        elif len(arg_) != num:
+        if len(arg) == 1:
+            arg = arg.repeat(num)
+        elif len(arg) != num:
             raise ValueError(f"Expected one scalar, a sequence of length {num}, or {num} args")
-    return arg_
+    return arg
 
 
 def batched_index_select(input: Tensor, dim: int, index: Tensor) -> Tensor:

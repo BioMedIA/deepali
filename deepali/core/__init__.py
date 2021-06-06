@@ -32,6 +32,7 @@ from .enum import Sampling
 
 from .grid import ALIGN_CORNERS
 from .grid import Axes
+from .cube import Cube
 from .grid import Grid
 from .grid import grid_points_transform
 from .grid import grid_vectors_transform
@@ -77,6 +78,7 @@ __all__ = (
     "Array",
     "Axes",
     "Batch",
+    "Cube",
     "Dataclass",
     "DataclassConfig",
     "Device",

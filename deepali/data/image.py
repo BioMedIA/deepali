@@ -14,6 +14,7 @@ try:
 except ImportError:
     sitk = None
 
+from ..core.cube import Cube
 from ..core.enum import PaddingMode, Sampling
 from ..core.grid import ALIGN_CORNERS, Axes, Grid
 from ..core import image as U
@@ -23,6 +24,7 @@ from ..core.types import Array, Device, DType, PathStr, Scalar, ScalarOrTuple, S
 
 from .tensor import DataTensor
 
+Domain = Cube
 
 TImage = TypeVar("TImage", bound="Image")
 TImageBatch = TypeVar("TImageBatch", bound="ImageBatch")
@@ -103,6 +105,28 @@ class ImageBatch(DataTensor):
                 grids = tuple(grid.clone() for grid in grids)
             result = self._make_instance(result, grids)
         return result
+
+    def cube(self: TImageBatch, n: int = 0) -> Cube:
+        r"""Get cube of n-th image in batch defining its normalized coordinates space with respect to the world."""
+        return self._grid[n].cube()
+
+    def cubes(self: TImageBatch) -> Tuple[Cube, ...]:
+        r"""Get cubes of all images which define their normalized coordinates spaces with respect to the world."""
+        return tuple(grid.cube() for grid in self._grid)
+
+    def domain(self: TImageBatch, n: int = 0) -> Domain:
+        r"""Get oriented bounding box of n-th image in world space which defines the domain within which it is defined."""
+        return self._grid[n].domain()
+
+    def domains(self: TImageBatch) -> Tuple[Domain, ...]:
+        r"""Get oriented bounding boxes of all images in world space which define the domains within which these are defined."""
+        return tuple(grid.domain() for grid in self._grid)
+
+    def same_domains_as(self, other: ImageBatch) -> bool:
+        """Check if images in this batch and another batch have the same cube domains."""
+        if len(self) != len(other):
+            return False
+        return all(a.same_domain_as(b) for a, b in zip(self.grids(), other.grids()))
 
     @overload
     def grid(self: TImageBatch, n: int = 0) -> Grid:
@@ -758,6 +782,18 @@ class Image(DataTensor):
         data = self.unsqueeze(0)
         grid = self._grid
         return ImageBatch(data, grid)
+
+    def cube(self: TImage) -> Cube:
+        r"""Get cube which defines the normalized coordinates space of the image with respect to the world."""
+        return self._grid.cube()
+
+    def domain(self: TImage) -> Domain:
+        r"""Get oriented bounding box in world space which defines the domain within which the image is defined."""
+        return self._grid.domain()
+
+    def same_domain_as(self, other: Image) -> bool:
+        """Check if this and another image have the same cube domain."""
+        return self.same_domain_as(other.grid())
 
     @overload
     def grid(self: TImage) -> Grid:

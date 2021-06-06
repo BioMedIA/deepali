@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from copy import copy as shallow_copy
 from enum import Enum
-from typing import Any, Dict, Optional, Union, overload
+from typing import TYPE_CHECKING, Any, Dict, Optional, Union, overload
 
 try:
     import SimpleITK as sitk
@@ -15,6 +15,10 @@ import torch
 import torch.nn.functional as F
 from torch import Tensor
 
+if TYPE_CHECKING:
+    # At runtime, cyclical import resolved by Grid.cube() instead
+    from .cube import Cube
+
 from .math import round_decimals
 from .linalg import homogeneous_transform, homogeneous_matrix, hmm
 from .tensor import as_tensor, cat_scalars
@@ -22,14 +26,12 @@ from .types import Array, Device, PathStr, ScalarOrTuple, Shape, Size
 from .types import is_int_dtype
 
 
-# Default setting of align_corners
+# By default, grid corner points define the domain within which the data is defined.
+# The normalized coordinates with respect to the grid cube are thus in [-1, 1] between
+# the first and last grid points (grid cell center points). This is such that when a
+# grid is downsampled or upsampled, respectively, the grid points at the boundary of
+# the domain remain unchanged. Points are only inserted or removed between these.
 ALIGN_CORNERS = True
-
-# Data type of grid attributes MUST be floating point dtype
-DTYPE = torch.float
-
-# Generally, it is best to keep sampling grid attributes in CPU memory
-DEVICE = torch.device("cpu")
 
 
 class Axes(Enum):
@@ -81,17 +83,19 @@ class Grid(object):
     To not confuse ``Grid.size()`` with ``torch.Tensor.size()``, it is recommended to prefer
     property ``torch.Tensor.shape``. The ``shape`` property is also known from ``numpy.ndarray.shape``.
 
-    A ``Grid`` instance stores the grid-aligned unit cube center point instead of the grid origin.
-    This simplifies grid resizing operations, which do not need to modify the origin explicitly, but
-    keep the center fixed. The ``Grid.origin()`` can still be accessed and used to initialize a ``Grid()``
-    for convenience. Conversion between center point and origin are taken care of by the ``Grid``.
+    A ``Grid`` instance stores the grid center point instead of the origin corresponding to the grid
+    point with zero index along each grid dimension. This simplifies resizing and resampling operations,
+    which do not need to modify the origin explicitly, but keep the center point fixed. To get the
+    coordinates of the grid origin, use ``Grid.origin()``. For convenience, the ``Grid`` initialization
+    function also accepts an ``origin`` instead a ``center`` point as keyward argument. Conversion between
+    center point and origin are taken care internally.
 
-    In addition, ``Grid.points()``, ``Grid.transform()`` and ``Grid.transform_points()`` support point
-    coordinates with respect to different axes, i.e., (continuous) grid indices as used for example
-    by SimpleITK, world space coordinates, and the grid-aligned unit cube with side length 2 with cube
-    center at the ``Grid.center()``. This ``Axes.CUBE`` makes grid point coordinates independent of
-    ``Grid.size()`` and ``Grid.spacing()``. These normalized grid coordinates are furthermore compatible
-    with the ``grid`` argument of ``torch.nn.functional.grid_sample()``.
+    In addition, ``Grid.points()``, ``Grid.transform()``, and ``Grid.apply_transform()`` support
+    coordinates with respect to different axes: 1) (continuous) grid indices, 2) world space, and
+    3) grid-aligned unit cube with side length 2. The latter, i.e., ``Axes.CUBE`` or ``Axes.CUBE_CORNERS``
+    makes coordinates independent of ``Grid.size()`` and ``Grid.spacing()``. These normalized coordinates
+    are furthermore compatible with the ``grid`` argument of ``torch.nn.functional.grid_sample()``. Use
+    ``Grid.cube()` to obtain a ``Cube`` defining the data domain without spatial sampling attributes.
 
     """
 
@@ -123,7 +127,6 @@ class Grid(object):
                 Either ``size`` or ``shape`` must be specified.
             center: Grid center point in world space.
             origin: World coordinates of grid point with zero indices.
-                Must be ``None`` if ``center is not None``.
             spacing: Size of each grid square along each dimension.
             direction: Direction cosines defining orientation of grid in world space.
                 The direction cosines are vectors that point from one pixel to the next.
@@ -138,36 +141,36 @@ class Grid(object):
 
         """
         if device is None:
-            device = DEVICE
+            device = torch.device("cpu")
         # Grid size, optionally given as data tensor shape
-        if size is None:
-            size_ = size
-        else:
-            size_ = as_tensor(size, device=device).detach()
-            if size_.dim() != 1:
+        if size is not None:
+            size = as_tensor(size, device=device)
+            if size.ndim != 1:
                 raise ValueError("Grid() 'size' must be 1-dimensional array")
-            if len(size_) == 0:
+            if len(size) == 0:
                 raise ValueError("Grid() 'size' must be non-empty array")
         if shape is None:
-            if size_ is None:
+            if size is None:
                 raise ValueError("Grid() 'size' or 'shape' required")
         else:
-            shape_ = as_tensor(shape, device=device).detach()
-            if size_ is None:
-                if shape_.dim() != 1:
+            shape = as_tensor(shape, device=device)
+            if size is None:
+                if shape.ndim != 1:
                     raise ValueError("Grid() 'shape' must be 1-dimensional array")
-                if len(shape_) == 0:
+                if len(shape) == 0:
                     raise ValueError("Grid() 'shape' must be non-empty array")
-                size_ = shape_.flip(0)
-            elif len(size_) != len(shape_) or torch.any(torch.ne(size_, shape_.flip(0))):
-                raise ValueError("Grid() 'size' and 'shape' are not compatible")
-        # Keep size as float such that ``grid.downsample().upsample() == grid```
-        self._size = torch.clamp(size_.to(DTYPE), min=0)
+                size = shape.flip(0)
+            else:
+                with torch.no_grad():
+                    if len(size) != len(shape) or shape.flip(0).ne(size).any():
+                        raise ValueError("Grid() 'size' and 'shape' are not compatible")
+        # Store size as float such that ``grid.downsample().upsample() == grid```
+        self._size = torch.clamp(size.float(), min=0)
         # Set other properties AFTER _size, which defines 'device', 'dim' properties.
         # Use in-place setters to take care of conversion and value assertions.
         self.spacing_(1 if spacing is None else spacing)
         if direction is None:
-            direction = torch.eye(self.dim(), dtype=self.dtype, device=self.device)
+            direction = torch.eye(self.ndim)
         self.direction_(direction)
         # Set grid center to default, specified center point, or derived from origin
         if origin is None:
@@ -177,8 +180,9 @@ class Grid(object):
             self.origin_(origin)
         else:
             self.center_(center)
-            if not torch.allclose(origin, self.origin()):
-                raise ValueError("Grid() 'center' and 'origin' are inconsistent")
+            with torch.no_grad():
+                if not torch.allclose(origin, self.origin()):
+                    raise ValueError("Grid() 'center' and 'origin' are inconsistent")
         # Default align_corners option argument for grid resizing operations
         self._align_corners = bool(align_corners)
 
@@ -229,6 +233,31 @@ class Grid(object):
             align_corners=align_corners,
         )
 
+    def cube(self) -> "Cube":
+        r"""Get oriented cube defining the space of normalized coordinates."""
+        # Import locally due to cyclical dependency between Cube and Grid
+        from .cube import Cube
+
+        return Cube(
+            extent=self.cube_extent(),
+            center=self.center(),
+            direction=self.direction(),
+            device=self.device,
+        )
+
+    def domain(self) -> "Cube":
+        r"""Get oriented bounding box defining the sampling grid domain in world space."""
+        return self.cube()
+
+    def dim(self) -> int:
+        r"""Number of spatial grid dimensions."""
+        return len(self._size)
+
+    @property
+    def ndim(self) -> int:
+        r"""Number of grid dimensions."""
+        return len(self._size)
+
     @property
     def dtype(self) -> torch.dtype:
         r"""Get data type of grid attribute tensors."""
@@ -247,6 +276,14 @@ class Grid(object):
             if isinstance(value, Tensor):
                 setattr(grid, name, value.clone())
         return grid
+
+    def __deepcopy__(self, memo) -> Grid:
+        r"""Support copy.deepcopy to clone this grid."""
+        if id(self) in memo:
+            return memo[id(self)]
+        copy = self.clone()
+        memo[id(self)] = copy
+        return copy
 
     @overload
     def align_corners(self) -> bool:
@@ -273,15 +310,6 @@ class Grid(object):
         r"""Grid axes."""
         return Axes.from_grid(self)
 
-    def dim(self) -> int:
-        r"""Number of spatial grid dimensions."""
-        return len(self._size)
-
-    @property
-    def ndim(self) -> int:
-        r"""Number of grid dimensions."""
-        return self.dim()
-
     def numel(self) -> int:
         r"""Number of grid points."""
         return self.size().numel()
@@ -298,12 +326,12 @@ class Grid(object):
 
     def size(self) -> torch.Size:
         r"""Sampling grid size for dimensions ordered as ``(X, ...)``."""
-        return torch.Size((int(n.item()) for n in self.size_tensor()))
+        return torch.Size((int(n) for n in self.size_tensor()))
 
     @property
     def shape(self) -> torch.Size:
         r"""Size of grid data tensor of shape (...X)."""
-        return torch.Size((int(n.item()) for n in self.size_tensor().flip(0)))
+        return torch.Size((int(n) for n in self.size_tensor().flip(0)))
 
     def extent(self) -> Tensor:
         r"""Extent of sampling grid in physical world units."""
@@ -313,8 +341,8 @@ class Grid(object):
         r"""Extent of sampling grid cube in physical world units."""
         n = self.size_tensor()
         if self._align_corners:
-            n -= 1
-        return n * self.spacing()
+            n = n.sub(1)
+        return self.spacing().mul(n)
 
     @overload
     def center(self) -> Tensor:
@@ -331,8 +359,8 @@ class Grid(object):
         return shallow_copy(self).center_(*args) if args else self._center
 
     def center_(self, arg: Union[float, Array], *args: float) -> Grid:
-        r"""Modify grid center point in world space."""
-        self._center = self._cat_scalars(arg, *args).to(self.dtype)
+        r"""Set grid center point in world space."""
+        self._center = cat_scalars(arg, *args, num=self.ndim, dtype=self.dtype, device=self.device)
         return self
 
     @overload
@@ -350,16 +378,17 @@ class Grid(object):
         if args:
             return shallow_copy(self).origin_(*args)
         size = self.size_tensor()
-        offset = 0.5 * torch.where(size.gt(0), size - 1, size)
-        return self._center - torch.matmul(self.affine(), offset)
+        offset = torch.where(size.gt(0), size.sub(1), size).div(2)
+        offset = torch.matmul(self.affine(), offset)
+        return self._center.sub(offset)
 
     def origin_(self, arg: Union[float, Array], *args: float) -> Grid:
         r"""Set world coordinates of grid point with zero index."""
-        value = self._cat_scalars(arg, *args).to(self.dtype)
+        origin = cat_scalars(arg, *args, num=self.ndim, dtype=self.dtype, device=self.device)
         size = self.size_tensor()
-        offset = 0.5 * torch.where(size.gt(0), size - 1, size)
-        value += torch.matmul(self.affine(), offset)
-        self._center = value
+        offset = torch.where(size.gt(0), size.sub(1), size).div(2)
+        offset = torch.matmul(self.affine(), offset)
+        self._center = origin.add(offset)
         return self
 
     @overload
@@ -378,10 +407,10 @@ class Grid(object):
 
     def spacing_(self, arg: Union[float, Array], *args: float) -> Grid:
         r"""Set spacing between grid points in physical world units."""
-        value = self._cat_scalars(arg, *args).to(self.dtype)
-        if torch.any(value.le(0)):
-            raise ValueError("grid spacing must be positive")
-        self._spacing = value
+        spacing = cat_scalars(arg, *args, num=self.ndim, dtype=self.dtype, device=self.device)
+        if spacing.le(0).any():
+            raise ValueError("Grid spacing must be positive")
+        self._spacing = spacing
         return self
 
     @overload
@@ -400,24 +429,28 @@ class Grid(object):
 
     def direction_(self, arg: Union[float, Array], *args: float) -> Grid:
         r"""Set grid axes direction cosines matrix of this grid."""
-        dim = self.dim()
-        if args:
-            value = torch.tensor((arg,) + args, dtype=self.dtype, device=self.device)
-        elif isinstance(arg, Tensor):
-            value = arg.clone().detach()
+        D = self.ndim
+        direction = torch.tensor((arg,) + args) if args else as_tensor(arg)
+        direction = direction.to(dtype=self.dtype, device=self.device)
+        if direction.ndim == 1:
+            if direction.shape[0] != D * D:
+                raise ValueError(
+                    f"Grid direction must be array or square matrix with numel={D * D}"
+                )
+            direction = direction.reshape(D, D)
         else:
-            value = torch.tensor(arg)
-        value = value.to(dtype=self.dtype, device=self.device)
-        if value.dim() == 1:
-            if value.shape[0] != dim * dim:
-                raise ValueError(f"direction must be array or square matrix with numel={dim * dim}")
-            value = value.reshape(dim, dim)
-        else:
-            if value.dim() != 2 or value.shape[0] != value.shape[1] or value.shape[0] != dim:
-                raise ValueError(f"direction must be array or square matrix with numel={dim * dim}")
-        if abs(value.det().abs().item() - 1) > 1e-4:
-            raise ValueError("direction cosines matrix must be valid rotation matrix")
-        self._direction = value
+            if (
+                direction.ndim != 2
+                or direction.shape[0] != direction.shape[1]
+                or direction.shape[0] != D
+            ):
+                raise ValueError(
+                    f"Grid direction must be array or square matrix with numel={D * D}"
+                )
+        with torch.no_grad():
+            if abs(direction.det().abs().item() - 1) > 1e-4:
+                raise ValueError("Grid direction cosines matrix must be valid rotation matrix")
+        self._direction = direction
         return self
 
     def affine(self) -> Tensor:
@@ -431,8 +464,8 @@ class Grid(object):
 
     def transform(
         self,
-        axes: Axes,
-        to_axes: Optional[Axes] = None,
+        axes: Optional[Union[Axes, str]] = None,
+        to_axes: Optional[Union[Axes, str]] = None,
         to_grid: Optional[Grid] = None,
         vectors: bool = False,
     ) -> Tensor:
@@ -440,6 +473,8 @@ class Grid(object):
 
         Args:
             axes: Target coordinate axes defined by this grid.
+                If ``None`` and also ``to_axes`` and ``to_grid`` is ``None``,
+                returns the transform which maps from grid cube to world space.
             to_axes: Source coordinate axes defined by ``grid``. If ``None``, use ``axes``.
             to_grid: Grid of ``to_axes``. If ``None``, ``to_grid=self``.
             vectors: Whether transformation is used to rescale and reorient vectors.
@@ -449,6 +484,13 @@ class Grid(object):
             Otherwise, a square transformation matrix of shape ``(D, D)`` is returned.
 
         """
+        if axes is None and to_axes is None and to_grid is None:
+            cube_axes = Axes.CUBE_CORNERS if self._align_corners else Axes.CUBE
+            return self.transform(cube_axes, Axes.WORLD, vectors=vectors)
+        if axes is None:
+            raise ValueError(
+                "Grid.transform() 'axes' required when 'to_axes' or 'to_cube' specified"
+            )
         matrix = None
         axes = Axes(axes)
         to_axes = axes if to_axes is None else Axes(to_axes)
@@ -534,6 +576,58 @@ class Grid(object):
             raise NotImplementedError(f"Grid.transform() for axes={axes} and to_axes={to_axes}")
         return matrix
 
+    def inverse_transform(self, vectors: bool = False) -> Tensor:
+        r"""Transform which maps from world to grid cube space."""
+        cube_axes = Axes.CUBE_CORNERS if self._align_corners else Axes.CUBE
+        return self.transform(Axes.WORLD, cube_axes, vectors=vectors)
+
+    def apply_transform(
+        self,
+        input: Array,
+        axes: Axes,
+        to_axes: Optional[Axes] = None,
+        to_grid: Optional[Grid] = None,
+        vectors: bool = False,
+        decimals: Optional[int] = -1,
+    ) -> Tensor:
+        r"""Map point coordinates or displacement vectors from one grid to another.
+
+        Args:
+            input: Set of points to transform, e.g., as tensor of shape ``(..., D)``.
+            axes: Target coordinate axes defined by this grid.
+            to_axes: Source coordinate axes defined by ``grid``. If ``None``, use ``axes``.
+            to_grid: Grid of ``to_axes``. If ``None``, ``to_grid=self``.
+            vectors: Whether transformation is used to rescale and reorient vectors.
+            decimals: If positive or zero, number of digits right of the decimal point to round to.
+                When mapping points to ``Axes.GRID``, ``Axes.CUBE``, or ``Axes.CUBE_CORNERS``,
+                this function by default (``decimals=-1``) rounds the transformed coordinates.
+                Explicitly set ``decimals=None`` to suppress this default rounding.
+
+        Returns:
+            If ``vectors=False``, a homogeneous coordinate transformation of shape ``(D, D + 1)``.
+            Otherwise, a square transformation matrix of shape ``(D, D)`` is returned.
+
+        """
+        axes = Axes(axes)
+        to_axes = axes if to_axes is None else Axes(to_axes)
+        input = as_tensor(input)
+        if not input.is_floating_point():
+            input = input.type(self.dtype)
+        if (to_grid is not None and to_grid != self) or axes is not to_axes:
+            matrix = self.transform(axes, to_axes, to_grid=to_grid, vectors=vectors)
+            matrix = matrix.unsqueeze(0).to(device=input.device)
+            result = homogeneous_transform(matrix, input)
+        else:
+            result = input
+        if decimals == -1:
+            if to_axes is Axes.CUBE or to_axes is Axes.CUBE_CORNERS:
+                decimals = 12
+            elif to_axes is Axes.GRID:
+                decimals = 6
+        if decimals is not None and decimals >= 0:
+            result = round_decimals(result, decimals=decimals)
+        return result
+
     def transform_points(
         self,
         points: Array,
@@ -545,7 +639,7 @@ class Grid(object):
         r"""Map point coordinates from one grid domain to another.
 
         Args:
-            points: List of points to transform as tensor of shape ``(..., D)``.
+            points: Set of points to transform, e.g., as tensor of shape ``(..., D)``.
             axes: Coordinate axes with respect to which ``points`` are defined.
             to_axes: Coordinate axes to which ``points`` should be mapped to. If ``None``, use ``axes``.
             to_grid: Grid with respect to which the codomain to defined. If ``None``, the target
@@ -559,25 +653,7 @@ class Grid(object):
             Point coordinates in ``axes`` mapped to coordinates with respect to ``to_axes``.
 
         """
-        axes = Axes(axes)
-        to_axes = axes if to_axes is None else Axes(to_axes)
-        points_ = as_tensor(points)
-        if not torch.is_floating_point(points_):
-            points_ = points_.type(self.dtype)
-        if (to_grid is not None and to_grid != self) or axes is not to_axes:
-            matrix = self.transform(axes, to_axes, to_grid=to_grid, vectors=False)
-            matrix = matrix.unsqueeze(0).to(device=points_.device)
-            result = homogeneous_transform(matrix, points_)
-        else:
-            result = points_
-        if decimals == -1:
-            if to_axes is Axes.CUBE or to_axes is Axes.CUBE_CORNERS:
-                decimals = 12
-            elif to_axes is Axes.GRID:
-                decimals = 6
-        if decimals is not None and decimals >= 0:
-            result = round_decimals(result, decimals=decimals)
-        return result
+        return self.apply_transform(points, axes, to_axes, to_grid=to_grid, decimals=decimals)
 
     def transform_vectors(
         self,
@@ -589,7 +665,7 @@ class Grid(object):
         r"""Rescale and reorient flow vectors.
 
         Args:
-            vectors: Batch of displacement vectors of shape ``(..., D)``.
+            vectors: Set of displacement vectors to transform, e.g., as tensor of shape ``(..., D)``.
             axes: Coordinate axes with respect to which ``vectors`` are defined.
             to_axes: Coordinate axes to which ``vectors`` should be mapped to. If ``None``, use ``axes``.
             to_grid: Grid with respect to which ``to_axes`` is defined. If ``None``, the target
@@ -602,11 +678,11 @@ class Grid(object):
         """
         axes = Axes(axes)
         to_axes = axes if to_axes is None else Axes(to_axes)
-        vectors_ = as_tensor(vectors)
-        if not torch.is_floating_point(vectors_):
-            vectors_ = vectors_.type(self.dtype)
+        vectors = as_tensor(vectors)
+        if not vectors.is_floating_point():
+            vectors = vectors.type(self.dtype)
         if axes is Axes.WORLD and to_axes is Axes.WORLD:
-            return vectors_
+            return vectors
         if to_grid is None or to_grid == self:
             if axes is not to_axes:
                 affine = None  # affine transform required if reorientation needed
@@ -646,17 +722,17 @@ class Grid(object):
                     )
                 if affine is None:
                     assert scales is not None
-                    scales = scales.to(dtype=vectors_.dtype, device=vectors_.device)
-                    vectors_ = vectors_ * scales
+                    scales = scales.to(vectors)
+                    vectors = vectors * scales
                 else:
-                    affine = affine.to(dtype=vectors_.dtype, device=vectors_.device)
-                    tensor = vectors_.reshape(-1, vectors_.shape[-1])
-                    vectors_ = F.linear(tensor, affine).reshape(vectors_.shape)
+                    affine = affine.to(vectors)
+                    tensor = vectors.reshape(-1, vectors.shape[-1])
+                    vectors = F.linear(tensor, affine).reshape(vectors.shape)
         else:
             matrix = self.transform(axes, to_axes, to_grid=to_grid, vectors=True)
-            matrix = matrix.to(dtype=vectors_.dtype, device=vectors_.device)
-            vectors_ = homogeneous_transform(matrix, vectors_, vectors=True)
-        return vectors_
+            matrix = matrix.to(vectors)
+            vectors = homogeneous_transform(matrix, vectors, vectors=True)
+        return vectors
 
     def index_to_cube(
         self, indices: Array, decimals: int = -1, align_corners: Optional[bool] = None
@@ -861,7 +937,7 @@ class Grid(object):
             device=device,
         )
         if axes is not Axes.CUBE and axes is not Axes.GRID:
-            coords = self.transform_points(coords, Axes.GRID, to_axes=axes)
+            coords = self.apply_transform(coords, Axes.GRID, to_axes=axes)
         return coords
 
     def _resize(self, size: Tensor, align_corners: Optional[bool] = None) -> Grid:
@@ -913,12 +989,12 @@ class Grid(object):
             New grid with given ``size`` and adjusted ``Grid.spacing()``.
 
         """
-        size_ = self._cat_scalars(size, *args)
-        if not is_int_dtype(size_.dtype):
-            raise TypeError(f"Grid.resize() 'size' must be integer values, got dtype={size_.dtype}")
-        if torch.any(size_.lt(0)):
+        size = cat_scalars(size, *args, num=self.ndim, device=self.device)
+        if not is_int_dtype(size.dtype):
+            raise TypeError(f"Grid.resize() 'size' must be integer values, got dtype={size.dtype}")
+        if size.lt(0).any():
             raise ValueError("Grid.resize() 'size' must be all non-negative numbers")
-        return self._resize(size_, align_corners=align_corners)
+        return self._resize(size, align_corners=align_corners)
 
     def reshape(
         self,
@@ -940,8 +1016,12 @@ class Grid(object):
             New grid with given ``shape`` and adjusted ``Grid.spacing()``.
 
         """
-        shape_ = self._cat_scalars(shape, *args)
-        return self.resize(shape_.flip(0))
+        shape = cat_scalars(shape, *args, num=self.ndim, device=self.device)
+        if not is_int_dtype(shape.dtype):
+            raise TypeError(
+                f"Grid.reshape() 'shape' must be integer values, got dtype={shape.dtype}"
+            )
+        return self.resize(shape.flip(0))
 
     def resample(self, spacing: Union[float, Array, str], *args: float, min_size: int = 1) -> Grid:
         r"""Create new grid with specified spacing.
@@ -962,16 +1042,16 @@ class Grid(object):
         elif spacing == "max":
             assert not args
             spacing = self._spacing.max()
-        spacing_ = self._cat_scalars(spacing, *args).to(self.dtype)
-        if torch.all(spacing_.eq(self._spacing)):
+        spacing = cat_scalars(spacing, *args, num=self.ndim, dtype=self.dtype, device=self.device)
+        if torch.allclose(spacing, self._spacing):
             return self
-        if torch.any(spacing_.le(0)):
+        if spacing.le(0).any():
             raise ValueError("Grid.resample() 'spacing' must be all positive numbers")
-        size = self.extent() / spacing_
+        size = self.extent().div(spacing)
         size = torch.where(self._size.gt(0), size.clamp(min=min_size), size)
         grid = shallow_copy(self)
         grid._size = size
-        grid._spacing = spacing_
+        grid._spacing = spacing
         return grid
 
     def avg_pool(
@@ -1208,15 +1288,15 @@ class Grid(object):
 
     def center_crop(self, size: Union[int, Array], *args: int) -> Grid:
         r"""Crop grid to specified maximum size."""
-        size_ = self._cat_scalars(size, *args)
-        if not is_int_dtype(size_.dtype):
+        size = cat_scalars(size, *args, num=self.ndim, device=self.device)
+        if not is_int_dtype(size.dtype):
             raise TypeError(
-                f"Grid.center_crop() expected scalar or array of integer values, got dtype={size_.dtype}"
+                f"Grid.center_crop() expected scalar or array of integer values, got dtype={size.dtype}"
             )
-        size_ = [min(m, n) for m, n in zip(self.size(), size_.tolist())]
-        origin = [(m - n) // 2 for m, n in zip(self.size(), size_)]
+        size = [min(m, n) for m, n in zip(self.size(), size.tolist())]
+        origin = [(m - n) // 2 for m, n in zip(self.size(), size)]
         return Grid(
-            size=size_,
+            size=size,
             origin=self.index_to_world(origin),
             spacing=self.spacing(),
             direction=self.direction(),
@@ -1226,15 +1306,15 @@ class Grid(object):
 
     def center_pad(self, size: Union[int, Array], *args: int) -> Grid:
         r"""Pad grid to specified minimum size."""
-        size_ = self._cat_scalars(size, *args)
-        if not is_int_dtype(size_.dtype):
+        size = cat_scalars(size, *args, num=self.ndim, device=self.device)
+        if not is_int_dtype(size.dtype):
             raise TypeError(
-                f"Grid.center_crop() expected scalar or array of integer values, got dtype={size_.dtype}"
+                f"Grid.center_crop() expected scalar or array of integer values, got dtype={size.dtype}"
             )
-        size_ = [max(m, n) for m, n in zip(self.size(), size_.tolist())]
-        origin = [-((n - m) // 2) for m, n in zip(self.size(), size_)]
+        size = [max(m, n) for m, n in zip(self.size(), size.tolist())]
+        origin = [-((n - m) // 2) for m, n in zip(self.size(), size)]
         return Grid(
-            size=size_,
+            size=size,
             origin=self.index_to_world(origin),
             spacing=self.spacing(),
             direction=self.direction(),
@@ -1258,15 +1338,10 @@ class Grid(object):
         )
 
     def same_domain_as(self, other: Grid) -> bool:
-        """Check if this and another grid cover the same unit cube domain."""
+        """Check if this and another grid cover the same cube domain."""
         if other is self:
             return True
-        return (
-            self.align_corners() == other.align_corners()
-            and torch.allclose(self.center(), other.center())
-            and torch.allclose(self.direction(), other.direction())
-            and torch.allclose(self.cube_extent(), other.cube_extent())
-        )
+        return self.domain() == other.domain()
 
     def __eq__(self, other: Any) -> bool:
         r"""Compare this grid to another."""
@@ -1282,6 +1357,7 @@ class Grid(object):
             if type(value) != type(other_value):
                 return False
             if isinstance(value, Tensor):
+                assert isinstance(other_value, Tensor)
                 if value.shape != other_value.shape:
                     return False
                 if not torch.allclose(value, other_value, rtol=1e-5, atol=1e-8):
@@ -1290,17 +1366,13 @@ class Grid(object):
                 return False
         return True
 
-    def _cat_scalars(self, arg, *args) -> Tensor:
-        r"""Concatenate or repeat scalar function arguments."""
-        return cat_scalars(arg, *args, num=self.ndim, device=self.device)
-
     def __repr__(self) -> str:
-        """String representation."""
+        r"""String representation."""
         size = ", ".join([f"{v:>6.2f}" for v in self._size])
-        center = ", ".join([f"{v:.5f}" for v in self.center()])
+        center = ", ".join([f"{v:.5f}" for v in self._center])
         origin = ", ".join([f"{v:.5f}" for v in self.origin()])
-        spacing = ", ".join([f"{v:.5f}" for v in self.spacing()])
-        direction = ", ".join([f"{v:.5f}" for v in self.direction().flatten()])
+        spacing = ", ".join([f"{v:.5f}" for v in self._spacing])
+        direction = ", ".join([f"{v:.5f}" for v in self._direction.flatten()])
         return (
             f"{type(self).__name__}("
             + f"size=({size})"
@@ -1309,7 +1381,7 @@ class Grid(object):
             + f", spacing=({spacing})"
             + f", direction=({direction})"
             + f", device={repr(str(self.device))}"
-            + f", align_corners={repr(self.align_corners())}"
+            + f", align_corners={repr(self._align_corners)}"
             + ")"
         )
 
