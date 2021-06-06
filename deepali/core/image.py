@@ -1221,6 +1221,56 @@ def rescale(
     return result
 
 
+def sample_image(
+    data: Tensor,
+    coords: Tensor,
+    mode: Optional[Union[Sampling, str]] = None,
+    padding: Optional[Union[PaddingMode, str, Scalar]] = None,
+    align_corners: bool = ALIGN_CORNERS,
+) -> Tensor:
+    r"""Sample images at given points.
+
+    This function samples a batch of images at spatial points. The ``coords`` tensor can be of any shape,
+    including ``(N, M, D)``, i.e., a batch of N point sets with cardianality M, and ``(N, ..., X, D)`` ,
+    i.e., a (deformed) regular sampling grid (cf. ``grid_sample()``).
+
+    Args:
+        data: Batch of images as tensor of shape ``(N, C, ..., X)``. If batch size is one,
+            but the batch size of ``coords`` is greater than one, this single image is sampled
+            at the different sets of points.
+        coords: Normalized coordinates of points given as tensor of shape ``(N, ..., D)``
+            or ``(1, ..., D)``. If batch size is one, all images are sampled at the same points.
+        align_corners: Whether point coordinates are with respect to ``Axes.CUBE`` (False)
+            or ``Axes.CUBE_CORNERS`` (True). This option is in particular passed on to the
+            ``grid_sample()`` function used to sample the images at the given points.
+
+    Returns:
+        Sampled image data as tensor of shape ``(N, C, ...)``, where ``...`` is ``coords.shape[:-1]``.
+
+    """
+    if not isinstance(data, Tensor):
+        raise TypeError("sample_image() 'data' must be of type torch.Tensor")
+    data = data.as_subclass(Tensor)
+    if data.ndim < 4:
+        raise ValueError("sample_image() 'data' must be at least 4-dimensional tensor")
+    if not isinstance(coords, Tensor):
+        raise TypeError("sample_image() 'coords' must be of type torch.Tensor")
+    if coords.ndim < 2:
+        raise ValueError("sample_image() 'coords' must be at least 2-dimensional tensor")
+    G = data.shape[0]
+    N = coords.shape[0] if G == 1 else G
+    D = data.shape[1]
+    if coords.shape[0] not in (1, N):
+        raise ValueError(f"sample_flow() 'coords' must be batch of length 1 or {N}")
+    if coords.shape[-1] != D:
+        raise ValueError(f"sample_flow() 'coords' must be tensor of {D}-dimensional points")
+    x = coords.expand((N,) + coords.shape[1:])
+    data = data.expand((N,) + data.shape[1:])
+    grid = x.reshape((N,) + (1,) * (data.ndim - 3) + (-1, D))  # pseudo grid
+    data = grid_sample(data, grid, mode=mode, padding=padding, align_corners=align_corners)
+    return data.reshape(data.shape[:2] + coords.shape[:-1])
+
+
 def spatial_derivatives(
     data: Tensor,
     mode: str = "central",

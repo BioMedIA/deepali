@@ -1,9 +1,6 @@
 Core:
 - [ ] Enable `Grid` to represent a batch of sampling grids, or add `GridBatch` (cf. `Image` <-> `ImageBatch`).
 
-Data:
-- [ ] `Image.sample` function with arbitrarily shaped point set tensor (..., D).
-
 Transforms:
 - [ ] Basic data augmentations.
 

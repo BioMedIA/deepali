@@ -16,7 +16,7 @@ except ImportError:
 
 from ..core.cube import Cube
 from ..core.enum import PaddingMode, Sampling
-from ..core.grid import ALIGN_CORNERS, Axes, Grid
+from ..core.grid import ALIGN_CORNERS, Axes, Grid, grid_transform_points
 from ..core import image as U
 from ..core.path import unlink_or_mkdir
 from ..core.tensor import cat_scalars
@@ -624,7 +624,7 @@ class ImageBatch(DataTensor):
     @overload
     def sample(
         self: TImageBatch,
-        grid: Grid,
+        grid: Union[Grid, Sequence[Grid]],
         mode: Optional[Union[Sampling, str]] = None,
         padding: Optional[Union[PaddingMode, str, Scalar]] = None,
     ) -> TImageBatch:
@@ -644,62 +644,88 @@ class ImageBatch(DataTensor):
     @overload
     def sample(
         self: TImageBatch,
-        grid: Tensor,
+        coords: Tensor,
         mode: Optional[Union[Sampling, str]] = None,
         padding: Optional[Union[PaddingMode, str, Scalar]] = None,
     ) -> Tensor:
         r"""Sample images at optionally deformed unit grid points.
 
         Args:
-            grid: Spatial grid points at which to sample image values.
+            coords: Normalized coordinates at which to sample image values as tensor of
+                shape ``(N, ..., D)`` or ``(1, ..., D)``. Note that the shape ``...`` need
+                not correspond to a (deformed) grid as required by ``grid_sample()``.
+                It can be an arbitrary shape, e.g., ``M`` to sample at ``M`` given points.
             mode: Image interpolation mode.
             padding: Image extrapolation mode or scalar padding value.
 
         Returns:
-            A tensor of shape (N, C, ..., X) of sampled image values as ``grid`` points.
+            A tensor of shape (N, C, ...) of sampled image values.
 
         """
         ...
 
     def sample(
         self: TImageBatch,
-        grid: Union[Grid, Tensor],
+        arg: Union[Grid, Sequence[Grid], Tensor],
         mode: Optional[Union[Sampling, str]] = None,
         padding: Optional[Union[PaddingMode, str, Scalar]] = None,
-    ) -> TImageBatch:
+    ) -> Union[TImageBatch, Tensor]:
         r"""Sample images at optionally deformed unit grid points.
 
         Args:
-            grid: Spatial grid points at which to sample image values.
+            arg: Either a single grid which defines the sampling points for all images in the batch,
+                a different grid for each image in the batch, or a tensor of normalized coordinates
+                with shape ``(N, ..., D)`` or ``(1, ..., D)``. In the latter case, note that the
+                shape ``...`` need not correspond to a (deformed) grid as required by ``grid_sample()``.
+                It can be an arbitrary shape, e.g., ``M`` to sample at ``M`` given points.
             mode: Image interpolation mode.
             padding: Image extrapolation mode or scalar padding value.
 
         Returns:
-            If ``grid`` is of type ``Grid``, an ``ImageBatch`` with the resampled data as
-            tensor attribute and the given sampling grid instance set as grid attribute.
-            Otherwise, a ``Tensor`` of grid sample points with respect to the unit cube is
-            expected as ``grid``, and the returned value is a ``Tensor`` of the sampled values.
+            If ``arg`` is of type ``Grid`` or ``Sequence[Grid]``, an ``ImageBatch`` is returned.
+            When these grids match the grids of this image batch, ``self`` is returned.
+            Otherwise, a ``Tensor`` of shape (N, C, ...) of sampled image values is returned.
 
         """
-        if isinstance(grid, Grid):
-            if all(grid == g for g in self._grid):
-                return self
-            align_corners = grid.align_corners()
-            axes = Axes.from_align_corners(align_corners)
-            coords = grid.coords(align_corners=align_corners, device=self.device).unsqueeze(0)
-            points = [grid.transform_points(coords, axes, to_grid=g) for g in self._grid]
-            points = torch.cat(points, dim=0)
-            data = U.grid_sample(
-                self,
-                points,
-                mode=mode,
-                padding=padding,
-                align_corners=align_corners,
-            )
-            return self._make_instance(data, grid)
         data = self.tensor()
         align_corners = self.align_corners()
-        return U.grid_sample(data, grid, mode=mode, padding=padding, align_corners=align_corners)
+        if isinstance(arg, Tensor):
+            return U.sample_image(
+                data, arg, mode=mode, padding=padding, align_corners=align_corners
+            )
+        if isinstance(arg, Grid):
+            arg = (arg,)
+        elif not isinstance(arg, Sequence) or any(not isinstance(item, Grid) for item in arg):
+            raise TypeError(
+                f"{type(self).__name__}.sample() 'arg' must be Grid, Sequence[Grid], or Tensor"
+            )
+        if len(arg) == 1:
+            grid = arg[0]
+            if all(grid == g for g in self._grid):
+                return self
+            coords = grid.coords(align_corners=align_corners, device=self.device).unsqueeze(0)
+        elif len(arg) == len(self):
+            if all(grid == g for grid, g in zip(arg, self._grid)):
+                return self
+            axes = Axes.from_align_corners(align_corners)
+            coords = [grid.coords(align_corners=align_corners, device=self.device) for grid in arg]
+            coords = [
+                grid_transform_points(p, grid, axes, to_grid)
+                for grid, to_grid, p in zip(arg, self._grid, coords)
+            ]
+            coords = torch.cat([tensor.unsqueeze(0) for tensor in coords], dim=0)
+        else:
+            raise ValueError(
+                f"{type(self).__name__}.sample() 'arg' must be one or {len(self)} grids"
+            )
+        data = U.grid_sample(
+            data,
+            coords,
+            mode=mode,
+            padding=padding,
+            align_corners=align_corners,
+        )
+        return self._make_instance(data, grid)
 
 
 class Image(DataTensor):
