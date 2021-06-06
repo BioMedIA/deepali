@@ -212,24 +212,22 @@ def denormalize_flow(
     return data
 
 
-def sample_flow(transform: Tensor, points: Tensor, align_corners: bool = ALIGN_CORNERS) -> Tensor:
+def sample_flow(flow: Tensor, coords: Tensor, align_corners: bool = ALIGN_CORNERS) -> Tensor:
     r"""Sample non-rigid flow fields at given points.
 
-    This function samples a vector field at spatial points. The ``points`` tensor can be of any shape,
+    This function samples a vector field at spatial points. The ``coords`` tensor can be of any shape,
     including ``(N, M, D)``, i.e., a batch of N point sets with cardianality M. It can also be applied to
     a tensor of grid points of shape ``(N, ..., X, D)`` regardless if the grid points are located at the
     undeformed grid positions or an already deformed grid. The given non-rigid flow field is interpolated
     at the input points ``x`` using linear interpolation. These flow vectors ``u(x)`` are returned.
 
     Args:
-        transform: Flow fields of non-rigid transformations given as tensor of shape
-            ``(N, D, ..., X)`` or ``(1, D, ..., X)``. If batch size is one, but the batch size
-            of ``points`` is greater than one, all point sets are transformed by the same non-rigid
-            transformation.
-        points: Coordinates of points given as tensor of shape ``(N, ..., D)`` or ``(1, ..., D)``.
-            If batch size is one, but multiple flow fields are given, this single point set is
-            transformed by each non-rigid transformation to produce ``N`` output point sets.
-        align_corners: Whether points and flow vectors are with respect to ``Axes.CUBE`` (False)
+        flow: Flow fields of non-rigid transformations given as tensor of shape ``(N, D, ..., X)``
+            or ``(1, D, ..., X)``. If batch size is one, but the batch size of ``coords`` is greater
+            than one, this single flow fields is sampled at the different sets of points.
+        coords: Normalized coordinates of points given as tensor of shape ``(N, ..., D)``
+            or ``(1, ..., D)``. If batch size is one, all flow fields are sampled at the same points.
+        align_corners: Whether point coordinates are with respect to ``Axes.CUBE`` (False)
             or ``Axes.CUBE_CORNERS`` (True). This option is in particular passed on to the
             ``grid_sample()`` function used to sample the flow vectors at the input points.
 
@@ -237,23 +235,23 @@ def sample_flow(transform: Tensor, points: Tensor, align_corners: bool = ALIGN_C
         Tensor of shape ``(N, ..., D)``.
 
     """
-    if not isinstance(transform, Tensor):
-        raise TypeError("sample_flow() 'transform' must be of type torch.Tensor")
-    if transform.ndim < 4:
-        raise ValueError("sample_flow() 'transform' must be at least 4-dimensional tensor")
-    if not isinstance(points, Tensor):
-        raise TypeError("sample_flow() 'points' must be of type torch.Tensor")
-    if points.ndim < 2:
-        raise ValueError("sample_flow() 'points' must be at least 2-dimensional tensor")
-    G = transform.shape[0]
-    N = points.shape[0] if G == 1 else G
-    D = transform.shape[1]
-    if points.shape[0] not in (1, N):
-        raise ValueError(f"sample_flow() 'points' must be batch of length 1 or {N}")
-    if points.shape[-1] != D:
-        raise ValueError(f"sample_flow() 'points' must be tensor of {D}-dimensional points")
-    x = points.expand((N,) + points.shape[1:])
-    t = transform.expand((N,) + transform.shape[1:])
+    if not isinstance(flow, Tensor):
+        raise TypeError("sample_flow() 'flow' must be of type torch.Tensor")
+    if flow.ndim < 4:
+        raise ValueError("sample_flow() 'flow' must be at least 4-dimensional tensor")
+    if not isinstance(coords, Tensor):
+        raise TypeError("sample_flow() 'coords' must be of type torch.Tensor")
+    if coords.ndim < 2:
+        raise ValueError("sample_flow() 'coords' must be at least 2-dimensional tensor")
+    G = flow.shape[0]
+    N = coords.shape[0] if G == 1 else G
+    D = flow.shape[1]
+    if coords.shape[0] not in (1, N):
+        raise ValueError(f"sample_flow() 'coords' must be batch of length 1 or {N}")
+    if coords.shape[-1] != D:
+        raise ValueError(f"sample_flow() 'coords' must be tensor of {D}-dimensional points")
+    x = coords.expand((N,) + coords.shape[1:])
+    t = flow.expand((N,) + flow.shape[1:])
     g = x.reshape((N,) + (1,) * (t.ndim - 3) + (-1, D))
     u = grid_sample(t, g, padding=PaddingMode.BORDER, align_corners=align_corners)
     u = move_dim(u, 1, -1)
@@ -261,7 +259,7 @@ def sample_flow(transform: Tensor, points: Tensor, align_corners: bool = ALIGN_C
     return u
 
 
-def warp_grid(transform: Tensor, grid: Tensor, align_corners: bool = ALIGN_CORNERS) -> Tensor:
+def warp_grid(flow: Tensor, grid: Tensor, align_corners: bool = ALIGN_CORNERS) -> Tensor:
     r"""Transform undeformed grid by a tensor of non-rigid flow fields.
 
     This function applies a non-rigid transformation to map a tensor of undeformed grid points to a
@@ -276,10 +274,9 @@ def warp_grid(transform: Tensor, grid: Tensor, align_corners: bool = ALIGN_CORNE
     the spatial transformation, use ``warp_points()`` instead.
 
     Args:
-        transform: Flow fields of non-rigid transformations given as tensor of shape
-            ``(N, D, ..., X)`` or ``(1, D, ..., X)``. If batch size is one, but the batch size
-            of ``points`` is greater than one, all point sets are transformed by the same non-rigid
-            transformation.
+        flow: Flow fields of non-rigid transformations given as tensor of shape ``(N, D, ..., X)``
+            or ``(1, D, ..., X)``. If batch size is one, but the batch size of ``points`` is greater
+            than one, all point sets are transformed by the same non-rigid transformation.
         grid: Coordinates of points given as tensor of shape ``(N, ..., D)`` or ``(1, ..., D)``.
             If batch size is one, but multiple flow fields are given, this single point set is
             transformed by each non-rigid transformation to produce ``N`` output point sets.
@@ -291,30 +288,30 @@ def warp_grid(transform: Tensor, grid: Tensor, align_corners: bool = ALIGN_CORNE
         Tensor of shape ``(N, ..., D)`` with coordinates of spatially transformed points.
 
     """
-    if not isinstance(transform, Tensor):
-        raise TypeError("warp_grid() 'transform' must be of type torch.Tensor")
-    if transform.ndim < 4:
-        raise ValueError("warp_grid() 'transform' must be at least 4-dimensional tensor")
+    if not isinstance(flow, Tensor):
+        raise TypeError("warp_grid() 'flow' must be of type torch.Tensor")
+    if flow.ndim < 4:
+        raise ValueError("warp_grid() 'flow' must be at least 4-dimensional tensor")
     if not isinstance(grid, Tensor):
         raise TypeError("warp_grid() 'grid' must be of type torch.Tensor")
     if grid.ndim < 4:
         raise ValueError("warp_grid() 'grid' must be at least 4-dimensional tensor")
-    G = transform.shape[0]
+    G = flow.shape[0]
     N = grid.shape[0] if G == 1 else G
-    D = transform.shape[1]
+    D = flow.shape[1]
     if grid.shape[0] not in (1, N):
         raise ValueError(f"warp_grid() 'grid' must be batch of length 1 or {N}")
     if grid.shape[-1] != D:
         raise ValueError(f"warp_grid() 'grid' must be tensor of {D}-dimensional points")
     x = grid.expand((N,) + grid.shape[1:])
-    t = transform.expand((N,) + transform.shape[1:])
+    t = flow.expand((N,) + flow.shape[1:])
     u = grid_reshape(t, grid.shape[1:-1], align_corners=align_corners)
     u = move_dim(u, 1, -1)
     y = x + u
     return y
 
 
-def warp_points(transform: Tensor, points: Tensor, align_corners: bool = ALIGN_CORNERS) -> Tensor:
+def warp_points(flow: Tensor, coords: Tensor, align_corners: bool = ALIGN_CORNERS) -> Tensor:
     r"""Transform set of points by a tensor of non-rigid flow fields.
 
     This function applies a non-rigid transformation to map a tensor of spatial points to another tensor
@@ -327,13 +324,12 @@ def warp_points(transform: Tensor, points: Tensor, align_corners: bool = ALIGN_C
     vectors ``u(x)`` are then added to the input points, i.e., ``y = x + u(x)``.
 
     Args:
-        transform: Flow fields of non-rigid transformations given as tensor of shape
-            ``(N, D, ..., X)`` or ``(1, D, ..., X)``. If batch size is one, but the batch size
-            of ``points`` is greater than one, all point sets are transformed by the same non-rigid
-            transformation.
-        points: Coordinates of points given as tensor of shape ``(N, ..., D)`` or ``(1, ..., D)``.
-            If batch size is one, but multiple flow fields are given, this single point set is
-            transformed by each non-rigid transformation to produce ``N`` output point sets.
+        flow: Flow fields of non-rigid transformations given as tensor of shape ``(N, D, ..., X)``
+            or ``(1, D, ..., X)``. If batch size is one, but the batch size of ``points`` is greater
+            than one, all point sets are transformed by the same non-rigid transformation.
+        coords: Normalized coordinates of points given as tensor of shape ``(N, ..., D)``
+            or ``(1, ..., D)``. If batch size is one, this single point set is deformed by each
+            flow field to produce ``N`` output point sets.
         align_corners: Whether points and flow vectors are with respect to ``Axes.CUBE`` (False)
             or ``Axes.CUBE_CORNERS`` (True). This option is in particular passed on to the
             ``grid_sample()`` function used to sample the flow vectors at the input points.
@@ -342,8 +338,8 @@ def warp_points(transform: Tensor, points: Tensor, align_corners: bool = ALIGN_C
         Tensor of shape ``(N, ..., D)`` with coordinates of spatially transformed points.
 
     """
-    u = sample_flow(transform, points, align_corners=align_corners)
-    x = points.reshape_as(u)
+    u = sample_flow(flow, coords, align_corners=align_corners)
+    x = coords.reshape_as(u)
     y = x + u
     return y
 
