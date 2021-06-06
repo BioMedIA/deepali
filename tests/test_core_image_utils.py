@@ -1,7 +1,8 @@
 import torch
 from torch import Tensor
 
-import deepali.core.image as U
+from deepali.core import Grid
+from deepali.core import functional as U
 
 
 def test_fill_border():
@@ -39,3 +40,23 @@ def test_fill_border():
     assert result[:, :, :, :, 8:].eq(1).all()
     assert result[:, :, 2:5, 1:4, 3:8].eq(0).all()
     assert result.sum() == 680
+
+
+def test_sample_image() -> None:
+    shape = torch.Size((5, 2, 32, 64, 63))
+    image: Tensor = torch.arange(shape.numel())
+    image = image.reshape(shape)
+    grid = Grid(shape=shape[2:])
+
+    indices = torch.arange(0, grid.numel(), 10)
+    voxels = U.unravel_coords(indices.unsqueeze(0), grid.size())
+    coords = grid.index_to_cube(voxels)
+    assert coords.dtype == grid.dtype
+    assert coords.dtype.is_floating_point
+    assert coords.shape == (1, len(indices), 3)
+    assert coords.min().ge(-1)
+    assert coords.max().le(1)
+
+    result = U.sample_image(image, coords, mode="nearest")
+    expected = image.flatten(2).index_select(2, indices)
+    assert result.eq(expected).all()

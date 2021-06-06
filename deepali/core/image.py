@@ -1245,7 +1245,7 @@ def sample_image(
             ``grid_sample()`` function used to sample the images at the given points.
 
     Returns:
-        Sampled image data as tensor of shape ``(N, C, ...)``, where ``...`` is ``coords.shape[:-1]``.
+        Sampled image data as tensor of shape ``(N, C, *coords.shape[1:-1])``.
 
     """
     if not isinstance(data, Tensor):
@@ -1259,16 +1259,16 @@ def sample_image(
         raise ValueError("sample_image() 'coords' must be at least 2-dimensional tensor")
     G = data.shape[0]
     N = coords.shape[0] if G == 1 else G
-    D = data.shape[1]
+    D = data.ndim - 2
     if coords.shape[0] not in (1, N):
-        raise ValueError(f"sample_flow() 'coords' must be batch of length 1 or {N}")
+        raise ValueError(f"sample_image() 'coords' must be batch of length 1 or {N}")
     if coords.shape[-1] != D:
-        raise ValueError(f"sample_flow() 'coords' must be tensor of {D}-dimensional points")
+        raise ValueError(f"sample_image() 'coords' must be tensor of {D}-dimensional points")
     x = coords.expand((N,) + coords.shape[1:])
     data = data.expand((N,) + data.shape[1:])
     grid = x.reshape((N,) + (1,) * (data.ndim - 3) + (-1, D))  # pseudo grid
     data = grid_sample(data, grid, mode=mode, padding=padding, align_corners=align_corners)
-    return data.reshape(data.shape[:2] + coords.shape[:-1])
+    return data.reshape(data.shape[:2] + coords.shape[1:-1])
 
 
 def spatial_derivatives(
