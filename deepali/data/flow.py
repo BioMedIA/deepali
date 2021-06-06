@@ -320,30 +320,50 @@ class FlowField(Image):
         image = cls._read_sitk(path)
         return cls.from_sitk(image, axes)
 
-    def exp(self: TFlowField, **kwargs) -> TFlowField:
-        r"""Group exponential map of vector field computed using scaling and squaring."""
-        batch = self.batch()
-        flow = batch.exp(**kwargs)[0]
-        return type(self).from_image(flow)
-
-    def curl(self: TFlowField, **kwargs) -> Image:
+    def curl(self: TFlowField, mode: str = "central") -> Image:
         r"""Compute curl of vector field."""
         batch = self.batch()
-        rotvec = batch.curl(**kwargs)
+        rotvec = batch.curl(mode=mode)
         return rotvec[0]
 
+    def exp(
+        self: TFlowField,
+        scale: Optional[float] = None,
+        steps: Optional[int] = None,
+        sampling: Union[Sampling, str] = Sampling.LINEAR,
+        padding: Union[PaddingMode, str] = PaddingMode.BORDER,
+    ) -> TFlowField:
+        r"""Group exponential map of vector field computed using scaling and squaring."""
+        batch = self.batch()
+        batch = batch.exp(scale=scale, steps=steps, sampling=sampling, padding=padding)
+        flow = batch[0]
+        return type(self).from_image(flow)
+
     @overload
-    def warp_image(self: TFlowField, image: Image, **kwargs) -> Image:
+    def warp_image(
+        self: TFlowField,
+        image: Image,
+        sampling: Optional[Union[Sampling, str]] = None,
+        padding: Optional[Union[PaddingMode, str]] = None,
+    ) -> Image:
         r"""Deform given image using this displacement field."""
         ...
 
     @overload
-    def warp_image(self: TFlowField, image: ImageBatch, **kwargs) -> ImageBatch:
+    def warp_image(
+        self: TFlowField,
+        image: ImageBatch,
+        sampling: Optional[Union[Sampling, str]] = None,
+        padding: Optional[Union[PaddingMode, str]] = None,
+    ) -> ImageBatch:
         r"""Deform images in batch using this displacement field."""
         ...
 
     def warp_image(
-        self: TFlowField, image: Union[Image, ImageBatch], **kwargs
+        self: TFlowField,
+        image: Union[Image, ImageBatch],
+        sampling: Optional[Union[Sampling, str]] = None,
+        padding: Optional[Union[PaddingMode, str]] = None,
     ) -> Union[Image, ImageBatch]:
         r"""Deform given image (batch) using this displacement field.
 
@@ -357,7 +377,7 @@ class FlowField(Image):
 
         """
         batch = self.batch()
-        result = batch.warp_image(image, **kwargs)
+        result = batch.warp_image(image, sampling=sampling, padding=padding)
         if isinstance(image, Image) and len(result) == 1:
             return result[0]
         return result

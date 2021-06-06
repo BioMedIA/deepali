@@ -928,22 +928,39 @@ class Image(DataTensor):
         path = unlink_or_mkdir(path)
         sitk.WriteImage(image, str(path), compress)
 
-    def normalize(self: TImage, *args, **kwargs) -> TImage:
+    def normalize(
+        self: TImage,
+        mode: str = "unit",
+        min: Optional[float] = None,
+        max: Optional[float] = None,
+    ) -> TImage:
         r"""Normalize image intensities in [min, max]."""
         batch = self.batch()
-        batch = batch.normalize(*args, **kwargs)
+        batch = batch.normalize(mode=mode, min=min, max=max)
         return batch[0]
 
-    def normalize_(self: TImage, *args, **kwargs) -> TImage:
+    def normalize_(
+        self: TImage,
+        mode: str = "unit",
+        min: Optional[float] = None,
+        max: Optional[float] = None,
+    ) -> TImage:
         r"""Normalize image intensities in [min, max]."""
         batch = self.batch()
-        batch = batch.normalize_(*args, **kwargs)
+        batch = batch.normalize_(mode=mode, min=min, max=max)
         return batch[0]
 
-    def rescale(self: TImage, *args, **kwargs) -> TImage:
+    def rescale(
+        self: TImage,
+        min: Optional[Scalar] = None,
+        max: Optional[Scalar] = None,
+        data_min: Optional[Scalar] = None,
+        data_max: Optional[Scalar] = None,
+        dtype: Optional[DType] = None,
+    ) -> TImage:
         r"""Clamp and linearly rescale image values."""
         batch = self.batch()
-        batch = batch.rescale(*args, **kwargs)
+        batch = batch.rescale(min, max, data_min, data_max, dtype=dtype)
         return batch[0]
 
     def narrow(self: TImage, dim: int, start: int, length: int) -> TImage:
@@ -952,70 +969,146 @@ class Image(DataTensor):
         batch = batch.narrow(dim, start, length)
         return batch[0]
 
-    def resize(self: TImage, *args, **kwargs) -> TImage:
+    def resize(
+        self: TImage,
+        size: Union[int, Array, Size],
+        *args: int,
+        mode: Union[Sampling, str] = Sampling.LINEAR,
+        align_corners: Optional[bool] = None,
+    ) -> TImage:
         r"""Interpolate image with specified spatial image grid size."""
         batch = self.batch()
-        batch = batch.resize(*args, **kwargs)
+        batch = batch.resize(size, *args, mode=mode, align_corners=align_corners)
         return batch[0]
 
-    def resample(self: TImage, *args, **kwargs) -> TImage:
+    def resample(
+        self: TImage,
+        spacing: Union[float, Array, str],
+        *args: float,
+        mode: Union[Sampling, str] = Sampling.LINEAR,
+    ) -> TImage:
         r"""Interpolate image with specified spacing."""
         batch = self.batch()
-        batch = batch.resample(*args, **kwargs)
+        batch = batch.resample(spacing, *args, mode=mode)
         return batch[0]
 
-    def avg_pool(self: TImage, *args, **kwargs) -> TImage:
+    def avg_pool(
+        self: TImage,
+        kernel_size: ScalarOrTuple[int],
+        stride: Optional[ScalarOrTuple[int]] = None,
+        padding: ScalarOrTuple[int] = 0,
+        ceil_mode: bool = False,
+        count_include_pad: bool = True,
+    ) -> TImage:
         r"""Average pooling of image data."""
         batch = self.batch()
-        batch = batch.avg_pool(*args, **kwargs)
+        batch = batch.avg_pool(
+            kernel_size,
+            stride=stride,
+            padding=padding,
+            ceil_mode=ceil_mode,
+            count_include_pad=count_include_pad,
+        )
         return batch[0]
 
-    def downsample(self: TImage, *args, **kwargs) -> TImage:
+    def downsample(
+        self: TImage,
+        levels: int = 1,
+        sigma: Optional[Union[Scalar, Array]] = None,
+        mode: Optional[Union[Sampling, str]] = None,
+        min_size: int = 0,
+        align_corners: Optional[bool] = None,
+    ) -> TImage:
         r"""Downsample image a given number of times."""
         batch = self.batch()
-        batch = batch.downsample(*args, **kwargs)
+        batch = batch.downsample(
+            levels, sigma=sigma, mode=mode, min_size=min_size, align_corners=align_corners
+        )
         return batch[0]
 
-    def upsample(self: TImage, *args, **kwargs) -> TImage:
+    def upsample(
+        self: TImage,
+        levels: int = 1,
+        sigma: Optional[Union[Scalar, Array]] = None,
+        mode: Optional[Union[Sampling, str]] = None,
+        align_corners: Optional[bool] = None,
+    ) -> TImage:
         r"""Upsample image a given number of times."""
         batch = self.batch()
-        batch = batch.upsample(*args, **kwargs)
+        batch = batch.upsample(levels, sigma=sigma, mode=mode, align_corners=align_corners)
         return batch[0]
 
-    def pyramid(self: TImage, levels: int, start: int = 0, **kwargs) -> Dict[int, TImage]:
+    def pyramid(
+        self: TImage,
+        levels: int,
+        start: int = 0,
+        end: int = -1,
+        sigma: Optional[Union[Scalar, Array]] = None,
+        mode: Optional[Union[Sampling, str]] = None,
+        spacing: Optional[float] = None,
+        min_size: int = 0,
+        align_corners: Optional[bool] = None,
+    ) -> Dict[int, TImage]:
         r"""Create Gaussian resolution pyramid."""
         batch = self.batch()
-        batches = batch.pyramid(levels, start=start, **kwargs)
+        batches = batch.pyramid(
+            levels,
+            start,
+            end,
+            sigma=sigma,
+            mode=mode,
+            spacing=spacing,
+            min_size=min_size,
+            align_corners=align_corners,
+        )
         return {level: batch[0] for level, batch in batches.items()}
 
-    def crop(self: TImage, *args, **kwargs) -> TImage:
+    def crop(
+        self: TImage,
+        margin: Optional[Union[int, Array]] = None,
+        num: Optional[Union[int, Array]] = None,
+        mode: Union[PaddingMode, str] = PaddingMode.CONSTANT,
+        value: Scalar = 0,
+    ) -> TImage:
         r"""Crop image at boundary."""
         batch = self.batch()
-        batch = batch.crop(*args, **kwargs)
+        batch = batch.crop(margin=margin, num=num, mode=mode, value=value)
         return batch[0]
 
-    def pad(self: TImage, *args, **kwargs) -> TImage:
+    def pad(
+        self: TImage,
+        margin: Optional[Union[int, Array]] = None,
+        num: Optional[Union[int, Array]] = None,
+        mode: Union[PaddingMode, str] = PaddingMode.CONSTANT,
+        value: Scalar = 0,
+    ) -> TImage:
         r"""Pad image at boundary."""
         batch = self.batch()
-        batch = batch.pad(*args, **kwargs)
+        batch = batch.pad(margin=margin, num=num, mode=mode, value=value)
         return batch[0]
 
-    def center_crop(self: TImage, *args, **kwargs) -> TImage:
+    def center_crop(self: TImage, size: Union[int, Array], *args: int) -> TImage:
         r"""Crop image to specified maximum size."""
         batch = self.batch()
-        batch = batch.center_crop(*args, **kwargs)
+        batch = batch.center_crop(size, *args)
         return batch[0]
 
-    def center_pad(self: TImage, *args, **kwargs) -> TImage:
+    def center_pad(
+        self: TImage,
+        size: Union[int, Array],
+        *args: int,
+        mode: Union[PaddingMode, str] = PaddingMode.CONSTANT,
+        value: Scalar = 0,
+    ) -> TImage:
         r"""Pad image to specified minimum size."""
         batch = self.batch()
-        batch = batch.center_pad(*args, **kwargs)
+        batch = batch.center_pad(size, *args, mode=mode, value=value)
         return batch[0]
 
-    def conv(self: TImage, *args, **kwargs) -> TImage:
+    def conv(self: TImage, kernel: Tensor, padding: Union[PaddingMode, str, int] = None) -> TImage:
         r"""Filter image with a given (separable) kernel."""
         batch = self.batch()
-        batch = batch.conv(*args, **kwargs)
+        batch = batch.conv(kernel, padding=padding)
         return batch[0]
 
     @overload
