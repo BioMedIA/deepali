@@ -1019,34 +1019,93 @@ class Image(DataTensor):
         return batch[0]
 
     @overload
-    def sample(self: TImage, grid: Tensor, *args, **kwargs) -> Tensor:
-        r"""Sample image at optionally deformed unit grid points."""
+    def sample(
+        self: TImage,
+        coords: Tensor,
+        mode: Optional[Union[Sampling, str]] = None,
+        padding: Optional[Union[PaddingMode, str, Scalar]] = None,
+    ) -> Tensor:
+        r"""Sample image at optionally deformed unit grid points.
+
+        Note, to sample a set of 2D patches from a 3D volume, it may be beneficial to use ``ImageBatch.sample()``
+        instead such that the output tensor shape is ``(N, C, Y, X)`` instead of ``(C, N, Y, X)`` given an
+        input ``coords`` shape of ``(N, Y, X, D)``. For example, use ``image.batch().sample()``.
+
+        Args:
+            coords: Normalized coordinates of points at which to sample image as tensor of shape ``(..., D)``.
+                Typical tensor shapes are: ``(Y, X, D)`` or ``(Z, Y, X, D)`` to sample an image at (deformed)
+                2D or 3D grid points (cf. ``grid_sample()``), ``(N, D)`` to sample an image at a set of ``N``
+                points, and ``(N, Y, X, D)`` to sample ``N`` 2D patches of size ``(X, Y)`` from a 3D volume.
+            mode: Interpolation mode.
+            padding: Extrapolation mode or scalar padding value.
+
+        Returns:
+            Tensor of sampled image values with shape ``(C, ...)``, where ``C`` is the number of channels
+            of this image and ``...`` are the leading dimensions of ``coords`` (i.e., ``coords.shape[:-1]``).
+
+        """
         ...
 
     @overload
-    def sample(self: TImage, grid: Grid, *args, **kwargs) -> TImage:
-        r"""Sample image at optionally deformed unit grid points."""
+    def sample(
+        self: TImage,
+        grid: Grid,
+        mode: Optional[Union[Sampling, str]] = None,
+        padding: Optional[Union[PaddingMode, str, Scalar]] = None,
+    ) -> TImage:
+        r"""Sample image at optionally deformed unit grid points.
+
+        Args:
+            grid: Sample this image at the points of the given sampling grid.
+            mode: Interpolation mode.
+            padding: Extrapolation mode or scalar padding value.
+
+        Returns:
+            Image sampled at grid points.
+
+        """
         ...
 
-    def sample(self: TImage, grid: Union[Grid, Tensor], *args, **kwargs) -> Union[Tensor, TImage]:
-        r"""Sample image at optionally deformed unit grid points."""
+    def sample(
+        self: TImage,
+        arg: Union[Grid, Tensor],
+        mode: Optional[Union[Sampling, str]] = None,
+        padding: Optional[Union[PaddingMode, str, Scalar]] = None,
+    ) -> Union[Tensor, TImage]:
+        r"""Sample image at points given as normalized coordinates.
+
+        Note, to sample a set of 2D patches from a 3D volume, it may be beneficial to use ``ImageBatch.sample()``
+        instead such that the output tensor shape is ``(N, C, Y, X)`` instead of ``(C, N, Y, X)`` given an
+        input ``arg`` shape of ``(N, Y, X, D)``. For example, use ``image.batch().sample()``.
+
+        Args:
+            arg: Sampling grid defining points at which to sample image data, or normalized coordinates of
+                points at which to sample image as tensor of shape ``(..., D)``. Typical tensor shapes are:
+                ``(Y, X, D)`` or ``(Z, Y, X, D)`` to sample an image at (deformed) 2D or 3D grid points
+                (cf. ``grid_sample()``), ``(N, D)`` to sample an image at a set of ``N`` points, and
+                ``(N, Y, X, D)`` to sample ``N`` 2D patches of size ``(X, Y)`` from a 3D volume.
+            mode: Interpolation mode.
+            padding: Extrapolation mode or scalar padding value.
+
+        Returns:
+            If ``arg`` is of type ``Grid``, an ``Image`` with the sampled values and given sampling grid is returend.
+            When ``arg == self.grid()``, a reference to ``self`` is returned. Otherwise, a ``Tensor`` of sampled image
+            values with shape ``(C, ...)`` is returned, where ``C`` is the number of channels of this image and ``...``
+            are the leading dimensions of ``grid`` (i.e., ``grid.shape[:-1]``).
+
+        """
         batch = self.batch()
-        if isinstance(grid, Tensor):
-            if grid.ndim == self.sdim:
-                grid = grid.unsqueeze(0)
-                data = batch.sample(grid, *args, **kwargs)
-                assert isinstance(data, Tensor)
-                assert data.shape[0] == 1
-                data = data.squeeze(0)
-            elif grid.ndim == self.ndim:
-                data = batch.sample(grid, *args, **kwargs)
-                assert isinstance(data, Tensor)
-            else:
-                raise ValueError(
-                    f"{type(self).__name__}.sample() 'grid' tensor must be {self.sdim}- or {self.ndim}-dimensional"
-                )
+        if isinstance(arg, Grid):
+            if arg == self.grid():
+                return self
+            batch = batch.sample(arg, mode=mode, padding=padding)
+            assert isinstance(batch, ImageBatch)
+            return batch[0]
+        if isinstance(arg, Tensor):
+            grid = arg.unsqueeze(0)
+            data = batch.sample(grid, mode=mode, padding=padding)
             assert type(data) is Tensor
+            assert data.shape[0] == 1
+            data = data.squeeze(0)
             return data
-        batch = batch.sample(grid, *args, **kwargs)
-        assert isinstance(batch, ImageBatch)
-        return batch[0]
+        raise TypeError(f"{type(self).__name__}.sample() 'arg' must be Grid or Tensor")

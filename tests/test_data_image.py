@@ -5,7 +5,7 @@ import pytest
 import torch
 from torch import Tensor
 
-from deepali.core import ALIGN_CORNERS, Grid
+from deepali.core import ALIGN_CORNERS, Grid, functional as U
 from deepali.data import Image, ImageBatch
 
 
@@ -342,3 +342,97 @@ def test_image_rescale(data: Tensor, grid: Grid) -> None:
     assert result.dtype == torch.uint8
     assert result.min().eq(0)
     assert result.max().eq(255)
+
+
+def test_image_sample() -> None:
+    shape = torch.Size((2, 32, 64, 63))
+    data: Tensor = torch.arange(shape.numel())
+    data = data.reshape(shape)
+    grid = Grid(shape=shape[1:])
+    image = Image(data, grid)
+
+    indices = torch.arange(0, grid.numel(), 10)
+    voxels = U.unravel_coords(indices, grid.size())
+    coords = grid.index_to_cube(voxels)
+    assert coords.dtype == grid.dtype
+    assert coords.dtype.is_floating_point
+    assert coords.shape == (len(indices), grid.ndim)
+    assert coords.min().ge(-1)
+    assert coords.max().le(1)
+
+    result = image.sample(coords, mode="nearest")
+    expected = data.flatten(1).index_select(1, indices)
+    assert type(result) is Tensor
+    assert result.dtype == image.dtype
+    assert result.shape == (image.nchannels, *coords.shape[:-1])
+    assert result.shape == expected.shape
+    assert result.eq(expected).all()
+
+    result = image.sample(coords, mode="linear")
+    assert type(result) is Tensor
+    assert result.is_floating_point()
+    assert result.dtype != image.dtype
+
+    # Grid points
+    coords = grid.coords()
+    assert coords.ndim == image.ndim
+    result = image.sample(coords, mode="nearest")
+    assert type(result) is Tensor
+    assert result.dtype == image.dtype
+    assert result.device == image.device
+    assert result.shape[0] == image.nchannels
+    assert result.shape[1:] == grid.shape
+    assert torch.allclose(result, image)
+
+    # Batch of grid points
+    coords = grid.coords()
+    coords = coords.unsqueeze(0).repeat((3,) + (1,) * coords.ndim)
+    assert coords.ndim == image.ndim + 1
+    result = image.sample(coords, mode="nearest")
+    assert type(result) is Tensor
+    assert result.dtype == image.dtype
+    assert result.device == image.device
+    assert result.shape[0] == image.nchannels
+    assert result.shape[1] == coords.shape[0]
+    assert result.shape[2:] == grid.shape
+
+    batch_result = image.batch().sample(coords, mode="nearest")
+    assert type(result) is Tensor
+    assert batch_result.dtype == image.dtype
+    assert batch_result.device == image.device
+    assert batch_result.shape[0] == coords.shape[0]
+    assert batch_result.shape[1] == image.nchannels
+    assert batch_result.shape[2:] == grid.shape
+    assert torch.allclose(result, batch_result.transpose(0, 1))
+
+    # Sampling grid
+    result = image.sample(grid)
+    assert type(result) is Image
+    assert result.grid() is grid
+    assert result.data_ptr() == image.data_ptr()
+    assert result is image
+
+    shape = torch.Size((3, 31, 63, 63))
+    data: Tensor = torch.arange(shape.numel())
+    data = data.reshape(shape)
+    grid = Grid(shape=shape[1:])
+    image = Image(data, grid)
+
+    ds_grid = grid.downsample()
+    ds_image = image.sample(ds_grid)
+    assert type(ds_image) is Image
+    assert ds_image.grid() is ds_grid
+    assert ds_image.nchannels == image.nchannels
+    assert ds_image.device == image.device
+    assert ds_image.is_floating_point()
+
+    indices = torch.arange(0, grid.numel())
+    voxels = U.unravel_coords(indices, grid.size())
+    coords = grid.index_to_cube(voxels)
+    coords = coords.reshape(grid.shape + (grid.ndim,))
+    coords = coords[::2, ::2, ::2, :]
+    assert torch.allclose(coords, ds_grid.coords())
+
+    result = image.sample(coords)
+    assert result.is_floating_point()
+    assert torch.allclose(ds_image, result)
