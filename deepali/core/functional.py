@@ -108,27 +108,6 @@ from .pointset import polyline_tangents
 from .pointset import transform_grid
 from .pointset import transform_points
 
-# Loss functions
-from .losses import label_smoothing
-from .losses import dice_score
-from .losses import dice_loss
-from .losses import kld_loss
-from .losses import lcc_loss
-from .losses import ssd_loss
-from .losses import grad_loss
-from .losses import bending_loss
-from .losses import bending_energy_loss
-from .losses import be_loss
-from .losses import curvature_loss
-from .losses import diffusion_loss
-from .losses import divergence_loss
-from .losses import elasticity_loss
-from .losses import total_variation_loss
-from .losses import tv_loss
-from .losses import inverse_consistency_loss
-from .losses import masked_loss
-from .losses import reduce_loss
-
 
 __all__ = (
     # Basic tensor functions
@@ -230,24 +209,4 @@ __all__ = (
     "warp_points",
     "zeros_flow",
     "zeros_image",
-    # Loss functions
-    "label_smoothing",
-    "dice_score",
-    "dice_loss",
-    "kld_loss",
-    "lcc_loss",
-    "ssd_loss",
-    "grad_loss",
-    "bending_loss",
-    "bending_energy_loss",
-    "be_loss",
-    "curvature_loss",
-    "diffusion_loss",
-    "divergence_loss",
-    "elasticity_loss",
-    "total_variation_loss",
-    "tv_loss",
-    "inverse_consistency_loss",
-    "masked_loss",
-    "reduce_loss",
 )

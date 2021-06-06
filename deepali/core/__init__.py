@@ -8,7 +8,7 @@ Object-oriented APIs use this functional API to realize their functionality. In 
 (cf. ``transforms``) and neural network components (cf. ``modules`` and ``networks``) are implemented
 using these functional building blocks.
 
-To access most core library functions with a single import similar to ``torch.nn.functional``, use
+The following import statement can be used to access the functional API:
 
 .. code::
 

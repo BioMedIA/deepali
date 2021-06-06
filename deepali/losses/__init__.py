@@ -2,7 +2,13 @@ r"""Losses for image, point set, and/or surface registration.
 
 Classes representing loss terms defined by this package are derived from ``torch.nn.Module``
 and therefore follow a stateful object oriented design. The underlying functions implementing
-these loss terms are defined in ``functional.losses`` following a stateless functional API.
+these loss terms are defined in the ``functional`` module following a stateless functional API.
+
+The following import statement can be used to access the functional API:
+
+.. code::
+
+    import deepali.losses.functional as L
 
 """
 
@@ -10,26 +16,6 @@ import sys
 from typing import Any
 
 from torch.nn import Module
-
-from ..functional.losses import label_smoothing
-from ..functional.losses import dice_score
-from ..functional.losses import dice_loss
-from ..functional.losses import kld_loss
-from ..functional.losses import lcc_loss
-from ..functional.losses import ssd_loss
-from ..functional.losses import grad_loss
-from ..functional.losses import bending_loss
-from ..functional.losses import bending_energy_loss
-from ..functional.losses import be_loss
-from ..functional.losses import curvature_loss
-from ..functional.losses import diffusion_loss
-from ..functional.losses import divergence_loss
-from ..functional.losses import elasticity_loss
-from ..functional.losses import total_variation_loss
-from ..functional.losses import tv_loss
-from ..functional.losses import inverse_consistency_loss
-from ..functional.losses import masked_loss
-from ..functional.losses import reduce_loss
 
 from .base import DisplacementLoss
 from .base import PairwiseImageLoss
@@ -58,26 +44,6 @@ from .pointset import LandmarkPointDistance, LPD
 
 
 __all__ = (
-    # Loss functions
-    "label_smoothing",
-    "dice_score",
-    "dice_loss",
-    "kld_loss",
-    "lcc_loss",
-    "ssd_loss",
-    "grad_loss",
-    "bending_loss",
-    "bending_energy_loss",
-    "be_loss",
-    "curvature_loss",
-    "diffusion_loss",
-    "divergence_loss",
-    "elasticity_loss",
-    "total_variation_loss",
-    "tv_loss",
-    "inverse_consistency_loss",
-    "masked_loss",
-    "reduce_loss",
     # Base types
     "DisplacementLoss",
     "PairwiseImageLoss",

@@ -1,4 +1,4 @@
-r"""Functions for evaluation of registration energy terms."""
+r"""Loss functions, evaluation metrics, and related utilities."""
 
 import itertools
 from typing import Optional, Sequence, Union
@@ -6,14 +6,37 @@ from typing import Optional, Sequence, Union
 import torch
 from torch import Tensor
 
-from .enum import SpatialDerivativeKeys
-from .grid import Grid
-from .image import avg_pool, dot_channels, spatial_derivatives
-from .flow import denormalize_flow
-from .pointset import transform_grid
-from .pointset import transform_points
-from .tensor import as_one_hot_tensor, move_dim
-from .types import Array, ScalarOrTuple
+from ..core.enum import SpatialDerivativeKeys
+from ..core.grid import Grid
+from ..core.image import avg_pool, dot_channels, spatial_derivatives
+from ..core.flow import denormalize_flow
+from ..core.pointset import transform_grid
+from ..core.pointset import transform_points
+from ..core.tensor import as_one_hot_tensor, move_dim
+from ..core.types import Array, ScalarOrTuple
+
+
+__all__ = (
+    "label_smoothing",
+    "dice_score",
+    "dice_loss",
+    "kld_loss",
+    "lcc_loss",
+    "ssd_loss",
+    "grad_loss",
+    "bending_loss",
+    "bending_energy_loss",
+    "be_loss",
+    "curvature_loss",
+    "diffusion_loss",
+    "divergence_loss",
+    "elasticity_loss",
+    "total_variation_loss",
+    "tv_loss",
+    "inverse_consistency_loss",
+    "masked_loss",
+    "reduce_loss",
+)
 
 
 def label_smoothing(
