@@ -197,7 +197,7 @@ class MetaDataset(Dataset):
     This dataset can be used in conjunction with data reader transforms to load the data from
     configured input file paths. For example, use the ``ReadImage`` transform followed by image
     data preprocessing and augmentation functions for image data. The specified file path strings
-    are Python format strings, where keywords are replaced by the respect column entries for the
+    are Python format strings, where keywords are replaced by the respective column entries for the
     sample in the dataset index table (`pandas.DataFrame`).
 
     """
@@ -327,7 +327,7 @@ class ImageDatasetConfig(DataclassConfig):
     table: PathStr
     prefix: Optional[PathStr] = None
     images: Mapping[str, PathStr] = field(default_factory=dict)
-    transforms: Mapping[str, ImageTransformConfig] = field(default_factory=list)
+    transforms: Mapping[str, ImageTransformConfig] = field(default_factory=dict)
 
     @classmethod
     def _from_dict(
