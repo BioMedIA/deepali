@@ -13,17 +13,15 @@ class Partition(Enum):
     r"""Enumeration of dataset partitions / splits."""
 
     NONE = "none"
-    EVAL = "eval"
-    TRAIN = "train"
-    VALID = "valid"
+    TEST = "test"  # use for testing a trained model
+    TRAIN = "train"  # use for model training backward pass
+    VALID = "valid"  # use for model training evaluation (validation)
 
     @classmethod
     def from_arg(cls, arg: Union[Partition, str, None]) -> Partition:
         r"""Create enumeration value from function argument."""
         if arg is None:
             return cls.NONE
-        if arg == "test":
-            arg = "eval"
         return cls(arg)
 
 
