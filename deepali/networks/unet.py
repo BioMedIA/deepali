@@ -648,12 +648,12 @@ class UNetDecoder(ReprWithCrossReferences, Module):
         self.stages = stages
 
     @property
-    def num_channels(self) -> Sequence[int]:
+    def num_channels(self) -> NumChannels:
         return self.config.num_channels
 
     @property
     def out_channels(self) -> int:
-        return self.config.num_channels[-1]
+        return last_num_channels(self.config.num_channels)
 
     @classmethod
     def from_encoder(
@@ -785,7 +785,7 @@ class SequentialUNet(ReprWithCrossReferences, Sequential):
         return self.encoder.in_channels
 
     @property
-    def num_channels(self) -> Sequence[int]:
+    def num_channels(self) -> NumChannels:
         return self.decoder.num_channels
 
     @property
@@ -899,7 +899,7 @@ class UNet(ReprWithCrossReferences, Module):
         return self.encoder.in_channels
 
     @property
-    def num_channels(self) -> Sequence[int]:
+    def num_channels(self) -> NumChannels:
         return self.decoder.num_channels
 
     @property
