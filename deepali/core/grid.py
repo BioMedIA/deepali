@@ -1054,34 +1054,35 @@ class Grid(object):
         grid._spacing = spacing
         return grid
 
-    def avg_pool(
+    def pool(
         self,
         kernel_size: ScalarOrTuple[int],
         stride: Optional[ScalarOrTuple[int]] = None,
         padding: ScalarOrTuple[int] = 0,
+        dilation: ScalarOrTuple[int] = 1,
         ceil_mode: bool = False,
     ) -> Grid:
-        r"""Output grid after average pooling.
+        r"""Output grid after applying pooling operation.
 
         Args:
             kernel_size: Size of the pooling region.
             stride: Stride of the pooling operation.
             padding: Implicit zero paddings on both sides of the input.
+            dilation: Spacing between pooling kernel elements.
             ceil_mode: When True, will use `ceil` instead of `floor` to compute the output size.
 
         Returns:
-            New grid corresponding to output data tensor after average pooling.
+            New grid corresponding to output data tensor after pooling operation.
 
         """
         if stride is not None:
-            raise NotImplementedError("Grid.avg_pool() 'stride' currently not supported")
+            raise NotImplementedError("Grid.pool() 'stride' currently not supported")
         if padding != 0:
-            raise NotImplementedError("Grid.avg_pool() 'padding' currently not supported")
+            raise NotImplementedError("Grid.pool() 'padding' currently not supported")
+        if dilation != 1:
+            raise NotImplementedError("Grid.pool() 'dilation' currently not supported")
         size = self.size_tensor() / kernel_size
-        if ceil_mode:
-            size = size.ceil()
-        else:
-            size = size.floor()
+        size = size.ceil() if ceil_mode else size.floor()
         size = size.type(torch.int)
         grid = Grid(
             size=size,
@@ -1092,6 +1093,16 @@ class Grid(object):
             device=self.device,
         )
         return grid
+
+    def avg_pool(
+        self,
+        kernel_size: ScalarOrTuple[int],
+        stride: Optional[ScalarOrTuple[int]] = None,
+        padding: ScalarOrTuple[int] = 0,
+        ceil_mode: bool = False,
+    ) -> Grid:
+        r"""Output grid after applying average pooling."""
+        return self.pool(kernel_size, stride=stride, padding=padding, ceil_mode=ceil_mode)
 
     def downsample(
         self, levels: int = 1, min_size: int = 1, align_corners: Optional[bool] = None
