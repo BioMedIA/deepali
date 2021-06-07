@@ -365,7 +365,7 @@ class Cube(object):
         r"""Map point coordinates or displacement vectors from one cube to another.
 
         Args:
-            arg: List of points or vectors to transform as tensor of shape ``(..., D)``.
+            arg: Coordinates of points or displacement vectors as tensor of shape ``(..., D)``.
             axes: Axes of this cube with respect to which input coordinates are defined.
             to_axes: Axes of cube to which coordinates are mapped. Use ``axes`` if ``None``.
             to_cube: Other cube. Use ``self`` if ``None``.
@@ -403,7 +403,7 @@ class Cube(object):
         r"""Map point coordinates from one cube to another.
 
         Args:
-            points: List of points to transform as tensor of shape ``(..., D)``.
+            points: Coordinates of points to transform as tensor of shape ``(..., D)``.
             axes: Axes of this cube with respect to which input coordinates are defined.
             to_axes: Axes of cube to which coordinates are mapped. Use ``axes`` if ``None``.
             to_cube: Other cube. Use ``self`` if ``None``.
@@ -426,7 +426,7 @@ class Cube(object):
         r"""Rescale and reorient flow vectors.
 
         Args:
-            vectors: Batch of displacement vectors of shape ``(..., D)``.
+            vectors: Displacement vectors as tensor of shape ``(..., D)``.
             axes: Axes of this cube with respect to which input coordinates are defined.
             to_axes: Axes of cube to which coordinates are mapped. Use ``axes`` if ``None``.
             to_cube: Other cube. Use ``self`` if ``None``.
@@ -443,7 +443,7 @@ class Cube(object):
         r"""Map point coordinates from cube to world space.
 
         Args:
-            coords: List of normalized coordinates to transform as tensor of shape ``(N, D)``.
+            coords: Normalized coordinates with respect to this cube as tensor of shape ``(N, D)``.
 
         Returns:
             Coordinates of points in world space.
@@ -451,16 +451,14 @@ class Cube(object):
         """
         return self.apply_transform(coords, Axes.CUBE, Axes.WORLD, vectors=False)
 
-    def world_to_cube(
-        self, points: Array, decimals: int = -1, align_corners: Optional[bool] = None
-    ) -> Tensor:
+    def world_to_cube(self, points: Array) -> Tensor:
         r"""Map point coordinates from world to cube space.
 
         Args:
-            points: List of points to transform as tensor of shape ``(N, D)``.
+            points: Coordinates of points in world space as tensor of shape ``(N, D)``.
 
         Returns:
-            Normalized coordinates of points.
+            Normalized coordinates of points with respect to this cube.
 
         """
         return self.apply_transform(points, Axes.WORLD, Axes.CUBE, vectors=False)
