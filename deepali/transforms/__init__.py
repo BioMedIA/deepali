@@ -6,21 +6,20 @@ which is attached to a data loader. The spatial transforms defined in ``transfor
 can be used to implement either a traditional or machine learning based image or point set
 registration approach.
 
-Note that data transforms are imported from "core.transforms" and "data.transforms".
-This is to avoid cyclical imports between modules defining specialized tensor types
-(e.g., ``data.image``) and datasets defined in ``data.dataset`` which also use these
-transforms to read and preprocess the loaded data (c.f., ``data.dataset.ImageDataset``).
+Note that data transforms are imported from "data.transforms". This is to avoid cyclical
+imports between modules defining specialized tensor types (e.g., ``data.image``) and datasets
+defined in ``data.dataset`` which also use these transforms to read and preprocess the loaded
+data (c.f., ``data.dataset.ImageDataset``).
+
+Following torchvision's lead, data transform classes which operate on tensors and do not require
+lambda functions are derived from ``torch.nn.Module``. Use ``torch.nn.Sequential`` to compose
+transforms instead of ``torchvision.transforms.Compose``. This is to support ``torch.jit.script``.
+
+See also: https://github.com/pytorch/vision/blob/3852b41975702cb683a92c8e37f1ef74fd6a79b1/torchvision/transforms/transforms.py#L49.
 
 """
 
-# Follow torchvision's lead and derive transforms which operate on tensors
-# and do not require lambda functions from torch.nn.Module. Use torch.nn.Sequential
-# to compose transforms instead of Compose. This is to support torch.jit.script.
-#
-# See also:
-# https://github.com/pytorch/vision/blob/3852b41975702cb683a92c8e37f1ef74fd6a79b1/torchvision/transforms/transforms.py#L49.
-
-from ..core.types import Transform
+from ..data.transforms import Transform
 
 from .item import ItemTransform
 from .item import ItemwiseTransform
@@ -41,10 +40,10 @@ from .image import RescaleImage
 __all__ = (
     # Type annotation
     "Transform",
-    # Core transforms
+    # Generic transforms
     "ItemTransform",
     "ItemwiseTransform",
-    # Image data transforms
+    # Image transforms
     "AvgPoolImage",
     "CastImage",
     "CenterCropImage",

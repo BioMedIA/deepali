@@ -39,9 +39,6 @@ from .grid import grid_vectors_transform
 from .grid import grid_transform_points
 from .grid import grid_transform_vectors
 
-from .transforms import ItemTransform
-from .transforms import ItemwiseTransform
-
 from .types import Array
 from .types import Batch
 from .types import Dataclass
@@ -58,7 +55,6 @@ from .types import ScalarOrTuple3d
 from .types import Size
 from .types import Shape
 from .types import TensorCollection
-from .types import Transform
 
 from .types import RE_OUTPUT_KEY_INDEX
 from .types import get_tensor
@@ -84,8 +80,6 @@ __all__ = (
     "Device",
     "DType",
     "Grid",
-    "ItemTransform",
-    "ItemwiseTransform",
     "Name",
     "PaddingMode",
     "PathStr",
@@ -99,7 +93,6 @@ __all__ = (
     "Size",
     "Shape",
     "TensorCollection",
-    "Transform",
     "abspath",
     "abspath_template",
     "delete",

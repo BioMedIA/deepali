@@ -3,7 +3,7 @@ r"""Type annotations for torch functions."""
 from dataclasses import Field
 from pathlib import Path
 import re
-from typing import Any, Callable, Dict, Mapping, NamedTuple
+from typing import Any, Dict, Mapping, NamedTuple
 from typing import Optional, Sequence, Tuple, TypeVar, Union
 from typing_extensions import Protocol
 
@@ -46,7 +46,6 @@ class Dataclass(Protocol):
 # - Batch: Values must be tensors with batch dimension (first dimension) or None if optional.
 Batch = Union[Dataclass, Dict[str, Any], NamedTuple]
 Sample = Union[Dataclass, Dict[str, Any], NamedTuple]
-Transform = Callable
 
 TensorMapOrSequence = Union[Mapping[str, Tensor], Sequence[Tensor]]
 TensorCollection = Union[

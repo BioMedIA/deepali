@@ -2,18 +2,14 @@ r"""Generic wrappers and mix-ins for data transforms."""
 
 from copy import copy as shallowcopy, deepcopy
 from dataclasses import is_dataclass, fields
-from typing import Any, Mapping, Optional, Union
+from typing import Any, Callable, Mapping, Optional, Union
 
 from torch.nn import Module
 
-from .types import RE_OUTPUT_KEY_INDEX, Transform, is_namedtuple
+from ...core.types import RE_OUTPUT_KEY_INDEX, is_namedtuple
 
 
-__all__ = (
-    "ItemTransform",
-    "ItemwiseTransform",
-    "Transform",
-)
+__all__ = ("ItemTransform", "ItemwiseTransform")
 
 
 class ItemTransform(Module):
@@ -21,7 +17,7 @@ class ItemTransform(Module):
 
     def __init__(
         self,
-        transform: Transform,
+        transform: Callable,
         key: Optional[Union[int, str]] = None,
         copy: bool = False,
         ignore_missing: bool = False,

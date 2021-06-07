@@ -1,12 +1,4 @@
-r"""Data transforms.
-
-Note that data transforms are included in the ``data`` package to avoid cyclical imports
-between modules defining specialized tensor types (e.g., ``data.image``) and datasets
-defined in ``data.dataset`` which also use these transforms to read and preprocess the
-loaded data (c.f., ``ImageDataset``). The data transforms can also be imported from the
-top-level ``transforms`` package instead of from ``data.transforms``.
-
-"""
+r"""Image data transforms."""
 
 from pathlib import Path
 from typing import List, Mapping, Optional, Sequence, Union
@@ -15,11 +7,11 @@ import torch
 from torch import Tensor
 from torch.nn import Module
 
-from ..core.enum import PaddingMode, Sampling
-from ..core.transforms import ItemTransform, ItemwiseTransform
-from ..core.types import PathStr, ScalarOrTuple, Transform
+from ...core.enum import PaddingMode, Sampling
+from ...core.types import PathStr, ScalarOrTuple
+from ..image import Image
 
-from .image import Image
+from .item import ItemTransform, ItemwiseTransform
 
 
 __all__ = (
@@ -410,7 +402,7 @@ def image_transform(
     return transform
 
 
-def image_transforms(config: ImageTransformConfig, key: Optional[str] = None) -> List[Transform]:
+def image_transforms(config: ImageTransformConfig, key: Optional[str] = None) -> List[Module]:
     r"""Create image data transforms from configuration."""
     transforms = []
     if isinstance(config, str):
