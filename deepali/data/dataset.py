@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
 from copy import copy as shallowcopy
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterable, Iterator, Mapping, Optional, Union, Sequence
-from typing import overload
+from typing import Any, Callable, Dict, List, Iterable, Iterator
+from typing import Mapping, Optional, Union, Sequence, TypeVar, overload
 
 import pandas as pd
 
@@ -31,6 +31,9 @@ __all__ = (
 )
 
 
+TDataset = TypeVar("TDataset", bound="Dataset")
+
+
 class Dataset(TorchDataset, metaclass=ABCMeta):
     r"""Base class of datasets with optionally on-the-fly pre-processed samples.
 
@@ -42,7 +45,7 @@ class Dataset(TorchDataset, metaclass=ABCMeta):
 
     """
 
-    def __init__(self, transform: Optional[Union[Transform, Sequence[Transform]]] = None):
+    def __init__(self, transforms: Optional[Union[Transform, Sequence[Transform]]] = None):
         r"""Initialize dataset.
 
         If a dataset produces samples (i.e., a dictionary, named tuple, or custom dataclass)
@@ -53,7 +56,7 @@ class Dataset(TorchDataset, metaclass=ABCMeta):
         loader to the execution device.
 
         Args:
-            transform: Data preprocessing and augmentation transforms.
+            transforms: Data preprocessing and augmentation transforms.
                 If more than one transformation is given, these will be composed
                 in the given order, where the first transformation in the sequence
                 is applied first. When the data samples are passed directly to
@@ -62,10 +65,12 @@ class Dataset(TorchDataset, metaclass=ABCMeta):
 
         """
         super().__init__()
-        if transform is not None and not isinstance(transform, Sequential):
-            if not isinstance(transform, (list, tuple)):
-                transform = [transform]
-            transform = Sequential(*transform)
+        if isinstance(transforms, Sequential):
+            transform = transforms
+        elif transforms is not None:
+            if not isinstance(transforms, (list, tuple)):
+                transforms = [transforms]
+            transform = Sequential(*transforms)
         self._transform: Optional[Sequential] = transform
 
     @abstractmethod
@@ -120,22 +125,28 @@ class Dataset(TorchDataset, metaclass=ABCMeta):
 
     @overload
     def transform(
-        self,
+        self: TDataset,
         arg0: Union[Transform, Sequence[Transform], None],
         *args: Union[Transform, Sequence[Transform], None],
-    ) -> Dataset:
+    ) -> TDataset:
         ...
 
-    def transform(self, *args: Union[Transform, Sequence[Transform], None]) -> Dataset:
+    def transform(
+        self: TDataset, *args: Union[Transform, Sequence[Transform], None]
+    ) -> Union[Sequential, TDataset]:
         r"""Get composite data preprocessing and augmentation transform, or new dataset with specified transform."""
         if not args:
             return self._transform
         return shallowcopy(self).transform_(*args)
 
-    def transform_(self, *args: Union[Transform, Sequence[Transform], None]) -> Dataset:
+    def transform_(
+        self: TDataset,
+        arg0: Union[Transform, Sequence[Transform], None],
+        *args: Union[Transform, Sequence[Transform], None],
+    ) -> TDataset:
         r"""Set data preprocessing and augmentation transform of this dataset."""
         transforms = []
-        for arg in args:
+        for arg in [arg0, *args]:
             if arg is None:
                 continue
             if isinstance(arg, (list, tuple)):
@@ -149,6 +160,35 @@ class Dataset(TorchDataset, metaclass=ABCMeta):
         else:
             self._transform = Sequential(*transforms)
         return self
+
+    @overload
+    def transforms(self) -> List[Transform]:
+        ...
+
+    @overload
+    def transforms(
+        self: TDataset,
+        arg0: Union[Transform, Sequence[Transform], None],
+        *args: Union[Transform, Sequence[Transform], None],
+    ) -> TDataset:
+        ...
+
+    def transforms(
+        self: TDataset,
+        *args: Union[Transform, Sequence[Transform], None],
+    ) -> Union[List[Transform], TDataset]:
+        r"""Get or set dataset transforms."""
+        if not args:
+            return [transform for transform in self._transform]
+        return shallowcopy(self).transform_(*args)
+
+    def transforms_(
+        self,
+        arg0: Union[Transform, Sequence[Transform], None],
+        *args: Union[Transform, Sequence[Transform], None],
+    ) -> Dataset:
+        r"""Set data transforms of this dataset."""
+        return self.transform_(arg0, *args)
 
 
 class MetaDataset(Dataset):
@@ -167,7 +207,7 @@ class MetaDataset(Dataset):
         table: Union[Path, str, pd.DataFrame],
         paths: Optional[Mapping[str, Union[PathStr, Callable[..., PathStr]]]] = None,
         prefix: Optional[PathStr] = None,
-        transform: Optional[Union[Transform, Sequence[Transform]]] = None,
+        transforms: Optional[Union[Transform, Sequence[Transform]]] = None,
         **kwargs,
     ):
         r"""Initialize dataset.
@@ -187,7 +227,7 @@ class MetaDataset(Dataset):
             prefix: Root directory of input file paths starting with ``"{prefix}/"``.
                 If ``None`` and ``table`` is a file path, it is set to the directory containing the index table.
                 Otherwise, template file path strings may not contain a ``{prefix}`` key if ``None``.
-            transform: Data preprocessing and augmentation transforms.
+            transforms: Data preprocessing and augmentation transforms.
             kwargs: Additional format arguments used in addition to ``prefix`` and ``table`` column values.
 
         """
@@ -218,7 +258,7 @@ class MetaDataset(Dataset):
         self.paths = paths
         self.prefix = prefix
         self.kwargs = kwargs
-        super().__init__(transform=transform)
+        super().__init__(transforms=transforms)
 
     def __len__(self) -> int:
         r"""Number of samples in dataset."""
@@ -235,6 +275,9 @@ class MetaDataset(Dataset):
             return meta
         data = {}
         args = {"prefix": str(self.prefix)} if self.prefix else {}
+        args["index"] = index
+        args["index+1"] = index + 1
+        args["index + 1"] = index + 1
         args.update(self.kwargs)
         args.update(meta)
         for name, path in self.paths.items():
@@ -282,9 +325,9 @@ class ImageDatasetConfig(DataclassConfig):
     r"""Configuration of image dataset."""
 
     table: PathStr
-    images: Optional[Mapping[str, PathStr]] = None
     prefix: Optional[PathStr] = None
-    transforms: Optional[Mapping[str, ImageTransformConfig]] = None
+    images: Mapping[str, PathStr] = field(default_factory=dict)
+    transforms: Mapping[str, ImageTransformConfig] = field(default_factory=list)
 
     @classmethod
     def _from_dict(
@@ -302,13 +345,12 @@ class ImageDatasetConfig(DataclassConfig):
 
         """
         arg = dict(arg)
-        images = arg.pop("images") or {}
-        transforms = arg.pop("transforms") or {}
+        images = arg.pop("images", None) or {}
+        transforms = arg.pop("transforms", None) or {}
         image_paths = {}
         for name, value in images.items():
             dtype = None
             device = None
-            image_transforms = []
             if isinstance(value, Mapping):
                 if "path" not in value:
                     raise ValueError(
@@ -317,13 +359,14 @@ class ImageDatasetConfig(DataclassConfig):
                 path = value["path"]
                 dtype = value.get("dtype", dtype)
                 device = value.get("device", device)
-                image_transforms = value.get("transforms", image_transforms)
+                image_transforms = value.get("transforms") or []
                 if not isinstance(image_transforms, Sequence):
                     raise TypeError(
                         f"{cls.__name__}.from_dict() image 'transforms' value must be Sequence"
                     )
             elif is_path_str(value):
                 path = Path(value).as_posix()
+                image_transforms = []
             else:
                 raise ValueError(
                     f"{cls.__name__}.from_dict() 'images' key '{name}' must be PathStr or dict with 'path' entry"
@@ -344,11 +387,9 @@ class ImageDatasetConfig(DataclassConfig):
                 )
             transforms[name] = image_transforms
             image_paths[name] = path
-        if image_paths:
-            arg["images"] = image_paths
-        if transforms:
-            arg["transforms"] = transforms
-        super()._from_dict(arg, parent)
+        arg["images"] = {k: v for k, v in image_paths.items() if v}
+        arg["transforms"] = {k: v for k, v in transforms.items() if v}
+        return super()._from_dict(arg, parent)
 
 
 class ImageDataset(MetaDataset):
