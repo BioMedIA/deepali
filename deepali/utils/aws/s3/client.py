@@ -6,7 +6,7 @@ from contextlib import contextmanager
 from enum import Enum
 import io
 from pathlib import Path
-from typing import Any, Callable, Dict, Generator, Optional, Set, Tuple, Union
+from typing import Any, Callable, Dict, Generator, List, Optional, Set, Tuple, Union
 
 import boto3
 
@@ -35,7 +35,7 @@ class S3Client(object):
         WRITE = "w"
         DELETE = "d"
 
-    _default = []
+    _default: List[S3Client] = []
 
     @classmethod
     def default(cls, client: Optional[S3Client] = None) -> S3Client:
@@ -125,6 +125,16 @@ class S3Client(object):
         if isinstance(arg, dict):
             return cls(**arg)
         return cls.default()
+
+    @property
+    def exceptions(self):
+        r"""Get boto3 exceptions for connected client."""
+        if self._client is None:
+            raise AssertionError(
+                f"{type(self).__name__} must be connected to access exceptions."
+                " Mabye use botocore.exceptions module instead."
+            )
+        return self._client.exceptions
 
     @property
     def config(self) -> S3Config:
@@ -225,10 +235,8 @@ class S3Client(object):
         if prefix:
             kwargs["Prefix"] = prefix
         while True:
-            resp = self._client.list_objects_v2(**kwargs)
-            if "Contents" not in resp:
-                break
-            for obj in resp["Contents"]:
+            resp: dict = self._client.list_objects_v2(**kwargs)
+            for obj in resp.get("Contents", []):
                 yield obj["Key"]
             try:
                 kwargs["ContinuationToken"] = resp["NextContinuationToken"]
@@ -260,10 +268,10 @@ class S3Client(object):
         if prefix:
             kwargs["Prefix"] = prefix
         while True:
-            resp = self._client.list_objects_v2(**kwargs)
-            if "CommonPrefixes" not in resp:
-                break
-            for obj in resp["CommonPrefixes"]:
+            resp: dict = self._client.list_objects_v2(**kwargs)
+            for obj in resp.get("Contents", []):
+                yield obj["Key"]
+            for obj in resp.get("CommonPrefixes", []):
                 yield obj["Prefix"]
             try:
                 kwargs["ContinuationToken"] = resp["NextContinuationToken"]
@@ -394,13 +402,15 @@ class S3Client(object):
         path = Path(path).absolute()
         if path.is_dir():
             path = path.joinpath(key.rsplit("/", 1)[-1])
-        else:
-            path.parent.mkdir(parents=True, exist_ok=True)
         if not overwrite and path.is_file():
             raise FileExistsError(
                 "Use overwrite=True to force overwriting existing local file '{}'".format(path)
             )
         data = self.read_bytes(bucket, key)
+        try:
+            path.unlink()
+        except FileNotFoundError:
+            path.parent.mkdir(parents=True, exist_ok=True)
         try:
             path.write_bytes(data)
         except (FileNotFoundError, PermissionError):
