@@ -252,17 +252,23 @@ class S3Client(object):
             PermissionError: If read operations have not been enabled for this client.
 
         """
-        if prefix is None:
-            prefix = ""
-        visited = set()
-        for key in self.keys(bucket, prefix):
-            parts = key[len(prefix) :].split("/", 2)
-            item = prefix + parts[0]
-            if len(parts) > 1:
-                item += "/"
-            if item not in visited:
-                visited.add(item)
-                yield item
+        assert not self.is_closed(), "client connection required"
+        assert bucket, "S3 bucket must be specified"
+        if S3Client.Operation.READ not in self.ops:
+            raise PermissionError("S3 client has no read permissions")
+        kwargs = {"Bucket": bucket, "Delimiter": "/"}
+        if prefix:
+            kwargs["Prefix"] = prefix
+        while True:
+            resp = self._client.list_objects_v2(**kwargs)
+            if "CommonPrefixes" not in resp:
+                break
+            for obj in resp["CommonPrefixes"]:
+                yield obj["Prefix"]
+            try:
+                kwargs["ContinuationToken"] = resp["NextContinuationToken"]
+            except KeyError:
+                break
 
     def listdir(self, bucket: str, prefix: Optional[str] = None) -> Generator[str, None, None]:
         r"""List names of S3 objects whose keys match a given prefix, excluding subfolder contents.
