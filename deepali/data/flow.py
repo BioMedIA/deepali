@@ -295,9 +295,7 @@ class FlowField(Image):
             return self._axes
         batch = self.batch()
         batch = batch.axes(axes)
-        data = batch.tensor().squeeze(0)
-        axes = batch.axes()
-        return self._make_instance(data, self._grid, axes)
+        return batch[0]
 
     @classmethod
     def from_sitk(
@@ -309,8 +307,7 @@ class FlowField(Image):
 
     def sitk(self: TFlowField, axes: Optional[Axes] = None) -> "sitk.Image":
         r"""Create ``SimpleITK.Image`` from this vector field."""
-        disp = self.detach()
-        assert isinstance(disp, type(self))
+        disp: TFlowField = self.detach()
         disp = disp.axes(axes or Axes.WORLD)
         return Image.sitk(disp)
 
@@ -336,8 +333,7 @@ class FlowField(Image):
         r"""Group exponential map of vector field computed using scaling and squaring."""
         batch = self.batch()
         batch = batch.exp(scale=scale, steps=steps, sampling=sampling, padding=padding)
-        flow = batch[0]
-        return type(self).from_image(flow)
+        return batch[0]
 
     @overload
     def warp_image(
