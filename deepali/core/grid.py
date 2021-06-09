@@ -1019,7 +1019,9 @@ class Grid(object):
         """
         shape = cat_scalars(shape, *args, num=self.ndim, device=self.device)
         if not is_int_dtype(shape.dtype):
-            raise TypeError(f"Grid.reshape() 'shape' must be integer values, got dtype={shape.dtype}")
+            raise TypeError(
+                f"Grid.reshape() 'shape' must be integer values, got dtype={shape.dtype}"
+            )
         if shape.lt(0).any():
             raise ValueError("Grid.reshape() 'shape' must be all non-negative numbers")
         return self._resize(shape.flip(0), align_corners=align_corners)
@@ -1199,7 +1201,7 @@ class Grid(object):
             margin: Number of spatial grid points to remove (positive) or add (negative) at each border.
                 Use instead of ``num`` in order to symmetrically crop the input ``data`` tensor, e.g.,
                 ``(nx, ny, nz)`` is equivalent to ``num=(nx, nx, ny, ny, nz, nz)``.
-            num: Number of spatial gird points to remove (positive) or add (negative) at each border,
+            num: Number of spatial grid points to remove (positive) or add (negative) at each border,
                 where margin of the last dimension of the ``data`` tensor must be given first, e.g.,
                 ``(nx, nx, ny, ny)``. If a scalar is given, the input is cropped equally at all borders.
                 Otherwise, the given sequence must have an even length.
@@ -1255,7 +1257,7 @@ class Grid(object):
             margin: Number of spatial grid points to add (positive) or remove (negative) at each border.
                 Use instead of ``num`` in order to symmetrically pad the input ``data`` tensor, e.g.,
                 ``(nx, ny, nz)`` is equivalent to ``num=(nx, nx, ny, ny, nz, nz)``.
-            num: Number of spatial gird points to remove (positive) or add (negative) at each border,
+            num: Number of spatial grid points to remove (positive) or add (negative) at each border,
                 where margin of the last dimension of the ``data`` tensor must be given first, e.g.,
                 ``(nx, nx, ny, ny)``. If a scalar is given, the input is cropped equally at all borders.
                 Otherwise, the given sequence must have an even length.
