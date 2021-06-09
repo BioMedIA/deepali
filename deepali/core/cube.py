@@ -314,7 +314,9 @@ class Cube(object):
         if axes is None and to_axes is None and to_cube is None:
             return self.transform(Axes.CUBE, Axes.WORLD, vectors=vectors)
         if axes is None:
-            raise ValueError("Cube.transform() 'axes' required when 'to_axes' or 'to_cube' specified")
+            raise ValueError(
+                "Cube.transform() 'axes' required when 'to_axes' or 'to_cube' specified"
+            )
         axes = Axes(axes)
         to_axes = axes if to_axes is None else Axes(to_axes)
         if axes is Axes.GRID or to_axes is Axes.GRID:
@@ -443,7 +445,7 @@ class Cube(object):
         r"""Map point coordinates from cube to world space.
 
         Args:
-            coords: Normalized coordinates with respect to this cube as tensor of shape ``(N, D)``.
+            coords: Normalized coordinates with respect to this cube as tensor of shape ``(..., D)``.
 
         Returns:
             Coordinates of points in world space.
@@ -455,7 +457,7 @@ class Cube(object):
         r"""Map point coordinates from world to cube space.
 
         Args:
-            points: Coordinates of points in world space as tensor of shape ``(N, D)``.
+            points: Coordinates of points in world space as tensor of shape ``(..., D)``.
 
         Returns:
             Normalized coordinates of points with respect to this cube.

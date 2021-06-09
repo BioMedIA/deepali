@@ -740,7 +740,7 @@ class Grid(object):
         r"""Map points from grid indices to grid-aligned unit cube with side length 2.
 
         Args:
-            indices: List of grid point indices to transform as tensor of shape ``(N, D)``.
+            indices: List of grid point indices to transform as tensor of shape ``(..., D)``.
             decimals: If positive or zero, number of digits right of the decimal point to round to.
             align_corners: Whether output cube coordinates should be with respect to
                 ``Axes.CUBE_CORNERS`` (True) or ``Axes.CUBE`` (False), respectively.
@@ -761,7 +761,7 @@ class Grid(object):
         r"""Map points from grid-aligned unit cube to grid point indices.
 
         Args:
-            coords: List of unit grid points to transform as tensor of shape ``(N, D)``.
+            coords: List of unit grid points to transform as tensor of shape ``(..., D)``.
             decimals: If positive or zero, number of digits right of the decimal point to round to.
             align_corners: Whether ``coords`` are with respect to ``Axes.CUBE_CORNERS`` (True)
                 or ``Axes.CUBE`` (False), respectively. If ``None``, use default ``self.align_corners()``.
@@ -779,7 +779,7 @@ class Grid(object):
         r"""Map points from grid indices to world coordinates.
 
         Args:
-            indices: List of grid point indices to transform as tensor of shape ``(N, D)``.
+            indices: List of grid point indices to transform as tensor of shape ``(..., D)``.
             decimals: If positive or zero, number of digits right of the decimal point to round to.
 
         Returns:
@@ -792,7 +792,7 @@ class Grid(object):
         r"""Map points from world coordinates to grid point indices.
 
         Args:
-            points: List of points to transform as tensor of shape ``(N, D)``.
+            points: List of points to transform as tensor of shape ``(..., D)``.
             decimals: If positive or zero, number of digits right of the decimal point to round to.
 
         Returns:
@@ -807,7 +807,7 @@ class Grid(object):
         r"""Map point coordinates from grid-aligned unit cube with side length 2 to world space.
 
         Args:
-            coords: List of unit grid points to transform as tensor of shape ``(N, D)``.
+            coords: List of unit grid points to transform as tensor of shape ``(..., D)``.
             decimals: If positive or zero, number of digits right of the decimal point to round to.
             align_corners: Whether ``coords`` are with respect to ``Axes.CUBE_CORNERS`` (True)
                 or ``Axes.CUBE`` (False), respectively. If ``None``, use default ``self.align_corners()``.
@@ -827,7 +827,7 @@ class Grid(object):
         r"""Map point coordinates from world space to grid-aligned unit cube with side length 2.
 
         Args:
-            points: List of points to transform as tensor of shape ``(N, D)``.
+            points: List of points to transform as tensor of shape ``(..., D)``.
             decimals: If positive or zero, number of digits right of the decimal point to round to.
             align_corners: Whether output cube coordinates should be with respect to
                 ``Axes.CUBE_CORNERS`` (True) or ``Axes.CUBE`` (False), respectively.
