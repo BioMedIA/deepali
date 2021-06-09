@@ -331,7 +331,7 @@ class Grid(object):
 
     @property
     def shape(self) -> torch.Size:
-        r"""Size of grid data tensor of shape (...X)."""
+        r"""Sampling grid size for dimensions ordered as ``(..., X)``."""
         return torch.Size((int(n) for n in self.size_tensor().flip(0)))
 
     def extent(self) -> Tensor:
