@@ -1,4 +1,4 @@
-r"""Apply spatial transformations."""
+r"""Defines composite spatial transformations."""
 
 from __future__ import annotations
 
