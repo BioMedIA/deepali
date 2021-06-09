@@ -1,12 +1,12 @@
 r"""Data transforms.
 
-The transforms in this Python package generally built on the ``functional`` package.
+The transforms in this Python package generally built on the ``core`` package.
 The classes defined by these modules can be used, for example, in a data input pipeline
-which is attached to a data loader. The spatial transforms defined in ``transforms.spatial``
-can be used to implement either a traditional or machine learning based image or point set
-registration approach.
+which is attached to a data loader. The spatial transforms defined in ``transforms.spatial``,
+on the other hand, can be used to implement either a traditional or machine learning based
+image or point set registration approach.
 
-Note that data transforms are imported from "data.transforms". This is to avoid cyclical
+Note that some data transforms are imported from "data.transforms". This is to avoid cyclical
 imports between modules defining specialized tensor types (e.g., ``data.image``) and datasets
 defined in ``data.dataset`` which also use these transforms to read and preprocess the loaded
 data (c.f., ``data.dataset.ImageDataset``).
