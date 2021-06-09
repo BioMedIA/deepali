@@ -63,7 +63,9 @@ class DataTensor(Tensor):
     def _make_instance(self: T, data: Optional[Tensor] = None, **kwargs) -> T:
         r"""Create a new instance while preserving subclass (meta-)data."""
         if data is None:
-            data = self.tensor()
+            data = self
+        if type(data) is not Tensor:
+            data = data.as_subclass(Tensor)
         return type(self)(data, **kwargs)
 
     def __copy__(self: T) -> T:
