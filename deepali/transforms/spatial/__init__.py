@@ -217,6 +217,3 @@ def new_spatial_transform(
     if cls is not None and (name in LINEAR_TRANSFORMS or name in NONRIGID_TRANSFORMS):
         return cls(grid, groups=groups, **kwargs)
     raise ValueError(f"new_spatial_transform() 'name={name}' is not a valid transformation type")
-
-
-new = new_spatial_transform  # alias for use as transforms.spatial.new()
