@@ -3,7 +3,8 @@ Core:
 
 Transforms:
 - [ ] Basic data augmentations.
-- [ ] Modify spatial transformations to use ``Cube`` instead of sampling ``Grid`` to define domain and codomain.
+- [ ] Modify spatial transformations to use ``Cube`` instead of sampling ``Grid`` to define domain and codomain?
+      But note that at the moment, sampling grid determines the output shape of the ``SpatialTransform.tensor()``.
 
 Spatial transforms:
 - [ ] Fix __repr__ of transforms with "params" set to a torch.nn.Module.

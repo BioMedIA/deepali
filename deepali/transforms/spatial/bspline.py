@@ -233,20 +233,20 @@ class StationaryVelocityFreeFormDeformation(BSplineTransform):
         r"""Get inverse of this transformation.
 
         Args:
-            link: Whether to inverse transformation keeps a reference to this transformation.
+            link: Whether the inverse transformation keeps a reference to this transformation.
                 If ``True``, the ``update()`` function of the inverse function will not recompute
-                shared parameters, e.g., parameters obtained by a callable neural network, but
+                shared parameters (e.g., parameters obtained by a callable neural network), but
                 directly access the parameters from this transformation. Note that when ``False``,
                 the inverse transformation will still share parameters, modules, and buffers with
                 this transformation, but these shared tensors may be replaced by a call of ``update()``
                 (which is implicitly called as pre-forward hook when ``__call__()`` is invoked).
-            update_buffers: Whether buffers of inverse transformation should be update after creating
+            update_buffers: Whether buffers of inverse transformation should be updated after creating
                 the shallow copy. If ``False``, the ``update()`` function of the returned inverse
                 transformation has to be called before it is used.
 
         Returns:
             Shallow copy of this transformation with ``exp`` module which uses negative scaling factor
-            to scale and square the stationary velocity field to computes the inverse displacement field.
+            to scale and square the stationary velocity field to compute the inverse displacement field.
 
         """
         inv = shallow_copy(self)

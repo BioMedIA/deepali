@@ -27,7 +27,7 @@ class ParametricTransform:
     - ``Tensor``: Tensor of fixed parameters which are thus not be returned by ``Module.parameters()``.
     - ``Callable``: A callable such as a function or ``torch.nn.Module``. Function ``update()``, which is
         registered as pre-forward hook, invokes this callable to obtain the current transformation parameters
-        with arguments set and obtained by ``SpatialTransform.condition()``. For examlpe an input batch of
+        with arguments set and obtained by ``SpatialTransform.condition()``. For example, an input batch of
         a neural network can be passed to a ``torch.nn.Module`` this way to infer parameters from this input.
 
     """
@@ -315,7 +315,7 @@ class InvertibleParametricTransform(ParametricTransform):
         Args:
             link: Whether the inverse transformation keeps a reference to this transformation.
                 If ``True``, the ``update()`` function of the inverse function will not recompute
-                shared parameters, e.g., parameters obtained by a callable neural network, but
+                shared parameters (e.g., parameters obtained by a callable neural network), but
                 directly access the parameters from this transformation. Note that when ``False``,
                 the inverse transformation will still share parameters, modules, and buffers with
                 this transformation, but these shared tensors may be replaced by a call of ``update()``

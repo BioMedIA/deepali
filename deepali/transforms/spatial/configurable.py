@@ -18,7 +18,6 @@ from ...core.linalg import quaternion_to_rotation_matrix
 from ...core.linalg import rotation_matrix_to_quaternion
 from ...core.types import ScalarOrTuple
 
-from .base import SpatialTransform
 from .bspline import FreeFormDeformation, StationaryVelocityFreeFormDeformation
 from .composite import SequentialTransform
 from .linear import AnisotropicScaling, EulerRotation, QuaternionRotation
@@ -125,7 +124,7 @@ class TransformConfig(DataclassConfig):
     # Valid values are "ZXZ", "XZX", ... (cf. euler_rotation() function).
     rotation_model: str = "ZXZ"
     # Control point spacing of non-rigid transformations in voxel units of
-    # the grid domain with respect to which the transformations is defined.
+    # the grid domain with respect to which the transformations are defined.
     control_point_spacing: ScalarOrTuple[int] = 7
     # Number of scaling and squaring steps
     scaling_and_squaring_steps: int = 6
@@ -211,7 +210,6 @@ class ConfigurableTransform(SequentialTransform):
         # Set parameters of transformation if given as dictionary
         if isinstance(params, dict):
             for name, transform in self.named_transforms():
-                assert isinstance(transform, SpatialTransform)
                 transform.data_(params[name])
         # Insert transformations in order of composition
         super().__init__(grid, modules)
@@ -226,7 +224,6 @@ class ConfigurableTransform(SequentialTransform):
         if params is None:
             params = {}
             for name, transform in self.named_transforms():
-                assert isinstance(transform, SpatialTransform)
                 params[name] = transform.data()
             return params
         if isinstance(params, ConfigurableTransform):
@@ -290,14 +287,14 @@ class ConfigurableTransform(SequentialTransform):
         r"""Get inverse of this transformation.
 
         Args:
-            link: Whether to inverse transformation keeps a reference to this transformation.
+            link: Whether the inverse transformation keeps a reference to this transformation.
                 If ``True``, the ``update()`` function of the inverse function will not recompute
-                shared parameters, e.g., parameters obtained by a callable neural network, but
+                shared parameters (e.g., parameters obtained by a callable neural network), but
                 directly access the parameters from this transformation. Note that when ``False``,
                 the inverse transformation will still share parameters, modules, and buffers with
                 this transformation, but these shared tensors may be replaced by a call of ``update()``
                 (which is implicitly called as pre-forward hook when ``__call__()`` is invoked).
-            update_buffers: Whether buffers of inverse transformation should be update after creating
+            update_buffers: Whether buffers of inverse transformation should be updated after creating
                 the shallow copy. If ``False``, the ``update()`` function of the returned inverse
                 transformation has to be called before it is used.
 
@@ -319,7 +316,7 @@ class ConfigurableTransform(SequentialTransform):
         r"""Update transformation parameters."""
         params = self._data()
         for k, p in params.items():
-            transform: SpatialTransform = self._transforms[k]
+            transform = self._transforms[k]
             transform.data_(p)
         super().update()
         return self
