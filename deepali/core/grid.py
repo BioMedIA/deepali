@@ -473,11 +473,11 @@ class Grid(object):
         r"""Transformation from one grid domain to another.
 
         Args:
-            axes: Target coordinate axes defined by this grid.
-                If ``None`` and also ``to_axes`` and ``to_grid`` is ``None``,
-                returns the transform which maps from grid cube to world space.
-            to_axes: Source coordinate axes defined by ``grid``. If ``None``, use ``axes``.
-            to_grid: Grid of ``to_axes``. If ``None``, ``to_grid=self``.
+            axes: Axes with respect to which input coordinates are defined.
+                If ``None`` and also ``to_axes`` and ``to_cube`` is ``None``,
+                returns the transform which maps from cube to world space.
+            to_axes: Axes of grid to which coordinates are mapped. Use ``axes`` if ``None``.
+            to_grid: Other grid. Use ``self`` if ``None``.
             vectors: Whether transformation is used to rescale and reorient vectors.
 
         Returns:
@@ -490,7 +490,7 @@ class Grid(object):
             return self.transform(cube_axes, Axes.WORLD, vectors=vectors)
         if axes is None:
             raise ValueError(
-                "Grid.transform() 'axes' required when 'to_axes' or 'to_cube' specified"
+                "Grid.transform() 'axes' required when 'to_axes' or 'to_grid' specified"
             )
         matrix = None
         axes = Axes(axes)
@@ -594,10 +594,10 @@ class Grid(object):
         r"""Map point coordinates or displacement vectors from one grid to another.
 
         Args:
-            input: Set of points to transform, e.g., as tensor of shape ``(..., D)``.
-            axes: Target coordinate axes defined by this grid.
-            to_axes: Source coordinate axes defined by ``grid``. If ``None``, use ``axes``.
-            to_grid: Grid of ``to_axes``. If ``None``, ``to_grid=self``.
+            input: Points or vectors to transform as tensor of shape ``(..., D)``.
+            axes: Axes with respect to which input coordinates are defined.
+            to_axes: Axes of cube to which coordinates are mapped. Use ``axes`` if ``None``.
+            to_cube: Other cube. Use ``self`` if ``None``.
             vectors: Whether transformation is used to rescale and reorient vectors.
             decimals: If positive or zero, number of digits right of the decimal point to round to.
                 When mapping points to ``Axes.GRID``, ``Axes.CUBE``, or ``Axes.CUBE_CORNERS``,
@@ -640,10 +640,10 @@ class Grid(object):
         r"""Map point coordinates from one grid domain to another.
 
         Args:
-            points: Set of points to transform, e.g., as tensor of shape ``(..., D)``.
+            points: Coordinates of points to transform as tensor of shape ``(..., D)``.
             axes: Coordinate axes with respect to which ``points`` are defined.
             to_axes: Coordinate axes to which ``points`` should be mapped to. If ``None``, use ``axes``.
-            to_grid: Grid with respect to which the codomain to defined. If ``None``, the target
+            to_grid: Grid with respect to which the codomain is defined. If ``None``, the target
                 and source sampling grids are assumed to be identical.
             decimals: If positive or zero, number of digits right of the decimal point to round to.
                 When mapping points to codomain ``Axes.GRID``, ``Axes.CUBE``, or ``Axes.CUBE_CORNERS``,
@@ -666,7 +666,7 @@ class Grid(object):
         r"""Rescale and reorient flow vectors.
 
         Args:
-            vectors: Set of displacement vectors to transform, e.g., as tensor of shape ``(..., D)``.
+            vectors: Displacement vectors to transform, e.g., as tensor of shape ``(..., D)``.
             axes: Coordinate axes with respect to which ``vectors`` are defined.
             to_axes: Coordinate axes to which ``vectors`` should be mapped to. If ``None``, use ``axes``.
             to_grid: Grid with respect to which ``to_axes`` is defined. If ``None``, the target
@@ -1019,10 +1019,10 @@ class Grid(object):
         """
         shape = cat_scalars(shape, *args, num=self.ndim, device=self.device)
         if not is_int_dtype(shape.dtype):
-            raise TypeError(
-                f"Grid.reshape() 'shape' must be integer values, got dtype={shape.dtype}"
-            )
-        return self.resize(shape.flip(0))
+            raise TypeError(f"Grid.reshape() 'shape' must be integer values, got dtype={shape.dtype}")
+        if shape.lt(0).any():
+            raise ValueError("Grid.reshape() 'shape' must be all non-negative numbers")
+        return self._resize(shape.flip(0), align_corners=align_corners)
 
     def resample(self, spacing: Union[float, Array, str], *args: float, min_size: int = 1) -> Grid:
         r"""Create new grid with specified spacing.
