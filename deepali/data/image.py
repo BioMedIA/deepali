@@ -598,7 +598,7 @@ class ImageBatch(DataTensor):
     def conv(
         self: TImageBatch, kernel: Tensor, padding: Union[PaddingMode, str, int] = None
     ) -> TImageBatch:
-        r"""Filter images in batch with a given (separable) kernel.
+        r"""Filter images in batch with a given convolutional kernel.
 
         Args:
             kernel: Weights of kernel used to filter the images in this batch by.
@@ -606,7 +606,7 @@ class ImageBatch(DataTensor):
                 If a 1-dimensional kernel is given, it is used as seperable convolution kernel in
                 all spatial image dimensions. Otherwise, the kernel is applied to the last spatial
                 image dimensions. For example, a 2D kernel applied to a batch of 3D image volumes
-                is applied slice-by-slice by convoling along the X and Y image axes.
+                is applied slice-by-slice by convolving along the X and Y image axes.
             padding: Image padding mode or margin size. If ``None``, use default mode ``PaddingMode.ZEROS``.
 
         Returns:
@@ -740,7 +740,7 @@ class Image(DataTensor):
         requires_grad: Optional[bool] = None,
         pin_memory: bool = False,
     ) -> None:
-        r"""Initialize image decorator.
+        r"""Initialize image tensor.
 
         Args:
             data: Image data tensor of shape (C, ...X). To create an ``Image`` instance from an
