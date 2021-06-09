@@ -3,6 +3,10 @@ Core:
 
 Transforms:
 - [ ] Basic data augmentations.
+- [ ] Modify spatial transformations to use ``Cube`` instead of sampling ``Grid`` to define domain and codomain.
+
+Spatial transforms:
+- [ ] Fix __repr__ of transforms with "params" set to a torch.nn.Module.
 
 Examples:
 - [ ] Implement traditional free-form deformation algorithm as an example.
