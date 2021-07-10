@@ -219,12 +219,11 @@ class SubpixelUpsample(Module):
     """Upsample using a subpixel CNN.
 
     This module is adapted from the MONAI project and supports 1D, 2D and 3D input images.
-    The module is consisted with two parts. First of all, a convolutional layer is employed
+    The module consists of two parts. First of all, a convolutional layer is employed
     to increase the number of channels into: ``in_channels * (scale_factor ** dimensions)``.
-    Secondly, a pixel shuffle manipulation is utilized to aggregates the feature maps from
-    low resolution space and build the super resolution space.
-    The first part of the module is not fixed, a sequential layers can be used to replace the
-    default single layer.
+    Secondly, a pixel shuffle manipulation is utilized to aggregate the feature maps from
+    low resolution space and build the super resolution space. The first part of the module
+    is not fixed, a sequential layer can be used to replace the default single layer.
 
     See: Shi et al., 2016, "Real-Time Single Image and Video Super-Resolution
     Using a nEfficient Sub-Pixel Convolutional Neural Network."
@@ -372,7 +371,7 @@ def pixelshuffle(x: Tensor, dimensions: int, scale_factor: int) -> Tensor:
     """Apply pixel shuffle to the tensor `x` with spatial dimensions `dimensions` and scaling factor `scale_factor`.
 
     See: Shi et al., 2016, "Real-Time Single Image and Video Super-Resolution
-    Using a nEfficient Sub-Pixel Convolutional Neural Network."
+    Using an Efficient Sub-Pixel Convolutional Neural Network."
 
     See: Aitken et al., 2017, "Checkerboard artifact free sub-pixel convolution".
 

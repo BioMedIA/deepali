@@ -122,11 +122,11 @@ def homogeneous_transform(transform: Tensor, points: Tensor, vectors: bool = Fal
             affine transformation matrices of shape ``(D, D)`` or ``(N, D, D)``, or tensor of homogeneous
             matrices of shape ``(D, D + 1)`` or ``(N, D, D + 1)``, respectively. When 3-dimensional
             batch of transformation matrices is given, the size of leading dimension N must be 1
-            for applying the same transformation to all points, or be equal the leading dimension
+            for applying the same transformation to all points, or be equal to the leading dimension
             of ``points``, otherwise. All points within a given batch dimension are transformed by
             the matrix of matching leading index. If size of ``points`` batch dimension is one,
             the size of the leading output batch dimension is equal to the number of transforms,
-            each applied to the same input points.
+            each applied to the same set of input points.
         points: Either 1-dimensional tensor of single point coordinates, or multi-dimensional tensor
             of shape ``(N, ..., D)``, where last dimension contains the spatial coordinates in the
             order ``(x, y)`` (2D) or ``(x, y, z)`` (3D), respectively.
