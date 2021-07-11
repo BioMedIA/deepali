@@ -2,9 +2,11 @@ r"""Base class of tensor subclasses with additional attributes and methods."""
 
 from __future__ import annotations
 
+from collections import OrderedDict
 from typing import Optional, Type, TypeVar
 
 import torch
+import torch.utils.hooks
 from torch import Tensor
 
 from ..core.tensor import as_tensor
@@ -82,6 +84,26 @@ class DataTensor(Tensor):
         memo[id(self)] = result
         return result
 
+    def __reduce_ex__(self, proto):
+        # See also: https://github.com/pytorch/pytorch/issues/47051#issuecomment-877788874
+        torch.utils.hooks.warn_if_has_hooks(self)
+        args = (self.storage(), self.storage_offset(), tuple(self.size()), self.stride())
+        if self.is_quantized:
+            args = args + (self.q_scale(), self.q_zero_point())
+        args = args + (self.requires_grad, OrderedDict())
+        f = torch._utils._rebuild_qtensor if self.is_quantized else torch._utils._rebuild_tensor_v2
+        return (_rebuild_from_type, (f, type(self), args, self.__dict__))
+
     def tensor(self: T) -> Tensor:
         r"""Convert to plain torch.Tensor."""
         return self.as_subclass(Tensor)
+
+
+def _rebuild_from_type(func, type, args, dict):
+    r"""Function used by DataTensor.__reduce_ex__ to support unpickling of subclass type."""
+    # from https://github.com/pytorch/pytorch/blob/13c975684a220ec096216ec6468ccd0dc90ff50a/torch/_tensor.py#L34
+    ret: Tensor = func(*args)
+    if type is not Tensor:
+        ret = ret.as_subclass(type)
+        ret.__dict__ = dict
+    return ret
