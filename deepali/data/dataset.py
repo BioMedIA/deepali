@@ -17,8 +17,9 @@ from torch.utils.data import Dataset as TorchDataset, Subset
 from ..core.config import DataclassConfig
 from ..core.types import PathStr, Sample, is_namedtuple, is_path_str
 
-from .transforms import Transform, ImageTransformConfig
-from .transforms import image_transforms, prepend_read_image_transform
+from .transforms import Transform
+from .transforms.image import ImageTransformConfig
+from .transforms.image import image_transforms, prepend_read_image_transform
 
 
 __all__ = (
