@@ -75,7 +75,12 @@ class HomogeneousTransform(InvertibleParametricTransform, LinearTransform):
 
     def extra_repr(self: HomogeneousTransform) -> str:
         r"""Print current transformation."""
-        return super().extra_repr() + f", matrix={self.matrix().tolist()!r}"
+        s = super().extra_repr() + ", matrix="
+        if self.params is None:
+            s += "undef"
+        else:
+            s += f"{self.matrix().tolist()!r}"
+        return s
 
 
 class Translation(InvertibleParametricTransform, LinearTransform):
@@ -131,7 +136,12 @@ class Translation(InvertibleParametricTransform, LinearTransform):
 
     def extra_repr(self: Translation) -> str:
         r"""Print current transformation."""
-        return super().extra_repr() + f", offset={self.offset().tolist()!r}"
+        s = super().extra_repr() + ", offset="
+        if self.params is None:
+            s += "undef"
+        else:
+            s += f"{self.offset().tolist()!r}"
+        return s
 
 
 class EulerRotation(InvertibleParametricTransform, LinearTransform):
@@ -217,7 +227,12 @@ class EulerRotation(InvertibleParametricTransform, LinearTransform):
 
     def extra_repr(self: EulerRotation) -> str:
         r"""Print current transformation."""
-        return super().extra_repr() + f", angles={self.angles().tolist()}"
+        s = super().extra_repr() + ", angles="
+        if self.params is None:
+            s += "undef"
+        else:
+            s += f"{self.angles().tolist()!r}"
+        return s
 
 
 class QuaternionRotation(InvertibleParametricTransform, LinearTransform):
@@ -303,7 +318,12 @@ class QuaternionRotation(InvertibleParametricTransform, LinearTransform):
 
     def extra_repr(self: QuaternionRotation) -> str:
         r"""Print current transformation."""
-        return super().extra_repr() + f", q={self.quaternion().tolist()}"
+        s = super().extra_repr() + ", q="
+        if self.params is None:
+            s += "undef"
+        else:
+            s += f"{self.quaternion().tolist()!r}"
+        return s
 
 
 class IsotropicScaling(InvertibleParametricTransform, LinearTransform):
@@ -384,7 +404,12 @@ class IsotropicScaling(InvertibleParametricTransform, LinearTransform):
 
     def extra_repr(self: IsotropicScaling) -> str:
         """Print current transformation."""
-        return super().extra_repr() + f", scales={self.scales().tolist()}"
+        s = super().extra_repr() + ", scales="
+        if self.params is None:
+            s += "undef"
+        else:
+            s += f"{self.scales().tolist()!r}"
+        return s
 
 
 class AnisotropicScaling(InvertibleParametricTransform, LinearTransform):
@@ -465,7 +490,12 @@ class AnisotropicScaling(InvertibleParametricTransform, LinearTransform):
 
     def extra_repr(self: AnisotropicScaling) -> str:
         r"""Print current transformation."""
-        return super().extra_repr() + f", scales={self.scales().tolist()}"
+        s = super().extra_repr() + ", scales="
+        if self.params is None:
+            s += "undef"
+        else:
+            s += f"{self.scales().tolist()!r}"
+        return s
 
 
 class Shearing(InvertibleParametricTransform, LinearTransform):
@@ -545,7 +575,12 @@ class Shearing(InvertibleParametricTransform, LinearTransform):
 
     def extra_repr(self: Shearing) -> str:
         r"""Print current transformation."""
-        return super().extra_repr() + f"angles={self.angles().tolist()}"
+        s = super().extra_repr() + "angles="
+        if self.params is None:
+            s += "undef"
+        else:
+            s += f"{self.angles().tolist()!r}"
+        return s
 
 
 class RigidTransform(SequentialTransform):
