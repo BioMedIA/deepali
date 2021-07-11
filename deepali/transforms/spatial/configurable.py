@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Dict, List, Optional, Union
+from typing import Callable, Dict, List, Mapping, Optional, Union
 
 import torch
 from torch import Tensor
@@ -23,6 +23,9 @@ from .composite import SequentialTransform
 from .linear import AnisotropicScaling, EulerRotation, QuaternionRotation
 from .linear import HomogeneousTransform, Shearing, Translation
 from .nonrigid import DisplacementFieldTransform, StationaryVelocityFieldTransform
+
+
+ParamsDict = Mapping[str, Tensor]
 
 
 # Names of elementary affine transformation child modules
@@ -143,12 +146,18 @@ class ConfigurableTransform(SequentialTransform):
     def __init__(
         self,
         grid: Grid,
-        params: Optional[Union[Callable[..., Dict[str, Tensor]], Dict[str, Tensor]]] = None,
+        params: Optional[Union[bool, Callable[..., ParamsDict], ParamsDict]] = True,
         config: Optional[TransformConfig] = None,
     ) -> None:
         r"""Initialize spatial transformation."""
-        if params is not None and not callable(params):
-            raise TypeError(f"{type(self).__name__}() 'params' must be callable or None")
+        if (
+            params not in (None, False, True)
+            and not callable(params)
+            and not isinstance(params, Mapping)
+        ):
+            raise TypeError(
+                f"{type(self).__name__}() 'params' must be bool, callable, dict, or None"
+            )
         if config is None:
             config = getattr(params, "config", None)
             if config is None:
@@ -178,7 +187,7 @@ class ConfigurableTransform(SequentialTransform):
                         f"{type(self).__name__}() 'config.affine_model' must contain each elementary"
                         f" transform at most once, but encountered key '{key}' more than once."
                     )
-                kwargs = dict(grid=grid, params=True if params is None else None)
+                kwargs = dict(grid=grid, params=params if isinstance(params, bool) else None)
                 if key == "R":
                     kwargs["order"] = config.rotation_model
                 modules[name] = AFFINE_TRANSFORMS[key](**kwargs)
@@ -190,7 +199,7 @@ class ConfigurableTransform(SequentialTransform):
             )
         if nonrigid_models:
             nonrigid_model = nonrigid_models[0]
-            nonrigid_params = True if params is None else None
+            nonrigid_params = params if isinstance(params, bool) else None
             nonrigid_kwargs = dict(grid=grid, params=nonrigid_params)
             NonRigidTransform = NONRIGID_TRANSFORMS[nonrigid_model]
             if nonrigid_model in ("DDF", "SVF") and config.control_point_spacing > 1:
@@ -208,7 +217,7 @@ class ConfigurableTransform(SequentialTransform):
                 _modules.update(modules)
                 modules = _modules
         # Set parameters of transformation if given as dictionary
-        if isinstance(params, dict):
+        if isinstance(params, Mapping):
             for name, transform in self.named_transforms():
                 transform.data_(params[name])
         # Insert transformations in order of composition
@@ -231,57 +240,76 @@ class ConfigurableTransform(SequentialTransform):
         if callable(params):
             args, kwargs = self.condition()
             pred = params(*args, **kwargs)
-            if not isinstance(pred, dict):
-                raise TypeError(f"{type(self).__name__}.params() value must be dict")
-            data = {}
-            flip_grid_coords = self.config.flip_grid_coords
-            if "affine" in self._transforms:
-                matrix = pred["affine"]
-                assert isinstance(matrix, Tensor)
-                assert matrix.ndim >= 2
-                D = matrix.shape[-2]
-                assert matrix.shape[-1] == D + 1
-                if flip_grid_coords:
-                    matrix[..., :D, :D] = matrix[..., :D, :D].flip((1, 2))
-                    matrix[..., :D, -1] = matrix[..., :D, -1].flip(-1)
-                data["affine"] = matrix
-            if "translation" in self._transforms:
+            if not isinstance(pred, Mapping):
+                raise TypeError(
+                    f"{type(self).__name__} 'params' callable return value must be a Mapping"
+                )
+        elif isinstance(params, Mapping):
+            pred = params
+        else:
+            raise TypeError(
+                f"{type(self).__name__} 'params' attribute must be a"
+                " callable, Mapping, linked ConfigurableTransform, or None"
+            )
+        data = {}
+        flip_grid_coords = self.config.flip_grid_coords
+        if "affine" in self._transforms:
+            matrix = pred["affine"]
+            assert isinstance(matrix, Tensor)
+            assert matrix.ndim >= 2
+            D = matrix.shape[-2]
+            assert matrix.shape[-1] == D + 1
+            if flip_grid_coords:
+                matrix[..., :D, :D] = matrix[..., :D, :D].flip((1, 2))
+                matrix[..., :D, -1] = matrix[..., :D, -1].flip(-1)
+            data["affine"] = matrix
+        if "translation" in self._transforms:
+            if "translation" in pred:
+                offset = pred["translation"]
+            else:
                 offset = pred["offset"]
-                assert isinstance(offset, Tensor)
-                if flip_grid_coords:
-                    offset = offset.flip(-1)
-                data["translation"] = offset
-            if "rotation" in self._transforms:
+            assert isinstance(offset, Tensor)
+            if flip_grid_coords:
+                offset = offset.flip(-1)
+            data["translation"] = offset
+        if "rotation" in self._transforms:
+            if "rotation" in pred:
+                angles = pred["rotation"]
+            else:
                 angles = pred["angles"]
-                assert isinstance(angles, Tensor)
-                if flip_grid_coords:
-                    rotmodel = self.config.rotation_model
-                    rotation = euler_rotation_matrix(angles, order=rotmodel).flip((1, 2))
-                    angles = euler_rotation_angles(rotation, order=rotmodel)
-                data["rotation"] = angles
-            if "scaling" in self._transforms:
+            assert isinstance(angles, Tensor)
+            if flip_grid_coords:
+                rotmodel = self.config.rotation_model
+                rotation = euler_rotation_matrix(angles, order=rotmodel).flip((1, 2))
+                angles = euler_rotation_angles(rotation, order=rotmodel)
+            data["rotation"] = angles
+        if "scaling" in self._transforms:
+            if "scaling" in pred:
+                scales = pred["scaling"]
+            else:
                 scales = pred["scales"]
-                assert isinstance(scales, Tensor)
-                if flip_grid_coords:
-                    scales = scales.flip(-1)
-                data["scaling"] = scales
-            if "quaternion" in self._transforms:
-                q = pred["quaternion"]
-                assert isinstance(q, Tensor)
-                if flip_grid_coords:
-                    m = quaternion_to_rotation_matrix(q)
-                    m = m.flip((1, 2))
-                    q = rotation_matrix_to_quaternion(m)
-                data["quaternion"] = q
-            if "nonrigid" in self._transforms:
+            assert isinstance(scales, Tensor)
+            if flip_grid_coords:
+                scales = scales.flip(-1)
+            data["scaling"] = scales
+        if "quaternion" in self._transforms:
+            q = pred["quaternion"]
+            assert isinstance(q, Tensor)
+            if flip_grid_coords:
+                m = quaternion_to_rotation_matrix(q)
+                m = m.flip((1, 2))
+                q = rotation_matrix_to_quaternion(m)
+            data["quaternion"] = q
+        if "nonrigid" in self._transforms:
+            if "nonrigid" in pred:
+                vfield = pred["nonrigid"]
+            else:
                 vfield = pred["vfield"]
-                assert isinstance(vfield, Tensor)
-                if flip_grid_coords:
-                    vfield = vfield.flip(1)
-                data["nonrigid"] = vfield
-            return data
-        assert isinstance(params, dict)
-        return params
+            assert isinstance(vfield, Tensor)
+            if flip_grid_coords:
+                vfield = vfield.flip(1)
+            data["nonrigid"] = vfield
+        return data
 
     def inverse(self, link: bool = False, update_buffers: bool = False) -> ConfigurableTransform:
         r"""Get inverse of this transformation.
@@ -314,9 +342,10 @@ class ConfigurableTransform(SequentialTransform):
 
     def update(self) -> ConfigurableTransform:
         r"""Update transformation parameters."""
-        params = self._data()
-        for k, p in params.items():
-            transform = self._transforms[k]
-            transform.data_(p)
+        if self.params is not None:
+            params = self._data()
+            for k, p in params.items():
+                transform = self._transforms[k]
+                transform.data_(p)
         super().update()
         return self
