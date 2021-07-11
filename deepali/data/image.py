@@ -727,6 +727,12 @@ class ImageBatch(DataTensor):
         )
         return self._make_instance(data, grid)
 
+    def __repr__(self) -> str:
+        return type(self).__name__ + f"(data={self.tensor()!r}, grid={self.grids()!r})"
+
+    def __str__(self) -> str:
+        return type(self).__name__ + f"(data={self.tensor()!s}, grid={self.grids()!s})"
+
 
 class Image(DataTensor):
     r"""Image sampled on oriented grid."""
@@ -1202,3 +1208,9 @@ class Image(DataTensor):
             data = data.squeeze(0)
             return data
         raise TypeError(f"{type(self).__name__}.sample() 'arg' must be Grid or Tensor")
+
+    def __repr__(self) -> str:
+        return type(self).__name__ + f"(data={self.tensor()!r}, grid={self.grid()!r})"
+
+    def __str__(self) -> str:
+        return type(self).__name__ + f"(data={self.tensor()!s}, grid={self.grid()!s})"

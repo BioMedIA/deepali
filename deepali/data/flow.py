@@ -192,6 +192,12 @@ class FlowFields(ImageBatch):
         )
         return image._make_instance(data, self._grid)
 
+    def __repr__(self) -> str:
+        return type(self).__name__ + f"(data={self.tensor()!r}, grids={self.grids()!r}, axes={self.axes()!r})"
+
+    def __str__(self) -> str:
+        return type(self).__name__ + f"(data={self.tensor()!s}, grids={self.grids()!s}, axes={self.axes()!r})"
+
 
 class FlowField(Image):
     r"""Flow field image.
@@ -377,3 +383,9 @@ class FlowField(Image):
         if isinstance(image, Image) and len(result) == 1:
             return result[0]
         return result
+
+    def __repr__(self) -> str:
+        return type(self).__name__ + f"(data={self.tensor()!r}, grid={self.grid()!r}, axes={self.axes()!r})"
+
+    def __str__(self) -> str:
+        return type(self).__name__ + f"(data={self.tensor()!s}, grid={self.grid()!s}, axes={self.axes()!r})"
