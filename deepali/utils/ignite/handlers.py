@@ -126,7 +126,7 @@ def write_summary_images(
     writer: SummaryWriter,
     names: Optional[Union[Mapping[str, str], Sequence[str], Set[str]]] = None,
     prefix: Optional[str] = None,
-    image_transform: Optional[Callable[[str, Tensor], Tensor]] = None,
+    image_transform: Optional[Callable[[str, Tensor], Tensor]] = True,
     rescale_transform: Union[bool, Callable[[str, Tensor], Tensor]] = False,
     global_step_transform: Optional[Callable[[Engine, Events], int]] = None,
     channel_offset: Union[bool, Callable[[Engine], int]] = False,
