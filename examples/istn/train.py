@@ -36,6 +36,7 @@ from deepali.data import collate_samples, prepare_batch
 from deepali.modules import ToImmutableOutput
 from deepali.transforms import CastImage, ResizeImage
 from deepali.utils.cli import LOG_FORMAT, LogLevel, cuda_visible_devices
+from deepali.utils.cli import filter_warning_of_experimental_named_tensors_feature
 from deepali.utils.ignite import handlers as H
 from deepali.utils.ignite.output_transforms import get_output_transform
 from deepali.utils.ignite.score_functions import negative_loss_score_function
@@ -195,6 +196,7 @@ def train_local(
     detect_anomaly: bool = False,
 ) -> None:
     r"""Run model training in local distributed process."""
+    filter_warning_of_experimental_named_tensors_feature()
 
     rank = idist.get_rank()
     seed = config.train.random_seed + rank
