@@ -67,13 +67,15 @@ class Dataset(TorchDataset, metaclass=ABCMeta):
 
         """
         super().__init__()
-        if isinstance(transforms, Sequential):
+        if transforms is None:
+            transform = Sequential()
+        elif isinstance(transforms, Sequential):
             transform = transforms
-        elif transforms is not None:
+        else:
             if not isinstance(transforms, (list, tuple)):
                 transforms = [transforms]
             transform = Sequential(*transforms)
-        self._transform: Optional[Sequential] = transform
+        self._transform: Sequential = transform
 
     @abstractmethod
     def __len__(self) -> int:
@@ -91,8 +93,7 @@ class Dataset(TorchDataset, metaclass=ABCMeta):
 
         """
         sample = self.sample(index)
-        if self._transform is not None:
-            sample = self._transform(sample)
+        sample = self._transform(sample)
         return sample
 
     @abstractmethod
