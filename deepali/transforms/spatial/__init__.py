@@ -8,8 +8,11 @@ from ...core.grid import Grid
 # Base classes for type comparison and annotation
 from .base import LinearTransform  # noqa
 from .base import NonRigidTransform  # noqa
-from .base import SpatialTransform
 from .base import ReadOnlyParameters  # noqa
+from .base import SpatialTransform
+
+# Parametric transformation mix-in
+from .parametric import ParametricTransform  # noqa
 
 # Composite coordinate transformations
 from .composite import CompositeTransform  # noqa
@@ -130,6 +133,7 @@ __all__ = (
         "ImageTransform",
         "LinearTransform",
         "NonRigidTransform",
+        "ParametricTransform",
         "ReadOnlyParameters",
         "SpatialTransform",
         "TransformConfig",
