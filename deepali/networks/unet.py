@@ -5,8 +5,7 @@ from __future__ import annotations
 from copy import deepcopy
 from collections import OrderedDict
 from dataclasses import dataclass
-import math
-from typing import Callable, Iterable, Mapping, Optional, Sequence, Type, Union
+from typing import Callable, Dict, Iterable, List, Mapping, Optional, Sequence, Type, Union
 
 from torch import Tensor
 from torch.nn import Identity, Module, ModuleDict, Sequential
@@ -20,6 +19,7 @@ from ..modules import GetItem, ReprWithCrossReferences
 from .blocks import ResidualUnit
 from .layers import ActivationArg, ConvLayer, JoinLayer, NormArg, PoolLayer
 from .layers import Upsample, UpsampleMode
+from .utils import module_output_size
 
 
 __all__ = (
@@ -93,6 +93,7 @@ class UNetDownsampleConfig(DataclassConfig):
     mode: str = "conv"
     factor: Union[int, Sequence[int]] = 2
     kernel_size: Optional[ScalarOrTuple[int]] = None
+    padding: Optional[ScalarOrTuple[int]] = None
 
 
 @dataclass
@@ -163,7 +164,7 @@ class UNetEncoderConfig(DataclassConfig):
 class UNetDecoderConfig(DataclassConfig):
 
     num_channels: NumChannels = (64, 32, 16, 8)
-    num_blocks: NumBlocks = 1
+    num_blocks: NumBlocks = 2
     num_layers: NumLayers = None
     conv_layer: UNetLayerConfig = UNetLayerConfig()
     upsample: Union[str, UNetUpsampleConfig] = UNetUpsampleConfig()
@@ -214,10 +215,6 @@ class UNetDecoderConfig(DataclassConfig):
         num_blocks = encoder.num_blocks
         if isinstance(num_blocks, Sequence):
             num_blocks = tuple(reversed(repeat_last(num_blocks, encoder.num_levels))[1:])
-            if not residual:
-                num_blocks = (n - 1 for n in num_blocks)
-        elif not residual:
-            num_blocks = num_blocks - 1
         num_layers = encoder.num_layers
         if isinstance(num_layers, Sequence):
             num_layers = tuple(reversed(repeat_last(num_layers, encoder.num_levels))[1:])
@@ -241,108 +238,6 @@ class UNetConfig(DataclassConfig):
     def __post_init__(self):
         if self.decoder is None:
             self.decoder = UNetDecoderConfig.from_encoder(self.encoder)
-
-    @classmethod
-    def symmetric(
-        cls,
-        num_channels: NumChannels = (8, 16, 32, 64),
-        num_blocks: NumBlocks = 2,
-        num_layers: NumLayers = None,
-        kernel_size: int = 3,
-        dilation: int = 1,
-        padding: Optional[int] = None,
-        padding_mode: Union[PaddingMode, str] = "zeros",
-        init: str = "default",
-        bias: Union[str, bool, None] = None,
-        norm: Union[str, Sequence, None] = "instance",
-        acti: Union[str, Sequence, None] = "lrelu",
-        order: str = "cna",
-        downsample: Union[str, UNetDownsampleConfig] = "conv",
-        upsample: Union[str, UpsampleMode, UNetUpsampleConfig] = "deconv",
-        join_mode: str = "cat",
-        residual: bool = False,
-    ) -> UNetConfig:
-        conv_layer = UNetLayerConfig(
-            kernel_size=kernel_size,
-            dilation=dilation,
-            padding=padding,
-            padding_mode=padding_mode,
-            init=init,
-            bias=bias,
-            norm=norm,
-            acti=acti,
-            order=order,
-        )
-        if num_layers is None:
-            num_layers = 2 if residual else 1
-        encoder = UNetEncoderConfig(
-            num_channels=num_channels,
-            num_blocks=num_blocks,
-            num_layers=num_layers,
-            conv_layer=conv_layer,
-            downsample=downsample,
-            residual=residual,
-        )
-        decoder = UNetDecoderConfig.from_encoder(encoder, join_mode=join_mode, upsample=upsample)
-        return cls(encoder, decoder)
-
-    @classmethod
-    def nnunet(
-        cls,
-        dimensions: int,
-        input_size: Optional[Union[int, Sequence[int]]] = None,
-        residual_encoder: bool = False,
-    ) -> UNetConfig:
-        r"""Segmentation U-net configuration adapted from nnUNet developed at MIC-DKFZ.
-
-        Isensee et al., 2020, Automated Design of Deep Learning Methods for Biomedical Image Segmentation, https://arxiv.org/abs/1904.08128.
-
-        Note that there may still be minor differences, such as the kernel size and pooling along the z dimension
-        for a 3D U-net, which in case of Isensee et al. are both set to 1 for the first two resolution levels
-        (cf. https://github.com/MIC-DKFZ/nnUNet/blob/d396fb702dc43d73f674d2fdfeb11d4782381558/nnunet/network_architecture/generic_modular_residual_UNet.py#L377-L392).
-
-        See also FabiansUNet implementation in nnUNet from MIC-DKFZ and the default network configuration at:
-        - https://github.com/MIC-DKFZ/nnUNet/blob/9bfd96103d7c53c7bea78eb48ed1abd273c27123/nnunet/network_architecture/generic_modular_residual_UNet.py#L305-L337
-        - https://github.com/MIC-DKFZ/nnUNet/blob/5848f9a7c2dfaf712661b733f9665db03b49312b/nnunet/network_architecture/generic_modular_UNet.py#L31-L78
-
-        """
-        if input_size is None:
-            input_size = 512
-        if isinstance(input_size, Sequence):
-            input_size = min(input_size)
-        conv_layer = UNetLayerConfig(
-            kernel_size=3,
-            dilation=1,
-            bias=None,  # no bias term when normalization layer after convolution
-            norm=("instance", dict(eps=1e-5, affine=True)),
-            acti=("lrelu", dict(negative_slope=0.01)),
-            order="cna",
-        )
-        num_levels = int(math.log(input_size / 4, 2)) + 1
-        num_blocks = repeat_last((1, 2, 3, 4)[:num_levels], num_levels)
-        num_layers = 2 if residual_encoder else 1
-        base_channels = 32  # cf. Isensee et al., 2020, arXiv:1904.08128
-        max_channels = 512 if dimensions == 2 else 320
-        num_channels = tuple(base_channels * (2 ** level) for level in range(len(num_blocks)))
-        num_channels = tuple(min(c, max_channels) for c in num_channels)
-        encoder = UNetEncoderConfig(
-            num_channels=num_channels,
-            num_blocks=num_blocks,
-            num_layers=num_layers,
-            conv_layer=conv_layer,
-            downsample="conv",
-            residual=residual_encoder,
-        )
-        decoder = UNetDecoderConfig(
-            num_channels=tuple(reversed(num_channels)),
-            num_blocks=1,
-            num_layers=1,
-            conv_layer=conv_layer,
-            upsample="deconv",
-            join_mode="cat",
-            residual=False,
-        )
-        return cls(encoder, decoder)
 
 
 def unet_conv_block(
@@ -462,6 +357,12 @@ class UNetEncoder(ReprWithCrossReferences, Module):
                 s = 1
             blocks = Sequential()
             for j, c in enumerate(nc):
+                k = config.conv_layer.kernel_size
+                p = config.conv_layer.padding
+                if s > 1:
+                    k = config.downsample.kernel_size or k
+                    if config.downsample.padding is not None:
+                        p = config.downsample.padding
                 d = 0
                 if j == 0:
                     d = config.block_1_dilation
@@ -472,10 +373,10 @@ class UNetEncoder(ReprWithCrossReferences, Module):
                     dimensions=dimensions,
                     in_channels=channels,
                     out_channels=c,
-                    kernel_size=config.conv_layer.kernel_size,
+                    kernel_size=k,
                     stride=s,
                     dilation=d,
-                    padding=config.conv_layer.padding,
+                    padding=p,
                     padding_mode=config.conv_layer.padding_mode,
                     init=config.conv_layer.init,
                     bias=config.conv_layer.bias,
@@ -505,7 +406,23 @@ class UNetEncoder(ReprWithCrossReferences, Module):
     def out_channels(self) -> int:
         return last_num_channels(self.config.num_channels)
 
-    def forward(self, x: Tensor) -> Sequence[Tensor]:
+    def output_size(self, in_size: ScalarOrTuple[int]) -> ScalarOrTuple[int]:
+        r"""Calculate output size of last feature map for a tensor of given spatial input size."""
+        return self.output_sizes(in_size)[-1]
+
+    def output_sizes(self, in_size: ScalarOrTuple[int]) -> List[ScalarOrTuple[int]]:
+        r"""Calculate output sizes of feature maps for a tensor of given spatial input size."""
+        size = in_size
+        fm_sizes = []
+        for stage in self.stages.values():
+            assert isinstance(stage, ModuleDict)
+            if "pool" in stage:
+                size = module_output_size(stage["pool"], size)
+            size = module_output_size(stage["blocks"], size)
+            fm_sizes.append(size)
+        return fm_sizes
+
+    def forward(self, x: Tensor) -> List[Tensor]:
         features = []
         for stage in self.stages.values():
             assert isinstance(stage, ModuleDict)
@@ -587,14 +504,17 @@ class UNetDecoder(ReprWithCrossReferences, Module):
             if not nc:
                 raise ValueError(f"{type(self).__name__}() invalid 'num_channels' specification")
             stage = ModuleDict()
-            if upsample_mode is UpsampleMode.INTERPOLATE:
+            if upsample_mode is UpsampleMode.INTERPOLATE and config.upsample.kernel_size != 0:
+                p = config.upsample.padding
+                if p is None:
+                    p = config.conv_layer.padding
                 pre_conv = ConvLayer(
                     dimensions=dimensions,
                     in_channels=channels,
                     out_channels=nc[0],
                     kernel_size=config.upsample.kernel_size or config.conv_layer.kernel_size,
                     dilation=config.upsample.dilation or config.conv_layer.dilation,
-                    padding=config.upsample.padding or config.conv_layer.padding,
+                    padding=p,
                     padding_mode=config.conv_layer.padding_mode,
                     init=config.conv_layer.init,
                     bias=config.conv_layer.bias,
@@ -621,7 +541,7 @@ class UNetDecoder(ReprWithCrossReferences, Module):
             stage["join"] = JoinLayer(join_mode, dim=1)
             channels = (2 if join_mode == "cat" else 1) * nc[0]
             blocks = Sequential()
-            for j, c in enumerate(nc):
+            for j, c in enumerate(nc[1:]):
                 block = conv_block(
                     dimensions=dimensions,
                     in_channels=channels,
@@ -647,14 +567,6 @@ class UNetDecoder(ReprWithCrossReferences, Module):
         self.in_channels = in_channels
         self.stages = stages
 
-    @property
-    def num_channels(self) -> NumChannels:
-        return self.config.num_channels
-
-    @property
-    def out_channels(self) -> int:
-        return last_num_channels(self.config.num_channels)
-
     @classmethod
     def from_encoder(
         cls,
@@ -666,7 +578,33 @@ class UNetDecoder(ReprWithCrossReferences, Module):
         config = UNetDecoderConfig.from_encoder(encoder, residual=residual, **kwargs)
         return cls(dimensions=encoder.dimensions, config=config)
 
-    def forward(self, features: Sequence[Tensor]) -> Union[Tensor, Sequence[Tensor]]:
+    @property
+    def num_channels(self) -> NumChannels:
+        return self.config.num_channels
+
+    @property
+    def out_channels(self) -> int:
+        return last_num_channels(self.config.num_channels)
+
+    def output_size(self, in_size: ScalarOrTuple[int]) -> ScalarOrTuple[int]:
+        r"""Calculate output size for an initial feature map of given spatial input size."""
+        return self.output_sizes(in_size)[-1]
+
+    def output_sizes(self, in_size: ScalarOrTuple[int]) -> List[ScalarOrTuple[int]]:
+        r"""Calculate output sizes for an initial feature map of given spatial input size."""
+        size = module_output_size(self.input, in_size)
+        out_sizes = [size]
+        for stage in self.stages.values():
+            if not isinstance(stage, ModuleDict):
+                raise AssertionError(
+                    f"{type(self).__name__}.out_sizes() expected stage ModuleDict, got {type(stage)}"
+                )
+            size = module_output_size(stage["upsample"], size)
+            size = module_output_size(stage["blocks"], size)
+            out_sizes.append(size)
+        return out_sizes
+
+    def forward(self, features: Sequence[Tensor]) -> Union[Tensor, List[Tensor]]:
         if not isinstance(features, Sequence):
             raise TypeError(f"{type(self).__name__}() 'features' must be Sequence")
         features = list(features)
@@ -690,7 +628,7 @@ class UNetDecoder(ReprWithCrossReferences, Module):
             x = join([x, skip])
             x = blocks(x)
             output.append(x)
-        return tuple(output)
+        return output
 
 
 class SequentialUNet(ReprWithCrossReferences, Sequential):
@@ -791,6 +729,14 @@ class SequentialUNet(ReprWithCrossReferences, Sequential):
     @property
     def num_levels(self) -> int:
         return len(self.num_channels)
+
+    def output_size(self, in_size: ScalarOrTuple[int]) -> ScalarOrTuple[int]:
+        r"""Calculate spatial output size given an input tensor with specified spatial size."""
+        # ATTENTION: module_output_size(self, in_size) would cause an infinite recursion!
+        size = in_size
+        for module in self:
+            size = module_output_size(module, size)
+        return size
 
 
 class UNet(ReprWithCrossReferences, Module):
@@ -914,18 +860,51 @@ class UNet(ReprWithCrossReferences, Module):
         return self.output_modules.keys()
 
     def output_is_dict(self) -> bool:
-        r"""Whether model output is dictionary."""
+        r"""Whether model output is dictionary of output tensors."""
         return not (self.output_is_tensor() or self.output_is_tuple())
 
     def output_is_tensor(self) -> bool:
-        r"""Whether model output is a tensor."""
+        r"""Whether model output is a single output tensor."""
         return len(self.output_modules) == 1 and bool(self.out_channels)
 
     def output_is_tuple(self) -> bool:
-        r"""Whether model output is tuple of feature maps."""
+        r"""Whether model output is tuple of decoded feature maps."""
         return not self.output_modules
 
-    def forward(self, x: Tensor) -> Union[Tensor, Sequence[Tensor], Mapping[str, Tensor]]:
+    def output_size(self, in_size: ScalarOrTuple[int]) -> ScalarOrTuple[int]:
+        out_sizes = self.output_sizes(in_size)
+        if self.output_is_tensor():
+            assert len(out_sizes) == 1
+            return out_sizes[0]
+        if self.output_is_tuple():
+            return out_sizes[-1]
+        assert isinstance(out_sizes, dict) and len(out_sizes) > 0
+        out_size = None
+        for size in out_sizes.values():
+            if out_size is None:
+                out_size = size
+            elif out_size != size:
+                raise RuntimeError(
+                    f"{type(self).__name__}.output_size() is ambiguous, use output_sizes() instead"
+                )
+        assert out_size is not None
+        return out_size
+
+    def output_sizes(
+        self, in_size: ScalarOrTuple[int]
+    ) -> Union[Dict[ScalarOrTuple[int]], List[ScalarOrTuple[int]]]:
+        enc_out_size = self.encoder.output_size(in_size)
+        dec_out_sizes = self.decoder.output_sizes(enc_out_size)
+        if self.output_is_tensor():
+            return dec_out_sizes[-1:]
+        if self.output_is_tuple():
+            return dec_out_sizes
+        out_sizes = {}
+        for name, module in self.output_modules.items():
+            out_sizes[name] = module_output_size(module, dec_out_sizes)
+        return out_sizes
+
+    def forward(self, x: Tensor) -> Union[Tensor, Dict[str, Tensor], List[Tensor]]:
         features = self.encoder(x)
         features = self.decoder(features)
         outputs = {}
