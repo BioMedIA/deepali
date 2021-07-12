@@ -5,11 +5,11 @@ from typing import Optional, Union
 from torch import Tensor
 
 from ..core import functional as U
-from ..core import losses as L
 from ..core.math import max_difference
 from ..core.types import ScalarOrTuple
 
 from .base import PairwiseImageLoss
+from . import functional as L
 
 
 class LCC(PairwiseImageLoss):

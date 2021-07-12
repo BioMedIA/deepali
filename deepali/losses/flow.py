@@ -10,7 +10,7 @@ from torch import Tensor
 from ..core.types import Shape
 
 from .base import DisplacementLoss
-from ..core import losses as L
+from . import functional as L
 
 
 class _SpatialDerivativesLoss(DisplacementLoss):
