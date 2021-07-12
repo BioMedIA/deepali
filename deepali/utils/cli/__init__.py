@@ -4,6 +4,7 @@ from .environ import cuda_visible_devices
 from .environ import check_cuda_visible_devices
 from .environ import init_omp_num_threads
 
+from .logging import LOG_FORMAT
 from .logging import LogLevel
 from .logging import configure_logging
 
@@ -25,6 +26,7 @@ __all__ = (
     "Args",
     "ArgumentParser",
     "LogLevel",
+    "LOG_FORMAT",
     "entry_point",
     "check_cuda_visible_devices",
     "configure_logging",
