@@ -1,8 +1,9 @@
 r"""Generic wrappers and mix-ins for data transforms."""
 
+from collections.abc import KeysView
 from copy import copy as shallowcopy, deepcopy
 from dataclasses import is_dataclass, fields
-from typing import Any, Callable, Mapping, Optional, Union
+from typing import Any, Callable, Iterable, Mapping, Optional, Union
 
 from torch.nn import Module
 
@@ -18,8 +19,9 @@ class ItemTransform(Module):
     def __init__(
         self,
         transform: Callable,
-        key: Optional[Union[int, str]] = None,
+        key: Optional[Union[int, str, KeysView, Iterable[Union[int, str]]]] = None,
         copy: bool = False,
+        ignore_meta: bool = True,
         ignore_missing: bool = False,
     ):
         r"""Initialize item transformation.
@@ -36,12 +38,16 @@ class ItemTransform(Module):
                 is made and only the item specified by ``key`` is replaced by its transformed value.
                 If ``True``, a deep copy of all input ``data`` items is made.
             ignore_missing: Whether to skip processing of items with value ``None``.
+            ignore_meta: Preserve 'meta' dictionary key value as is (cf. ``MetaDataset``).
 
         """
         super().__init__()
         self.transform = transform
-        self.key = key or "all"
+        if not isinstance(key, str) and isinstance(key, (KeysView, Iterable)):
+            key = set(key)
+        self.key = key
         self.copy = copy
+        self.ignore_meta = ignore_meta
         self.ignore_missing = ignore_missing
 
     def forward(self, data: Any) -> Any:
@@ -56,14 +62,23 @@ class ItemTransform(Module):
             By default, a shallow copy of ``data`` is made unless ``self.copy == True``.
 
         """
-        if self.key in (None, "", "all"):
+        if self.key in (None, "", "all", "ALL"):
             return self._apply_all(data)
-        if isinstance(self.key, int):
-            return self._apply_index(data, self.key)
-        if isinstance(self.key, str):
-            key = RE_OUTPUT_KEY_INDEX.sub(r".\1", self.key)
-            return self._apply_key(data, key)
-        raise AssertionError(f"{type(self).__name__}() 'key' must be None, int, or str")
+        if isinstance(self.key, set):
+            keys = self.key
+        elif not isinstance(self.key, str) and isinstance(self.key, (KeysView, Iterable)):
+            keys = set(self.key)
+        else:
+            keys = [self.key]
+        for key in keys:
+            if isinstance(key, int):
+                data = self._apply_index(data, key)
+            elif isinstance(key, str):
+                key = RE_OUTPUT_KEY_INDEX.sub(r".\1", key)
+                data = self._apply_key(data, key)
+            else:
+                raise TypeError(f"{type(self).__name__}() 'key' must be None, int, or str")
+        return data
 
     def _apply_all(self, data: Any) -> Any:
         r"""Transform all leaf items."""
@@ -71,10 +86,15 @@ class ItemTransform(Module):
             output = shallowcopy(data)
             for field in fields(data):
                 value = getattr(data, field.name)
-                value = self._apply_all(value)
+                if not self.ignore_meta or field.name != "meta":
+                    value = self._apply_all(value)
                 setattr(output, field.name, value)
         elif isinstance(data, Mapping):
-            output = {k: self._apply_all(v) for k, v in data.items()}
+            output = {}
+            for k, v in data.items():
+                if not self.ignore_meta or k != "meta":
+                    v = self._apply_all(v)
+                output[k] = v
         elif isinstance(data, tuple):
             output = tuple(self._apply_all(d) for d in data)
             if is_namedtuple(data):
@@ -213,6 +233,15 @@ class ItemwiseTransform:
     r"""Mix-in for data preprocessing and augmentation transforms."""
 
     @classmethod
-    def item(cls, key: str, *args, ignore_missing: bool = False, **kwargs) -> ItemTransform:
+    def item(
+        cls,
+        key: Union[int, str, KeysView, Iterable[Union[int, str]]],
+        *args,
+        ignore_meta: bool = True,
+        ignore_missing: bool = False,
+        **kwargs,
+    ) -> ItemTransform:
         r"""Apply transform to specified item only."""
-        return ItemTransform(cls(*args, **kwargs), key=key, ignore_missing=ignore_missing)
+        return ItemTransform(
+            cls(*args, **kwargs), key=key, ignore_meta=ignore_meta, ignore_missing=ignore_missing
+        )
