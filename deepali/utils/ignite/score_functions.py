@@ -13,6 +13,10 @@ def negative_loss_score_function(engine: Engine, key: str = "loss") -> Tensor:
     r"""Get negated loss value from ``engine.state.output``."""
     output = engine.state.output
     if isinstance(output, Mapping):
-        output = get_tensor(output, key)
-    assert isinstance(output, Tensor)
-    return -output
+        loss = get_tensor(output, key)
+    elif isinstance(output, Tensor):
+        loss = output
+    else:
+        raise ValueError("negative_loss_score_function() engine output loss must be a Tensor")
+    loss = loss.detach().sum()
+    return -float(loss)
