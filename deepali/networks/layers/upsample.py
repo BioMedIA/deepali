@@ -20,9 +20,9 @@ import torch
 from torch import Tensor, nn
 from torch.nn import Module, Sequential, Identity
 
-from ...core.convutils import upsample_padding, upsample_output_padding
 from ...core.enum import PaddingMode, Sampling
 from ...core.grid import ALIGN_CORNERS
+from ...core.nnutils import upsample_padding, upsample_output_padding
 from ...core.types import ScalarOrTuple
 from ...modules import Pad
 

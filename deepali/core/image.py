@@ -7,11 +7,11 @@ import torch
 import torch.nn.functional as F
 from torch import Tensor
 
-from .convutils import same_padding, stride_minus_kernel_padding
 from .enum import PaddingMode, Sampling, SpatialDim, SpatialDimArg, SpatialDerivativeKeys
 from .grid import ALIGN_CORNERS, Axes, Grid, grid_transform_points
 from .kernels import gaussian1d, gaussian1d_I
 from .names import image_batch_tensor_names
+from .nnutils import same_padding, stride_minus_kernel_padding
 from .tensor import as_tensor, cat_scalars, move_dim
 from .types import Array, Device, Scalar, ScalarOrTuple, Size, Shape, is_float_dtype
 

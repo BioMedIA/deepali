@@ -13,8 +13,8 @@ from torch.nn.modules import Conv1d as _Conv1d, ConvTranspose1d as _ConvTranspos
 from torch.nn.modules import Conv2d as _Conv2d, ConvTranspose2d as _ConvTranspose2d
 from torch.nn.modules import Conv3d as _Conv3d, ConvTranspose3d as _ConvTranspose3d
 
-from ...core.convutils import same_padding, stride_minus_kernel_padding
 from ...core.enum import PaddingMode
+from ...core.nnutils import same_padding, stride_minus_kernel_padding
 from ...core.types import ScalarOrTuple, ScalarOrTuple1d, ScalarOrTuple2d, ScalarOrTuple3d
 from ...modules import ReprWithCrossReferences
 
