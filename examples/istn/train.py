@@ -35,7 +35,7 @@ from deepali.data import ImageBatch, ImageDataset, ImageDatasetConfig, Partition
 from deepali.data import collate_samples, prepare_batch
 from deepali.modules import ToImmutableOutput
 from deepali.transforms import CastImage, ResizeImage
-from deepali.utils.cli import LogLevel, cuda_visible_devices
+from deepali.utils.cli import LOG_FORMAT, LogLevel, cuda_visible_devices
 from deepali.utils.ignite import handlers as H
 from deepali.utils.ignite.output_transforms import get_output_transform
 from deepali.utils.ignite.score_functions import negative_loss_score_function
@@ -45,8 +45,6 @@ from models import ImageAndSpatialTransformerNetwork, create_istn
 
 
 LossFunction = Callable[[Dict[str, Tensor]], Dict[str, Tensor]]
-
-LOG_FORMAT = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 
 
 @dataclass
