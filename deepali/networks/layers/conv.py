@@ -34,6 +34,7 @@ __all__ = (
     "conv_module",
     "is_convolution",
     "is_conv_module",
+    "is_transposed_convolution",
     "same_padding",
     "stride_minus_kernel_padding",
 )
@@ -420,10 +421,16 @@ def conv_module(*args, **kwargs) -> Module:
 
 def is_convolution(arg: Any) -> bool:
     r"""Whether given module is a learnable convolution."""
-    types = (Conv1d, Conv2d, Conv3d, ConvTranspose1d, ConvTranspose2d, ConvTranspose3d)
+    types = (_Conv1d, _Conv2d, _Conv3d, _ConvTranspose1d, _ConvTranspose2d, _ConvTranspose3d)
     return isinstance(arg, types)
 
 
 def is_conv_module(arg: Any) -> bool:
     r"""Whether given module is a learnable convolution."""
     return is_convolution(arg)
+
+
+def is_transposed_convolution(arg: Any) -> bool:
+    r"""Whether given module is a learnable transposed convolution."""
+    types = (_ConvTranspose1d, _ConvTranspose2d, _ConvTranspose3d)
+    return isinstance(arg, types)
