@@ -62,7 +62,7 @@ pip install git+https://github.com/HeartFlow/deepali.git#egg=deepali[all]
 # or: pip install .[all]
 ```
 
-When using Python >=3.9, note that there are as of May 2021 no binary wheels available on PyPI for VTK. This dependency must in this case be pre-installed with `conda install -c conda-forge vtk==9` in a conda environment created similar to below before executing above pip command.
+When using a recent Python version for which no binary wheels are available for VTK, this dependency must in this case be pre-installed with `conda install -c conda-forge vtk==9` in a conda environment created similar to below before executing above pip command. As of July 2021, VTK 9.0.3 is available on PyPI for Python 3.6, 3.7, 3.8, and 3.9.
 
 In order to use [conda] (e.g., [Miniconda]), we recommend to first create a new environment as follows
 
