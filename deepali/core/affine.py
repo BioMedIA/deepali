@@ -93,7 +93,7 @@ def euler_rotation_matrix(
 
     """
     if not isinstance(order, (str, type(None))):
-        raise TypeError("euler_rotation() 'order' must be None or str")
+        raise TypeError("euler_rotation_matrix() 'order' must be None or str")
     angles_ = atleast_1d(angles, dtype=dtype, device=device)
     angles_ = as_float_tensor(angles_)
     c = torch.cos(angles_)
@@ -105,10 +105,10 @@ def euler_rotation_matrix(
     if homogeneous:
         matrix[..., D] = 0
     if D == 2:
-        matrix[..., 0, 0] = c
-        matrix[..., 0, 1] = -s
-        matrix[..., 1, 0] = s
-        matrix[..., 1, 1] = c
+        matrix[..., 0, 0] = c[..., 0]
+        matrix[..., 0, 1] = -s[..., 0]
+        matrix[..., 1, 0] = s[..., 0]
+        matrix[..., 1, 1] = c[..., 0]
     elif D == 3:
         # See also the following Wikipedia page. Attention: Order of angles is reversed!
         # https://en.wikipedia.org/wiki/Euler_angles#Rotation_matrix
