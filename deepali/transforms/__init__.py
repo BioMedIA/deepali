@@ -35,6 +35,7 @@ from .image import NormalizeImage
 from .image import ReadImage
 from .image import ResampleImage
 from .image import RescaleImage
+from .image import ResizeImage
 
 
 __all__ = (
@@ -55,4 +56,5 @@ __all__ = (
     "ReadImage",
     "ResampleImage",
     "RescaleImage",
+    "ResizeImage",
 )

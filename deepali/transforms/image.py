@@ -11,6 +11,7 @@ from ..data.transforms.image import NormalizeImage
 from ..data.transforms.image import ReadImage
 from ..data.transforms.image import ResampleImage
 from ..data.transforms.image import RescaleImage
+from ..data.transforms.image import ResizeImage
 
 
 __all__ = (
@@ -25,4 +26,5 @@ __all__ = (
     "ReadImage",
     "ResampleImage",
     "RescaleImage",
+    "ResizeImage",
 )

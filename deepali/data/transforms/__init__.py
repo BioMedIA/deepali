@@ -21,6 +21,7 @@ from .image import NormalizeImage
 from .image import ReadImage
 from .image import ResampleImage
 from .image import RescaleImage
+from .image import ResizeImage
 
 from .item import ItemTransform
 from .item import ItemwiseTransform
@@ -47,4 +48,5 @@ __all__ = (
     "ReadImage",
     "ResampleImage",
     "RescaleImage",
+    "ResizeImage",
 )

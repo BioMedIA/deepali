@@ -26,6 +26,7 @@ __all__ = (
     "ReadImage",
     "ResampleImage",
     "RescaleImage",
+    "ResizeImage",
     "ImageTransformConfig",
     "config_has_read_image_transform",
     "prepend_read_image_transform",
@@ -77,8 +78,19 @@ class AvgPoolImage(ItemwiseTransform, Module):
 class CastImage(ItemwiseTransform, Module):
     r"""Cast image data to specified type."""
 
-    def __init__(self, dtype: torch.dtype) -> None:
+    def __init__(self, dtype: Union[torch.dtype, str]) -> None:
         super().__init__()
+        if isinstance(dtype, str):
+            attr = dtype
+            dtype = getattr(torch, attr, None)
+            if dtype is None:
+                raise ValueError(
+                    f"{type(self).__name__}() module torch has no 'dtype' named torch.{attr}"
+                )
+            if not isinstance(dtype, torch.dtype):
+                raise ValueError(f"{type(self).__name__}() torch.{attr} is not a torch.dtype name")
+        elif not isinstance(dtype, torch.dtype):
+            raise TypeError(f"{type(self).__name__}() 'dtype' must by dtype name or torch.dtype")
         self.dtype = dtype
 
     def forward(self, image: Image) -> Image:
@@ -328,6 +340,28 @@ class RescaleImage(ItemwiseTransform, Module):
         return s
 
 
+class ResizeImage(ItemwiseTransform, Module):
+    r"""Resample image to specified image size."""
+
+    def __init__(
+        self,
+        size: Union[int, Sequence[int]],
+        mode: Union[Sampling, str] = Sampling.LINEAR,
+    ) -> None:
+        super().__init__()
+        self.size = size
+        self.mode = Sampling(mode)
+
+    def forward(self, image: Image) -> Image:
+        if not isinstance(image, Image):
+            raise TypeError(f"{type(self).__name__}.forward() argument must be Image")
+        image = image.resize(self.size, mode=self.mode)
+        return image
+
+    def __repr__(self) -> str:
+        return type(self).__name__ + f"(size={self.size!r}, mode={self.mode.value!r})"
+
+
 ImageTransformMapping = Mapping[str, Union[Sequence, Mapping]]
 ImageTransformConfig = Union[
     str, ImageTransformMapping, Sequence[Union[str, ImageTransformMapping]]
@@ -345,6 +379,7 @@ IMAGE_TRANSFORM_TYPES = {
     "read": ReadImage,
     "rescale": RescaleImage,
     "resample": ResampleImage,
+    "resize": ResizeImage,
 }
 
 INPLACE_IMAGE_TRANSFORMS = {"clamp", "normalize", "rescale"}
