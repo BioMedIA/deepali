@@ -128,7 +128,7 @@ class TransformConfig(DataclassConfig):
     rotation_model: str = "ZXZ"
     # Control point spacing of non-rigid transformations in voxel units of
     # the grid domain with respect to which the transformations are defined.
-    control_point_spacing: ScalarOrTuple[int] = 7
+    control_point_spacing: ScalarOrTuple[int] = 1
     # Number of scaling and squaring steps
     scaling_and_squaring_steps: int = 6
     # Whether predicted transformation parameters are with respect to a grid
@@ -204,7 +204,8 @@ class ConfigurableTransform(SequentialTransform):
             NonRigidTransform = NONRIGID_TRANSFORMS[nonrigid_model]
             if nonrigid_model in ("DDF", "SVF") and config.control_point_spacing > 1:
                 size = grid.size_tensor()
-                size = (size / config.control_point_spacing).ceil().type(torch.int)
+                stride = torch.tensor(config.control_point_spacing).to(size)
+                size = size.div(stride).ceil().long()
                 nonrigid_kwargs["grid"] = grid.resize(size)
             if nonrigid_model == "SVF":
                 nonrigid_kwargs["steps"] = config.scaling_and_squaring_steps
