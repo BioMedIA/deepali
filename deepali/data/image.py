@@ -247,8 +247,9 @@ class ImageBatch(DataTensor):
     def narrow(self: TImageBatch, dim: int, start: int, length: int) -> TImageBatch:
         r"""Narrow image batch along specified tensor dimension."""
         data = self.tensor().narrow(dim, start, length)
+        grid = self.grid()
         if dim > 1:
-            grid = self.grid().narrow(self.ndim - dim - 1, start, length)
+            grid = grid.narrow(self.ndim - dim - 1, start, length)
         return self._make_instance(data, grid)
 
     def resize(
