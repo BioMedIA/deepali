@@ -1026,12 +1026,15 @@ def grid_sample(
         padding_value = float(padding or 0)
     out = data.type_as(grid)
     if padding_value != 0:
-        out -= padding_value
+        if out.data_ptr() == data.data_ptr():
+            out = out.sub(padding_value)
+        else:
+            out = out.sub_(padding_value)
     out = F.grid_sample(
         out, grid, mode=mode, padding_mode=padding_mode, align_corners=align_corners
     )
     if padding_mode == "zeros" and padding_value != 0:
-        out += padding_value
+        out = out.add_(padding_value)
     if mode == "nearest" or data.is_floating_point():
         out = out.type_as(data)
     return out
