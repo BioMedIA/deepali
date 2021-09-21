@@ -22,6 +22,8 @@ def conv_output_size(
     if m.ndim != 1:
         raise ValueError("conv_output_size() 'in_size' must be scalar or sequence")
     ndim = m.shape[0]
+    if ndim == 1 and k.shape[0] > 1:
+        ndim = k.shape[0]
     for arg, name in zip([k, s, d], ["kernel_size", "stride", "dilation"]):
         if arg.ndim != 1 or arg.shape[0] not in (1, ndim):
             raise ValueError(
@@ -46,7 +48,7 @@ def conv_output_size(
     p = p.expand(ndim)
     n = p.mul(2).add_(m).sub_(k.sub(1).mul_(d)).sub_(1).float().div_(s).add_(1).floor_().long()
     if isinstance(in_size, int):
-        return n.item()
+        return n[0].item()
     return Size(n.tolist())
 
 
@@ -69,6 +71,8 @@ def conv_transposed_output_size(
     if m.ndim != 1:
         raise ValueError("conv_transposed_output_size() 'in_size' must be scalar or sequence")
     ndim = m.shape[0]
+    if ndim == 1 and k.shape[0] > 1:
+        ndim = k.shape[0]
     for arg, name in zip(
         [k, s, p, o, d], ["kernel_size", "stride", "padding", "output_padding", "dilation"]
     ):
@@ -98,6 +102,8 @@ def pad_output_size(
     if m.ndim != 1:
         raise ValueError("pad_output_size() 'in_size' must be scalar or sequence")
     ndim = m.shape[0]
+    if ndim == 1 and p.shape[0] > 1 and p.shape[0] % 2:
+        ndim = p.shape[0] // 2
     if p.ndim != 1 or p.shape[0] not in (1, 2 * ndim):
         raise ValueError(
             f"pad_output_size() 'padding' must be scalar or sequence of length {2 * ndim}"
@@ -105,7 +111,7 @@ def pad_output_size(
     p = p.expand(2 * ndim)
     n = p.reshape(ndim, 2).sum(dim=1).add(m)
     if isinstance(in_size, int):
-        return n.item()
+        return n[0].item()
     return Size(n.tolist())
 
 
@@ -127,6 +133,8 @@ def pool_output_size(
     if m.ndim != 1:
         raise ValueError("pool_output_size() 'in_size' must be scalar or sequence")
     ndim = m.shape[0]
+    if ndim == 1 and k.shape[0] > 1:
+        ndim = k.shape[0]
     for arg, name in zip([k, s, p, d], ["kernel_size", "stride", "padding", "dilation"]):
         if arg.ndim != 1 or arg.shape[0] not in (1, ndim):
             raise ValueError(
@@ -140,7 +148,7 @@ def pool_output_size(
     n = n.ceil() if ceil_mode else n.floor()
     n = n.long()
     if isinstance(in_size, int):
-        return n.item()
+        return n[0].item()
     return Size(n.tolist())
 
 
@@ -159,6 +167,8 @@ def unpool_output_size(
     if m.ndim != 1:
         raise ValueError("unpool_output_size() 'in_size' must be scalar or sequence")
     ndim = m.shape[0]
+    if ndim == 1 and k.shape[0] > 1:
+        ndim = k.shape[0]
     for arg, name in zip([k, s, p], ["kernel_size", "stride", "padding"]):
         if arg.ndim != 1 or arg.shape[0] not in (1, ndim):
             raise ValueError(
@@ -169,7 +179,7 @@ def unpool_output_size(
     p = p.expand(ndim)
     n = m.sub(1).mul_(s).sub_(p.mul(2)).add(k)
     if isinstance(in_size, int):
-        return n.item()
+        return n[0].item()
     return Size(n.tolist())
 
 
