@@ -92,24 +92,18 @@ class SkipConnection(ReprWithCrossReferences, Module):
             func = args[0]
         else:
             func = Sequential(*args)
-        if hasattr(self, name):
-            raise ValueError(f"SkipConnection() 'name' cannot be an existing attribute {name}")
         self.name = name
-        if name == "func":
-            self.func = func
-        else:
-            setattr(self, name, func)
-            self.func = self._func
         if skip in (None, "identity"):
             skip = Identity()
         elif not callable(skip):
             raise ValueError("SkipConnection() 'skip' must be 'identity', callable, or None")
         self.skip = skip
         self.join = join_func(join, dim=dim)
+        self._modules[self.name] = func
 
     @property
-    def _func(self) -> Module:
-        return getattr(self, self.name)
+    def func(self) -> Module:
+        return self._modules[self.name]
 
     @property
     def shortcut(self) -> SkipFunc:
