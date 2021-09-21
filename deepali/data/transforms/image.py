@@ -295,7 +295,6 @@ class RescaleImage(ItemwiseTransform, Module):
         max: Optional[float] = None,
         mul: Optional[float] = None,
         add: Optional[float] = None,
-        inplace: bool = False,
     ) -> None:
         super().__init__()
         if mul is not None or add is not None:
@@ -312,7 +311,6 @@ class RescaleImage(ItemwiseTransform, Module):
             self.max = max
             self.mul = None
             self.add = None
-        self.inplace = bool(inplace)
 
     def forward(self, image: Image) -> Image:
         if not isinstance(image, Image):
@@ -320,14 +318,11 @@ class RescaleImage(ItemwiseTransform, Module):
         if self.mul is not None or self.add is not None:
             assert self.min is None and self.max is None
             if self.mul != 1:
-                mul_fn = image.mul_ if self.inplace else image.mul
-                image = mul_fn(self.mul)
+                image = image.mul(self.mul)
             if self.add != 0:
-                add_fn = image.add_ if self.inplace else image.add
-                image = add_fn(self.add)
+                image = image.add(self.add)
         else:
-            rescale_fn = image.rescale_ if self.inplace else image.rescale
-            image = rescale_fn(min=self.min, max=self.max)
+            image = image.rescale(min=self.min, max=self.max)
         return image
 
     def __repr__(self) -> str:
@@ -336,7 +331,6 @@ class RescaleImage(ItemwiseTransform, Module):
             s += f"mul={self.mul!r}, add={self.add!r}"
         else:
             s += f"min={self.min!r}, max={self.max!r}"
-        s += ", inplace={self.inplace!r})"
         return s
 
 
@@ -382,7 +376,7 @@ IMAGE_TRANSFORM_TYPES = {
     "resize": ResizeImage,
 }
 
-INPLACE_IMAGE_TRANSFORMS = {"clamp", "normalize", "rescale"}
+INPLACE_IMAGE_TRANSFORMS = {"clamp"}
 
 
 def config_has_read_image_transform(config: ImageTransformConfig) -> bool:
