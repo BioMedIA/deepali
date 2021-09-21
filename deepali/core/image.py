@@ -1125,30 +1125,41 @@ def normalize_image(
     """
     if inplace:
         if not data.is_floating_point():
-            raise TypeError("normalize_image() 'data.dtype' must be float when inplace=True")
-        add_fn = data.add_
-        sub_fn = data.sub_
-        mul_fn = data.mul_
+            raise AssertionError("normalize_image() 'data.dtype' must be float when inplace=True")
 
-        def clamp(data, a, b) -> Tensor:
+        def add_fn(data: Tensor, a: float) -> Tensor:
+            return data.add_(a)
+
+        def sub_fn(data: Tensor, a: float) -> Tensor:
+            return data.sub_(a)
+
+        def mul_fn(data: Tensor, a: float) -> Tensor:
+            return data.mul_(a)
+
+        def clamp_fn(data: Tensor, a: float, b: float) -> Tensor:
             return data.clamp_(a, b)
 
     else:
         data = data.float()
-        add_fn = data.add
-        sub_fn = data.sub
-        mul_fn = data.mul
 
-        # Attention: "clamp_fn = data.clamp" produced wrong results!
-        def clamp(data, a, b) -> Tensor:
+        def add_fn(data: Tensor, a: float) -> Tensor:
+            return data.add(a)
+
+        def sub_fn(data: Tensor, a: float) -> Tensor:
+            return data.sub(a)
+
+        def mul_fn(data: Tensor, a: float) -> Tensor:
+            return data.mul(a)
+
+        def clamp_fn(data: Tensor, a: float, b: float) -> Tensor:
             return data.clamp(a, b)
 
     if mode in ("zscore", "z-score"):
-        data = clamp(data, min, max)
+        data = clamp_fn(data, min, max)
         stdev, mean = torch.std_mean(data)
         data = sub_fn(data, mean)
         if stdev > 1e-15:
-            data = mul_fn(1 / stdev)
+            data = mul_fn(data, 1 / stdev)
     elif mode in ("unit", "center"):
         if min is None:
             min = float(data.min())
@@ -1160,13 +1171,13 @@ def normalize_image(
         if mode == "center":
             add -= 0.5
         if mul != 1:
-            data = mul_fn(mul)
+            data = mul_fn(data, mul)
         if add != 0:
-            data = add_fn(add)
+            data = add_fn(data, add)
         if mode == "center":
-            data = clamp(data, -0.5, 0.5)
+            data = clamp_fn(data, -0.5, 0.5)
         else:
-            data = clamp(data, 0, 1)
+            data = clamp_fn(data, 0, 1)
     return data
 
 
