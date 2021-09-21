@@ -604,7 +604,7 @@ class UNetDecoder(ReprWithCrossReferences, Module):
             out_sizes.append(size)
         return out_sizes
 
-    def forward(self, features: Sequence[Tensor]) -> Union[Tensor, List[Tensor]]:
+    def forward(self, features: Sequence[Tensor]) -> List[Tensor]:
         if not isinstance(features, Sequence):
             raise TypeError(f"{type(self).__name__}() 'features' must be Sequence")
         features = list(features)
