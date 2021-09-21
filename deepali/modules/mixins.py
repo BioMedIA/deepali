@@ -46,10 +46,11 @@ class ReprWithCrossReferences(object):
         child_lines = []
         for key, child in module._modules.items():
             mod_str = self._repr_impl(prefix=prefix + key + ".", module=child, memo=memo)
+            mod_str = _addindent(mod_str, 2)
             prev_key = memo.get(child)
             if prev_key:
                 mod_str = f"{prev_key}(\n  {mod_str}\n)"
-            mod_str = _addindent(mod_str, 2)
+                mod_str = _addindent(mod_str, 2)
             child_lines.append(f"({key}): {mod_str}")
             memo[child] = prefix + key
         lines = extra_lines + child_lines
