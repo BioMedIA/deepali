@@ -7,7 +7,7 @@ from ignite.engine import Engine, Events, State
 from torch import Tensor
 from torch.nn.modules import Module
 from torch.optim.optimizer import Optimizer
-from torch.utils.data import DataLoader
+from torch.utils.data import BatchSampler, DataLoader, IterableDataset
 from torch.utils.data.distributed import DistributedSampler
 from torch.utils.tensorboard import SummaryWriter
 
@@ -31,8 +31,18 @@ def clamp_learning_rate(
 
 def set_distributed_sampler_epoch(engine: Engine) -> None:
     data = engine.state.dataloader
-    if isinstance(data, DataLoader) and isinstance(data.sampler, DistributedSampler):
-        data.sampler.set_epoch(engine.state.epoch - 1)
+    epoch = engine.state.epoch - 1
+    if isinstance(data, DataLoader):
+        if isinstance(data.sampler, DistributedSampler):
+            data.sampler.set_epoch(epoch)
+        if isinstance(data.batch_sampler, BatchSampler):
+            if isinstance(data.batch_sampler.sampler, DistributedSampler):
+                data.batch_sampler.sampler.set_epoch(epoch)
+        data = data.dataset
+    if isinstance(data, IterableDataset):
+        set_epoch = getattr(data, "set_epoch", None)
+        if callable(set_epoch):
+            set_epoch(epoch)
 
 
 def print_metrics(
