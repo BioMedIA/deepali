@@ -42,10 +42,12 @@ class ResidualUnit(SkipConnection):
         num_channels: Optional[int] = None,
         kernel_size: ScalarOrTuple[int] = 3,
         stride: ScalarOrTuple[int] = 1,
+        padding: Optional[ScalarOrTuple[int]] = None,
         padding_mode: Union[PaddingMode, str] = "zeros",
         dilation: ScalarOrTuple[int] = 1,
         groups: int = 1,
-        bias: bool = False,
+        init: str = "default",
+        bias: Optional[Union[bool, str]] = False,
         norm: Union[str, Tuple[str, Mapping[str, Any]], Tuple[str, int]] = "batch",
         acti: Union[ActivationFunc, str, Tuple[str, Mapping[str, Any]]] = "relu",
         skip: Optional[Union[SkipFunc, str, Mapping[str, Any]]] = "identity | conv1 | conv",
@@ -75,6 +77,8 @@ class ResidualUnit(SkipConnection):
             stride: Stride of first residual convolution. All subsequent convolutions have stride 1.
                 In case of a bottleneck block, the first convolution with kernel size 1 also has stride 1,
                 and the specified stride is applied on the second convolution instead.
+            padding: Padding used by residual convolutions with specified ``kernel_size``.
+                If specified, must result in a same padding such that spatial tensor shape remains unchanged.
             padding_mode: Padding mode used for same padding of input to each convolutional layers.
             dilation: Dilation of convolution kernel.
             groups: Number of groups into which to split each convolution. Note that combined with a bottleneck,
@@ -84,6 +88,7 @@ class ResidualUnit(SkipConnection):
                 a residual block consisting of 32 paths with 4 channels in each path which are concatentated prior
                 to the final convolution with kernel size 1 before the resulting residuals are added to the result
                 of the (identity) skip connection (cf. Xie et al., 2017, Fig. 3).
+            init: Mode used to initialize weights of convolution kernels.
             bias: Whether to use bias terms of convolutional filters.
             norm: Normalization layer to use in each convolutional layer.
             acti: Activation function to use in each convolutional layer.
@@ -103,7 +108,7 @@ class ResidualUnit(SkipConnection):
                 is applied after the addition of the layer output with the shortcut connection.
                 Otherwise, the addition is of input and output is the last operation of this block.
             other: If specified, convolutions in convolutional layers are reused. The given residual unit
-                must have been created with the same parameters as this residual unit. Note that the resulting
+                must have created with the same parameters as this residual unit. Note that the resulting
                 and the other residual unit will share references to the same convolution modules.
 
         """
@@ -157,6 +162,7 @@ class ResidualUnit(SkipConnection):
                 out_channels=num_channels,
                 kernel_size=pre_kernel_size,
                 padding_mode=padding_mode,
+                init=init,
                 bias=bias,
                 norm=norm,
                 acti=acti,
@@ -180,9 +186,11 @@ class ResidualUnit(SkipConnection):
                 out_channels=num_channels,
                 kernel_size=kernel_size,
                 stride=stride if is_first_layer else 1,
+                padding=padding,
                 padding_mode=padding_mode,
                 dilation=dilation,
                 groups=groups,
+                init=init,
                 bias=bias,
                 norm=norm,
                 acti=None if is_last_layer and post_acti is not None else acti,
@@ -210,6 +218,7 @@ class ResidualUnit(SkipConnection):
                 out_channels=out_channels,
                 kernel_size=post_kernel_size,
                 padding_mode=padding_mode,
+                init=init,
                 bias=bias,
                 norm=norm,
                 acti=acti if post_acti is None else None,
@@ -252,7 +261,8 @@ class ResidualUnit(SkipConnection):
                 kernel_size=kernel_size if has_strided_conv else 1,
                 stride=stride,
                 dilation=1,
-                bias=bias in (None, True),
+                init=init,
+                bias=bias is not False,
             )
             conv_args.update(skip)
             if "padding" not in conv_args:
