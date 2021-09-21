@@ -179,7 +179,7 @@ def homogeneous_transform(transform: Tensor, points: Tensor, vectors: bool = Fal
             "homogeneous_transform() expected size of leading dimension"
             " of 'transform' and 'points' to be either 1 or equal"
         )
-    points = points.view(N, -1, D)
+    points = points.reshape(N, -1, D)
     if torch.is_floating_point(points):
         transform = transform.type(points.dtype)
     else:
