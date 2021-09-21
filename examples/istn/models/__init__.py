@@ -57,14 +57,6 @@ class ImageAndSpatialTransformerNetwork(Module):
         self.stn = stn
         grid = Grid(size=stn.in_size)
         transform = ConfigurableTransform(grid, params=None, config=stn.config)
-        # nonrigid_transform = transform.get("nonrigid")
-        # if isinstance(nonrigid_transform, ParametricTransform):
-        #     if stn.output_shape()[1:] != nonrigid_transform.data_shape:
-        #         raise ValueError(
-        #             f"{type(self).__name__}() spatial 'stn' output shape {tuple(stn.output_shape())} does not"
-        #             f" match non-rigid transformation parameters shape {tuple(nonrigid_transform.data_shape)}!"
-        #             " Check network configuration, e.g., input size and non-rigid control_point_spacing."
-        #         )
         self.warp = ImageTransform(transform, sampling=sampling, padding=padding)
 
     @property

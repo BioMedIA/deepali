@@ -544,8 +544,9 @@ def create_dataset(config: Config, partition: Union[Partition, str]) -> ImageDat
             f"Dataset partition must be {Partition.TRAIN.value!r} or {Partition.VALID.value!r}"
         )
     keys = config.dataset.train.images.keys()
-    dataset.transform().add_module("cast", CastImage.item(keys, dtype=torch.float32))
-    dataset.transform().add_module("resize", ResizeImage.item(keys, size=config.model.input.size))
+    transform = dataset.transform()
+    transform.add_module("cast", CastImage.item(keys, dtype=torch.float32))
+    transform.add_module("resize", ResizeImage.item(keys, size=config.model.input.size))
     return dataset
 
 
@@ -592,13 +593,13 @@ def create_loss(config: TrainConfig) -> LossFunction:
         loss_stn_i += F.mse_loss(output["warped_seg"], output["target_soi"])
         loss_stn_r = F.mse_loss(output["warped_soi"], output["target_soi"])
         # Loss term used for training
-        if config.loss == "explicit":
+        if config.loss in ("e", "explicit"):
             loss_train = loss_itn + loss_stn_s
-        elif config.loss == "implicit":
+        elif config.loss in ("i", "implicit"):
             loss_train = loss_stn_i + loss_stn_s
-        elif config.loss == "supervised":
+        elif config.loss in ("s", "supervised"):
             loss_train = loss_stn_s
-        elif config.loss == "unsupervised":
+        elif config.loss in ("u", "unsupervised"):
             loss_train = loss_stn_u
         else:
             raise ValueError(f"Invalid loss function: {config.loss}")

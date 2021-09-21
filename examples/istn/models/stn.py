@@ -1,4 +1,4 @@
-r"""Spatial transformer networks."""
+r"""Spatial transformer network (STN)."""
 
 from __future__ import annotations
 
@@ -6,16 +6,13 @@ from copy import deepcopy
 from collections import OrderedDict
 from dataclasses import dataclass
 import math
-from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple, Union, overload
 
 import torch
 from torch import Tensor, Size
-from torch.nn import Module, ModuleList, Sequential
-from torch.nn import ReLU, Upsample
+from torch.nn import Module, ModuleList, ReLU, Sequential, Upsample
 
-from deepali.core import functional as U
-from deepali.core import Device, PathStr, ScalarOrTuple
+from deepali.core import Device, PathStr, ScalarOrTuple, functional as U, unlink_or_mkdir
 from deepali.networks.layers import Conv2d, Conv3d, ConvLayer, Linear, convolution, pooling
 from deepali.networks.utils import module_output_size
 from deepali.transforms.spatial import TransformConfig
@@ -598,12 +595,11 @@ class SpatialTransformerNetwork(Module):
         if "state" not in data:
             raise ValueError(f"{cls.__name__}.read() model file must contain 'state' dict entry")
         config = SpatialTransformerConfig.from_dict(data["config"])
-        stn = cls(config, in_channels=in_channels, in_size=in_size)
+        stn = cls(in_channels=in_channels, in_size=in_size, config=config)
         stn.to(device).load_state_dict(data["state"])
         return stn
 
     def write(self, path: PathStr) -> None:
         r"""Save model parameters and configuration."""
-        path = Path(path).absolute()
-        path.parent.mkdir(parents=True, exist_ok=True)
+        path = unlink_or_mkdir(path)
         torch.save({"config": self.config.asdict(), "state": self.state_dict()}, path)

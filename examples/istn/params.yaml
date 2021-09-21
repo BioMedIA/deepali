@@ -8,7 +8,14 @@ dataset:
       source_img: "{prefix}/V_square_source{index+1:d}.png"
       source_seg: "{prefix}/V_square_source{index+1:d}_seg.png"
     transforms:
-      target_img: []
+      target_img:
+        - normalize: {min: 0, max: 255, mode: unit}
+      target_seg:
+        - normalize: {min: 0, max: 255, mode: unit}
+      source_img:
+        - normalize: {min: 0, max: 255, mode: unit}
+      source_seg:
+        - normalize: {min: 0, max: 255, mode: unit}
   valid:
     table: /Users/aschuh/Projects/istn/data/synth2d/val.csv
     prefix: /Users/aschuh/Data/ISTN/synth2d/train
@@ -17,16 +24,20 @@ dataset:
         path: "{prefix}/V_square_target{index+1:d}.png"
         dtype: float32
         device: cpu
-        transforms: null
+        transforms:
+          - normalize: {min: 0, max: 255, mode: unit}
       target_seg:
         path: "{prefix}/V_square_target{index+1:d}_seg.png"
-        transforms: null
+        transforms:
+          - normalize: {min: 0, max: 255, mode: unit}
       source_img:
         path: "{prefix}/V_square_source{index+1:d}.png"
-        transforms: null
+        transforms:
+          - normalize: {min: 0, max: 255, mode: unit}
       source_seg: 
         path: "{prefix}/V_square_source{index+1:d}_seg.png"
-        transforms: null
+        transforms:
+          - normalize: {min: 0, max: 255, mode: unit}
 model:
   input:
     channels: 1
