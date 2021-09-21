@@ -1681,7 +1681,7 @@ def grid_image(
         num: Number of images in batch. When ``shape`` is not a ``Grid``, must
             match the size of the first dimension in ``shape`` if not ``None``.
         stride: Spacing between grid lines. To draw in-plane grid lines on a
-            D-dimensional image where ``D>2``, specify a squence of two stride
+            D-dimensional image where ``D>2``, specify a sequence of two stride
             values, where the first stride applies to the last tensor dimension,
             which corresponds to the first spatial grid dimension.
         inverted: Whether to draw grid lines in black (0) over white (1) background.
