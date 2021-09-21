@@ -1688,13 +1688,13 @@ def grid_image(
     if stride is None:
         stride = 4
     if isinstance(stride, int):
-        stride = (stride,) * data.ndim - 2
+        stride = (stride,) * (data.ndim - 2)
     if len(stride) > data.ndim - 2:
         raise ValueError(
             "grid_image() 'stride' length must not be greater than number of spatial dimensions"
         )
     start = data.ndim - len(stride)
-    for dim, step in zip(range(start, data.ndim), stride):
+    for dim, step in zip(range(start, data.ndim), reversed(stride)):
         n = data.shape[dim]
         index = torch.arange((n % step) // 2, n, step, dtype=torch.int64, device=data.device)
         data.index_fill_(dim, index, 0 if inverted else 1)
