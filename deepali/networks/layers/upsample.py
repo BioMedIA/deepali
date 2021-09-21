@@ -103,20 +103,20 @@ class Upsample(Sequential):
 
             if not in_channels:
                 raise ValueError(
-                    f"Upsample() 'in_channels' required in {upsample_mode.value!r} mode"
+                    f"{type(self).__name__}() 'in_channels' required in {upsample_mode.value!r} mode"
                 )
 
             if isinstance(scale_factor, (int, float)):
                 scale_factor = (scale_factor,) * dimensions
             elif len(scale_factor) != dimensions:
                 raise ValueError(
-                    f"Upsample() 'scale_factor' must be scalar or sequence of length {dimensions}"
+                    f"{type(self).__name__}() 'scale_factor' must be scalar or sequence of length {dimensions}"
                 )
             try:
                 scale_factor = tuple(int(s) for s in scale_factor)
             except TypeError:
                 raise TypeError(
-                    f"Upsample() 'scale_factor' must be ints for {upsample_mode.value!r} mode"
+                    f"{type(self).__name__}() 'scale_factor' must be ints for {upsample_mode.value!r} mode"
                 )
 
             if kernel_size is None:
@@ -125,11 +125,11 @@ class Upsample(Sequential):
                 kernel_size = (kernel_size,) * dimensions
             elif len(kernel_size) != dimensions:
                 raise ValueError(
-                    f"Upsample() 'kernel_size' must be scalar or sequence of length {dimensions}"
+                    f"{type(self).__name__}() 'kernel_size' must be scalar or sequence of length {dimensions}"
                 )
             if any(k < s for k, s in zip(kernel_size, scale_factor)):
                 raise ValueError(
-                    "Upsample() 'kernel_size' must be greater than or equal to 'scale_factor'"
+                    f"{type(self).__name__}() 'kernel_size' must be greater than or equal to 'scale_factor'"
                 )
 
             # Output size should be scale factor times input size, thus:
@@ -154,29 +154,47 @@ class Upsample(Sequential):
 
         elif upsample_mode == UpsampleMode.INTERPOLATE:
 
-            if kernel_size is None:
-                kernel_size = 1
-            if pre_conv == "default" and in_channels is not None and in_channels != out_channels:
-                if kernel_size % 2 == 0:
-                    padding = ((kernel_size - 1) // 2, kernel_size // 2) * dimensions
-                    pre_pad = Pad(padding=padding, mode=padding_mode)
-                    self.add_module("prepad", pre_pad)
-                    padding = 0
+            if pre_conv == "default":
+                if in_channels is None or in_channels == out_channels:
+                    pre_conv = None
                 else:
-                    padding = kernel_size // 2
-                pre_conv = convolution(
-                    dimensions=dimensions,
-                    in_channels=in_channels,
-                    out_channels=out_channels,
-                    kernel_size=kernel_size,
-                    padding=padding,
-                    padding_mode=padding_mode,
-                    init=init,
-                    bias=bias,
-                )
+                    if kernel_size is None:
+                        kernel_size = 1
+                    if isinstance(kernel_size, int):
+                        kernel_size = (kernel_size,) * dimensions
+                    elif not isinstance(kernel_size, Sequence):
+                        raise TypeError(
+                            f"{type(self).__name__}() 'kernel_size' must be int or Sequence[int]"
+                        )
+                    elif len(kernel_size) != dimensions:
+                        raise ValueError(
+                            f"{type(self).__name__}() 'kernel_size' must be int or {dimensions}-tuple"
+                        )
+                    if any(k < 1 for k in kernel_size):
+                        raise ValueError(f"{type(self).__name__}() 'kernel_size' must be positive")
+                    if any(ks % 2 == 0 for ks in kernel_size):
+                        padding = tuple(((ks - 1) // 2, ks // 2) for ks in kernel_size)
+                        padding = tuple(p for a, b in reversed(padding) for p in (a, b))
+                        pre_pad = Pad(padding=padding, mode=padding_mode)
+                        self.add_module("prepad", pre_pad)
+                        padding = 0
+                    else:
+                        padding = tuple(ks // 2 for ks in kernel_size)
+                    pre_conv = convolution(
+                        dimensions=dimensions,
+                        in_channels=in_channels,
+                        out_channels=out_channels,
+                        kernel_size=kernel_size,
+                        padding=padding,
+                        padding_mode=padding_mode,
+                        init=init,
+                        bias=bias,
+                    )
             if pre_conv is not None:
                 if not isinstance(pre_conv, Module):
-                    raise TypeError("Upsample() 'preconv' must be string 'default' or Module")
+                    raise TypeError(
+                        f"{type(self).__name__}() 'preconv' must be string 'default' or Module"
+                    )
                 self.add_module("preconv", pre_conv)
 
             mode = Sampling(sampling).interpolate_mode(dimensions)
@@ -191,7 +209,7 @@ class Upsample(Sequential):
                 scale_factor_ = int(scale_factor)
             except TypeError:
                 raise TypeError(
-                    f"Upsample() 'scale_factor' must be int for {upsample_mode.value!r} mode"
+                    f"{type(self).__name__}() 'scale_factor' must be int for {upsample_mode.value!r} mode"
                 )
 
             if kernel_size is None:
@@ -212,7 +230,7 @@ class Upsample(Sequential):
             self.add_module("pixelshuffle", module)
 
         else:
-            raise NotImplementedError(f"Unsupported upsampling mode {mode}.")
+            raise NotImplementedError(f"{type(self).__name__}() mode={mode!r} not implemented")
 
 
 class SubpixelUpsample(Module):
