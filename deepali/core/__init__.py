@@ -17,6 +17,7 @@ The following import statement can be used to access the functional API:
 """
 
 from .config import DataclassConfig
+from .config import join_kwargs_in_sequence
 
 from .path import abspath
 from .path import abspath_template
@@ -101,6 +102,7 @@ __all__ = (
     "grid_vectors_transform",
     "grid_transform_points",
     "grid_transform_vectors",
+    "join_kwargs_in_sequence",
     "make_parent_dir",
     "make_temp_file",
     "is_bool_dtype",
