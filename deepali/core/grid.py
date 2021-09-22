@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from copy import copy as shallow_copy
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Dict, Optional, Union, overload
+from typing import TYPE_CHECKING, Any, Dict, Optional, Sequence, Union, overload
 
 try:
     import SimpleITK as sitk
@@ -19,6 +19,7 @@ if TYPE_CHECKING:
     # At runtime, cyclical import resolved by Grid.cube() instead
     from .cube import Cube
 
+from .enum import SpatialDim, SpatialDimArg
 from .math import round_decimals
 from .linalg import homogeneous_transform, homogeneous_matrix, hmm
 from .tensor import as_tensor, cat_scalars
@@ -932,10 +933,7 @@ class Grid(object):
         r"""Tensor of grid point coordinates with respect to specified coordinate axes."""
         axes = Axes(axes)
         coords = self.coords(
-            normalize=(axes is Axes.CUBE),
-            align_corners=False,
-            dtype=dtype,
-            device=device,
+            normalize=(axes is Axes.CUBE), align_corners=False, dtype=dtype, device=device,
         )
         if axes is not Axes.CUBE and axes is not Axes.GRID:
             coords = self.apply_transform(coords, Axes.GRID, to_axes=axes)
@@ -972,10 +970,7 @@ class Grid(object):
         return grid
 
     def resize(
-        self,
-        size: Union[int, Size, Array],
-        *args: int,
-        align_corners: Optional[bool] = None,
+        self, size: Union[int, Size, Array], *args: int, align_corners: Optional[bool] = None,
     ) -> Grid:
         r"""Create new grid of same extent with specified size.
 
@@ -998,10 +993,7 @@ class Grid(object):
         return self._resize(size, align_corners=align_corners)
 
     def reshape(
-        self,
-        shape: Union[int, Shape, Array],
-        *args: int,
-        align_corners: Optional[bool] = None,
+        self, shape: Union[int, Shape, Array], *args: int, align_corners: Optional[bool] = None,
     ) -> Grid:
         r"""Create new grid of same extent with specified data tensor shape.
 
@@ -1108,12 +1100,17 @@ class Grid(object):
         return self.pool(kernel_size, stride=stride, padding=padding, ceil_mode=ceil_mode)
 
     def downsample(
-        self, levels: int = 1, min_size: int = 1, align_corners: Optional[bool] = None
+        self,
+        levels: int = 1,
+        dims: Optional[Sequence[SpatialDimArg]] = None,
+        min_size: int = 1,
+        align_corners: Optional[bool] = None,
     ) -> Grid:
         r"""Create new grid with size halved the specified number of times.
 
         Args:
             levels: Number of times the grid size is halved (>0) or doubled (<0).
+            dims: Spatial dimensions along which to downsample. If not specified, consider all spatial dimensions.
             min_size: Minimum grid size. If downsampling the grid along a spatial dimension would reduce its
                 size below the given minimum value, the grid is not further downsampled along this dimension.
             align_corners: Whether to preserve positions of corner points (``True``) or grid extent (``False``).
@@ -1124,17 +1121,27 @@ class Grid(object):
         """
         if not isinstance(levels, int):
             raise TypeError("Grid.downsample() 'levels' must be of type int")
-        size = (2 ** -levels) * self._size
+        if not dims:
+            dims = tuple(dim for dim in range(self.ndim))
+        dims = tuple(SpatialDim.from_arg(dim) for dim in dims)
+        size = self._size.clone()
+        scale = 2 ** levels
+        for dim in dims:
+            size[dim] /= scale
         size = torch.where(size.ge(min_size), size, self._size)
         return self._resize(size, align_corners=align_corners)
 
     def upsample(
-        self, levels: int = 1, min_size: int = 1, align_corners: Optional[bool] = None
+        self,
+        levels: int = 1,
+        dims: Optional[Sequence[SpatialDimArg]] = None,
+        align_corners: Optional[bool] = None,
     ) -> Grid:
         r"""Create new grid of same extent with size doubled the specified number of times.
 
         Args:
             levels: Number of times the grid size is doubled (>0) or halved (<0).
+            dims: Spatial dimensions along which to upsample. If not specified, consider all spatial dimensions.
             min_size: Minimum grid size. If downsampling the grid along a spatial dimension would reduce its
                 size below the given minimum value, the grid is not further downsampled along this dimension.
             align_corners: Whether to preserve positions of corner points (``True``) or grid extent (``False``).
@@ -1145,11 +1152,18 @@ class Grid(object):
         """
         if not isinstance(levels, int):
             raise TypeError("Grid.upsample() 'levels' must be of type int")
-        size = (2 ** levels) * self._size
-        size = torch.where(size.ge(min_size), size, self._size)
+        if not dims:
+            dims = tuple(dim for dim in range(self.ndim))
+        dims = tuple(SpatialDim.from_arg(dim) for dim in dims)
+        size = self._size.clone()
+        scale = 2 ** levels
+        for dim in dims:
+            size[dim] *= scale
         return self._resize(size, align_corners=align_corners)
 
-    def pyramid(self, levels: int, min_size: int = 0) -> Dict[int, Grid]:
+    def pyramid(
+        self, levels: int, dims: Optional[Sequence[SpatialDimArg]] = None, min_size: int = 0
+    ) -> Dict[int, Grid]:
         r"""Compute image size at each image resolution pyramid level.
 
         This function computes suitable image sizes for each level of a multi-resolution
@@ -1159,6 +1173,7 @@ class Grid(object):
 
         Args:
             levels: Number of resolution levels.
+            dims: Spatial dimensions along which to downsample. If not specified, consider all spatial dimensions.
             min_size: Minimum grid size at each level. If the grid size after downsampling
                 would be smaller than the specified minimum size, the grid size is not reduced
                 for this spatial dimension. The number of resolution levels is not affected.
@@ -1174,18 +1189,19 @@ class Grid(object):
             raise TypeError("Grid.pyramid() 'levels' must be int")
         if not isinstance(min_size, int):
             raise TypeError("Grid.pyramid() 'min_size' must be int")
-        if self._align_corners:
-            m = sum([2 ** i for i in range(levels)])
-        else:
-            m = 0
-        sizes = {levels: [int(0.5 + (n + m) / (2 ** levels)) for n in self.size()]}
-        for level in range(levels - 1, -1, -1):
-            sizes[level] = [2 * n - 1 for n in sizes[level + 1]]
-        for level in range(1, levels + 1):
-            sizes[level] = [(n + 1) // 2 for n in sizes[level - 1]]
-            sizes[level] = [
-                m if n < min_size else n for m, n in zip(sizes[level - 1], sizes[level])
-            ]
+        if not dims:
+            dims = tuple(dim for dim in range(self.ndim))
+        dims = tuple(SpatialDim.from_arg(dim) for dim in dims)
+        m = sum([2 ** i for i in range(levels)]) if self._align_corners else 0
+        sizes = {level: list(self.size()) for level in range(levels + 1)}
+        for dim in dims:
+            sizes[levels][dim] = int(0.5 + (sizes[levels][dim] + m) / (2 ** levels))
+            for level in range(levels - 1, -1, -1):
+                sizes[level][dim] = 2 * sizes[level + 1][dim] - 1
+            for level in range(1, levels + 1):
+                sizes[level][dim] = (sizes[level - 1][dim] + 1) // 2
+                if sizes[level][dim] < min_size:
+                    sizes[level][dim] = sizes[level - 1][dim]
         return {level: self.resize(size) for level, size in sizes.items()}
 
     def crop(
@@ -1433,20 +1449,12 @@ def grid_vectors_transform(grid: Grid, axes: Axes, to_grid: Grid, to_axes: Optio
 
 
 def grid_transform_points(
-    points: Tensor,
-    grid: Grid,
-    axes: Axes,
-    to_grid: Grid,
-    to_axes: Optional[Axes] = None,
+    points: Tensor, grid: Grid, axes: Axes, to_grid: Grid, to_axes: Optional[Axes] = None,
 ):
     return grid.transform_points(points, axes=axes, to_axes=to_axes, to_grid=to_grid)
 
 
 def grid_transform_vectors(
-    vectors: Tensor,
-    grid: Grid,
-    axes: Axes,
-    to_grid: Grid,
-    to_axes: Optional[Axes] = None,
+    vectors: Tensor, grid: Grid, axes: Axes, to_grid: Grid, to_axes: Optional[Axes] = None,
 ):
     return grid.transform_vectors(vectors, axes=axes, to_axes=to_axes, to_grid=to_grid)

@@ -15,7 +15,7 @@ except ImportError:
     sitk = None
 
 from ..core.cube import Cube
-from ..core.enum import PaddingMode, Sampling
+from ..core.enum import PaddingMode, Sampling, SpatialDimArg
 from ..core.grid import ALIGN_CORNERS, Axes, Grid, grid_transform_points
 from ..core import image as U
 from ..core.path import unlink_or_mkdir
@@ -334,12 +334,7 @@ class ImageBatch(DataTensor):
             count_include_pad=count_include_pad,
         )
         grid = tuple(
-            grid.avg_pool(
-                kernel_size,
-                stride=stride,
-                padding=padding,
-                ceil_mode=ceil_mode,
-            )
+            grid.avg_pool(kernel_size, stride=stride, padding=padding, ceil_mode=ceil_mode,)
             for grid in self._grid
         )
         return self._make_instance(data, grid)
@@ -347,6 +342,7 @@ class ImageBatch(DataTensor):
     def downsample(
         self: TImageBatch,
         levels: int = 1,
+        dims: Optional[Sequence[SpatialDimArg]] = None,
         sigma: Optional[Union[Scalar, Array]] = None,
         mode: Optional[Union[Sampling, str]] = None,
         min_size: int = 0,
@@ -356,6 +352,7 @@ class ImageBatch(DataTensor):
 
         Args:
             levels: Number of times the image size is halved (>0) or doubled (<0).
+            dims: Spatial dimensions along which to downsample. If not specified, consider all spatial dimensions.
             sigma: Standard deviation of Gaussian filter applied at each downsampling level.
             mode: Image interpolation mode.
             align_corners: Whether to preserve grid extent (False) or corner points (True).
@@ -372,13 +369,14 @@ class ImageBatch(DataTensor):
         data = U.downsample(
             self,
             levels,
+            dims=dims,
             sigma=sigma,
             mode=mode,
             min_size=min_size,
             align_corners=align_corners,
         )
         grid = tuple(
-            grid.downsample(levels, min_size=min_size, align_corners=align_corners)
+            grid.downsample(levels, dims=dims, min_size=min_size, align_corners=align_corners)
             for grid in self._grid
         )
         return self._make_instance(data, grid)
@@ -386,6 +384,7 @@ class ImageBatch(DataTensor):
     def upsample(
         self: TImageBatch,
         levels: int = 1,
+        dims: Optional[Sequence[SpatialDimArg]] = None,
         sigma: Optional[Union[Scalar, Array]] = None,
         mode: Optional[Union[Sampling, str]] = None,
         align_corners: Optional[bool] = None,
@@ -394,6 +393,7 @@ class ImageBatch(DataTensor):
 
         Args:
             levels: Number of times the image size is doubled (>0) or halved (<0).
+            dims: Spatial dimensions along which to upsample. If not specified, consider all spatial dimensions.
             sigma: Standard deviation of Gaussian filter applied at each downsampling level.
             mode: Image interpolation mode.
             align_corners: Whether to preserve grid extent (False) or corner points (True).
@@ -407,8 +407,12 @@ class ImageBatch(DataTensor):
             raise TypeError(f"{type(self).__name__}.upsample() 'levels' must be of type int")
         if align_corners is None:
             align_corners = self.align_corners()
-        data = U.upsample(self, levels, sigma=sigma, mode=mode, align_corners=align_corners)
-        grid = tuple(grid.upsample(levels, align_corners=align_corners) for grid in self._grid)
+        data = U.upsample(
+            self, levels, dims=dims, sigma=sigma, mode=mode, align_corners=align_corners
+        )
+        grid = tuple(
+            grid.upsample(levels, dims=dims, align_corners=align_corners) for grid in self._grid
+        )
         return self._make_instance(data, grid)
 
     def pyramid(
@@ -416,6 +420,7 @@ class ImageBatch(DataTensor):
         levels: int,
         start: int = 0,
         end: int = -1,
+        dims: Optional[Sequence[SpatialDimArg]] = None,
         sigma: Optional[Union[Scalar, Array]] = None,
         mode: Optional[Union[Sampling, str]] = None,
         spacing: Optional[float] = None,
@@ -428,6 +433,7 @@ class ImageBatch(DataTensor):
             levels: Number of resolution levels.
             start: Highest resolution level to return, where 0 corresponds to the finest resolution.
             end: Lowest resolution level to return (inclusive).
+            dims: Spatial dimensions along which to downsample. If not specified, consider all spatial dimensions.
             sigma: Standard deviation of Gaussian filter applied at each downsampling level.
             mode: Interpolation mode for resampling image data on downsampled grid.
             spacing: Grid spacing at finest resolution level. Note that this option may increase the
@@ -473,7 +479,7 @@ class ImageBatch(DataTensor):
                     " spacing when output 'spacing' at finest level is specified"
                 )
             grids = tuple(grid.resample(spacing) for grid in grids)
-        grids = tuple(grid.pyramid(levels, min_size=min_size)[0] for grid in grids)
+        grids = tuple(grid.pyramid(levels, dims=dims, min_size=min_size)[0] for grid in grids)
         assert all(grid.size() == grids[0].size() for grid in grids)
         # Resize image to match finest resolution grid
         if torch.allclose(grids[0].cube_extent(), self._grid[0].cube_extent()):
@@ -488,7 +494,7 @@ class ImageBatch(DataTensor):
         if start == 0:
             pyramid[0] = batch
         for level in range(1, end + 1):
-            batch = batch.downsample(sigma=sigma, mode=mode, min_size=min_size)
+            batch = batch.downsample(dims=dims, sigma=sigma, mode=mode, min_size=min_size)
             if level >= start:
                 pyramid[level] = batch
         return pyramid
@@ -719,13 +725,7 @@ class ImageBatch(DataTensor):
             raise ValueError(
                 f"{type(self).__name__}.sample() 'arg' must be one or {len(self)} grids"
             )
-        data = U.grid_sample(
-            data,
-            coords,
-            mode=mode,
-            padding=padding,
-            align_corners=align_corners,
-        )
+        data = U.grid_sample(data, coords, mode=mode, padding=padding, align_corners=align_corners,)
         return self._make_instance(data, grid)
 
     def __repr__(self) -> str:
@@ -936,10 +936,7 @@ class Image(DataTensor):
         sitk.WriteImage(image, str(path), compress)
 
     def normalize(
-        self: TImage,
-        mode: str = "unit",
-        min: Optional[float] = None,
-        max: Optional[float] = None,
+        self: TImage, mode: str = "unit", min: Optional[float] = None, max: Optional[float] = None,
     ) -> TImage:
         r"""Normalize image intensities in [min, max]."""
         batch = self.batch()
@@ -947,10 +944,7 @@ class Image(DataTensor):
         return batch[0]
 
     def normalize_(
-        self: TImage,
-        mode: str = "unit",
-        min: Optional[float] = None,
-        max: Optional[float] = None,
+        self: TImage, mode: str = "unit", min: Optional[float] = None, max: Optional[float] = None,
     ) -> TImage:
         r"""Normalize image intensities in [min, max]."""
         batch = self.batch()
@@ -1021,6 +1015,7 @@ class Image(DataTensor):
     def downsample(
         self: TImage,
         levels: int = 1,
+        dims: Optional[Sequence[SpatialDimArg]] = None,
         sigma: Optional[Union[Scalar, Array]] = None,
         mode: Optional[Union[Sampling, str]] = None,
         min_size: int = 0,
@@ -1029,20 +1024,28 @@ class Image(DataTensor):
         r"""Downsample image a given number of times."""
         batch = self.batch()
         batch = batch.downsample(
-            levels, sigma=sigma, mode=mode, min_size=min_size, align_corners=align_corners
+            levels,
+            dims=dims,
+            sigma=sigma,
+            mode=mode,
+            min_size=min_size,
+            align_corners=align_corners,
         )
         return batch[0]
 
     def upsample(
         self: TImage,
         levels: int = 1,
+        dims: Optional[Sequence[SpatialDimArg]] = None,
         sigma: Optional[Union[Scalar, Array]] = None,
         mode: Optional[Union[Sampling, str]] = None,
         align_corners: Optional[bool] = None,
     ) -> TImage:
         r"""Upsample image a given number of times."""
         batch = self.batch()
-        batch = batch.upsample(levels, sigma=sigma, mode=mode, align_corners=align_corners)
+        batch = batch.upsample(
+            levels, dims=dims, sigma=sigma, mode=mode, align_corners=align_corners
+        )
         return batch[0]
 
     def pyramid(
@@ -1050,6 +1053,7 @@ class Image(DataTensor):
         levels: int,
         start: int = 0,
         end: int = -1,
+        dims: Optional[Sequence[SpatialDimArg]] = None,
         sigma: Optional[Union[Scalar, Array]] = None,
         mode: Optional[Union[Sampling, str]] = None,
         spacing: Optional[float] = None,
@@ -1062,6 +1066,7 @@ class Image(DataTensor):
             levels,
             start,
             end,
+            dims=dims,
             sigma=sigma,
             mode=mode,
             spacing=spacing,

@@ -335,12 +335,7 @@ def conv1d(
         result = F.pad(result, (margin, margin), mode=padding.pad_mode(1))
         margin = 0
     conv_fn = F.conv_transpose1d if transpose else F.conv1d
-    kwargs = dict(
-        stride=stride,
-        dilation=dilation,
-        padding=margin,
-        groups=groups,
-    )
+    kwargs = dict(stride=stride, dilation=dilation, padding=margin, groups=groups,)
     if transpose:
         if output_padding is None:
             output_padding = stride_minus_kernel_padding(1, stride)
@@ -395,6 +390,7 @@ def dot_channels(a: Tensor, b: Tensor, weight: Optional[Tensor] = None) -> Tenso
 def downsample(
     data: Tensor,
     levels: int = 1,
+    dims: Optional[Sequence[SpatialDimArg]] = None,
     sigma: Optional[Union[Scalar, Array]] = None,
     mode: Optional[Union[Sampling, str]] = None,
     min_size: int = 0,
@@ -407,6 +403,7 @@ def downsample(
         levels: Number of times the image size is halved. If zero, a reference to the
             unmodified input ``data`` tensor is returned. If negative, the images are
             upsampled instead.
+        dims: Spatial dimensions along which to downsample. If not specified, consider all spatial dimensions.
         sigma: Standard deviation of Gaussian used for each downsampling step.
             If a scalar or 1-element sequence is given, an isotropic Gaussian
             kernel is used. Otherwise, the first value is the standard deviation
@@ -433,30 +430,37 @@ def downsample(
     if levels == 0:
         return data
     if levels < 0:
-        return upsample(data, levels=-levels, sigma=sigma, mode=mode, align_corners=align_corners)
+        return upsample(
+            data, levels=-levels, dims=dims, sigma=sigma, mode=mode, align_corners=align_corners
+        )
     grid = Grid(shape=data.shape[2:])
-    grid = grid.downsample(levels, min_size=min_size, align_corners=align_corners)
+    if not dims:
+        dims = tuple(dim for dim in range(grid.ndim))
+    dims = tuple(SpatialDim.from_arg(dim) for dim in dims)
+    grid = grid.downsample(levels, dims=dims, min_size=min_size, align_corners=align_corners)
     if sigma is None:
         # This standard deviation is used by NiftyReg and also MIRTK to create the image resolution pyramid for registration
         # https://github.com/BioMedIA/MIRTK/blob/c8e35554f1c23ef14a1c1c51b042e43f82fb44a7/Modules/Registration/src/GenericRegistrationFilter.cc#L526
         sigma = 0.7355
-    sigma_ = as_tensor(sigma, dtype=torch.float)
-    if sigma_.ndim > 1:
+    sigma: Tensor = torch.atleast_1d(as_tensor(sigma, dtype=torch.float))
+    if sigma.ndim > 1:
         raise ValueError("downsample() 'sigma' must be scalar or 1-dimensional tensor")
-    if sigma_.ndim == 0:
-        sigma_ = sigma_.unsqueeze(0)
-    if sigma_.ne(0).any():
+    if sigma.ne(0).any():
         if levels > 1:
-            var = sigma_.new_zeros(sigma_.shape)
+            var = sigma.new_zeros(sigma.shape)
             for level in range(levels):
-                var += sigma_.mul(2 ** level).pow(2)  # type: ignore
-            sigma_ = var.sqrt()
-        if sigma_.shape[0] == 1:
-            sigma_ = sigma_.repeat(grid.ndim)
+                var += sigma.mul(2 ** level).pow(2)  # type: ignore
+            sigma = var.sqrt()
+        if sigma.shape[0] == 1:
+            sigma = sigma.repeat(grid.ndim)
+            for i in range(grid.ndim):
+                if i in dims:
+                    continue
+                sigma[i] = 0
         kernels = []
         kernels_ = {}
         for i in range(grid.ndim):
-            std = float(sigma_[i] if i < len(sigma_) else 0)
+            std = float(sigma[i] if i < len(sigma) else 0)
             if std > 0 and grid.size()[i] != data.shape[grid.ndim - i + 1]:
                 kernel = kernels_.get(std)
                 if kernel is None:
@@ -473,6 +477,7 @@ def downsample(
 def upsample(
     data: Tensor,
     levels: int = 1,
+    dims: Optional[Sequence[SpatialDimArg]] = None,
     sigma: Optional[Union[Scalar, Array]] = None,
     mode: Optional[Union[Sampling, str]] = None,
     align_corners: bool = ALIGN_CORNERS,
@@ -484,6 +489,7 @@ def upsample(
         levels: Number of times the image size is doubled. If zero, a reference to the
             unmodified input ``data`` tensor is returned. If negative, the images are
             downsampled instead.
+        dims: Spatial dimensions along which to upsample. If not specified, consider all spatial dimensions.
         sigma: Standard deviation of Gaussian used for each upsampling step.
             If a scalar or 1-element sequence is given, an isotropic Gaussian
             kernel is used. Otherwise, the first value is the standard deviation
@@ -509,29 +515,35 @@ def upsample(
     if levels == 0:
         return data
     if levels < 0:
-        return downsample(data, levels=-levels, sigma=sigma, mode=mode, align_corners=align_corners)
-    D = data.ndim - 2
-    mode = Sampling.from_arg(mode).interpolate_mode(D)
+        return downsample(
+            data, levels=-levels, dims=dims, sigma=sigma, mode=mode, align_corners=align_corners
+        )
     grid = Grid(shape=data.shape[2:], align_corners=align_corners)
-    grid = grid.upsample(levels)
-    result = F.interpolate(data, size=grid.shape, mode=mode, align_corners=align_corners)
+    if not dims:
+        dims = tuple(dim for dim in range(grid.ndim))
+    dims = tuple(SpatialDim.from_arg(dim) for dim in dims)
+    grid = grid.upsample(levels, dims=dims)
+    mode = Sampling.from_arg(mode).interpolate_mode(grid.ndim)
+    result: Tensor = F.interpolate(data, size=grid.shape, mode=mode, align_corners=align_corners)
     if sigma is not None:
-        sigma_ = as_tensor(sigma, dtype=torch.float)
-        if sigma_.ndim > 1:
+        sigma: Tensor = torch.atleast_1d(as_tensor(sigma, dtype=torch.float))
+        if sigma.ndim > 1:
             raise ValueError("upsample() 'sigma' must be scalar or 1-dimensional tensor")
-        if sigma_.ndim == 0:
-            sigma_ = sigma_.unsqueeze(0)
         if levels > 1:
-            var = sigma_.new_zeros(sigma_.shape)
+            var = sigma.new_zeros(sigma.shape)
             for level in range(levels):
-                var += sigma_.mul(2 ** level).pow(2)  # type: ignore
-            sigma_ = var.sqrt()
-        if sigma_.shape[0] == 1:
-            sigma_ = sigma_.repeat(D)
+                var += sigma.mul(2 ** level).pow(2)  # type: ignore
+            sigma = var.sqrt()
+        if sigma.shape[0] == 1:
+            sigma = sigma.repeat(grid.ndim)
+            for i in range(grid.ndim):
+                if i in dims:
+                    continue
+                sigma[i] = 0
         kernels = []
         kernels_ = {}
-        for i in range(D):
-            std = float(sigma_[i] if i < len(sigma_) else 0)
+        for i in range(grid.ndim):
+            std = float(sigma[i] if i < len(sigma) else 0)
             if std > 0:
                 kernel = kernels_.get(std)
                 if kernel is None:
@@ -548,6 +560,7 @@ def gaussian_pyramid(
     data: Tensor,
     levels: int,
     start: int = 0,
+    dims: Optional[Sequence[SpatialDimArg]] = None,
     sigma: Optional[Union[Scalar, Array]] = None,
     mode: Optional[Union[Sampling, str]] = None,
     min_size: int = 0,
@@ -559,6 +572,7 @@ def gaussian_pyramid(
         data: Image data tensor of shape ``(N, C, ..., X)``.
         levels: Coarsest resolution level.
         start: Finest resolution level, where 0 corresponds to the original resolution.
+        dims: Spatial dimensions along which to downsample. If not specified, consider all spatial dimensions.
         sigma: Standard deviation of Gaussian filter applied at each downsampling level.
         mode: Interpolation mode for resampling image data on downsampled grid.
         min_size: Minimum grid size.
@@ -588,6 +602,7 @@ def gaussian_pyramid(
         data = downsample(
             data,
             levels=level if i == 0 else 1,
+            dims=dims,
             sigma=sigma,
             mode=mode,
             min_size=min_size,
@@ -1041,10 +1056,7 @@ def grid_sample(
 
 
 def grid_sample_mask(
-    data: Tensor,
-    grid: Tensor,
-    threshold: float = 0,
-    align_corners: bool = ALIGN_CORNERS,
+    data: Tensor, grid: Tensor, threshold: float = 0, align_corners: bool = ALIGN_CORNERS,
 ) -> Tensor:
     r"""Sample binary mask at grid points.
 
@@ -1068,11 +1080,7 @@ def grid_sample_mask(
     mask = data if data.dtype == torch.bool else data > threshold
     mask = mask.to(dtype=torch.float32, device=data.device)
     return grid_sample(
-        mask,
-        grid,
-        mode=Sampling.LINEAR,
-        padding=PaddingMode.ZEROS,
-        align_corners=align_corners,
+        mask, grid, mode=Sampling.LINEAR, padding=PaddingMode.ZEROS, align_corners=align_corners,
     )
 
 
@@ -1382,10 +1390,7 @@ def spatial_derivatives(
                         for d in (d for d in range(D) if d != sdim):
                             dim = SpatialDim(d).tensor_dim(result.ndim)
                             result = conv1d(
-                                result,
-                                avg_kernel,
-                                dim=dim,
-                                padding=len(avg_kernel) // 2,
+                                result, avg_kernel, dim=dim, padding=len(avg_kernel) // 2,
                             )
                     fd_spacing = spacing[:, sdim]
                     result = finite_differences(result, sdim, mode=fd_mode, spacing=fd_spacing)
