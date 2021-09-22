@@ -4,8 +4,12 @@
     ],
     "executionEnvironments": [
         {
+            "root": "examples/ffd",
+            "extraPaths": ["examples/ffd"]
+        },
+        {
             "root": "examples/istn",
             "extraPaths": ["examples/istn"]
-        },
+        }
     ]
 }

@@ -1,17 +1,27 @@
 Core:
 - [ ] Enable `Grid` to represent a batch of sampling grids, or add `GridBatch` (cf. `Image` <-> `ImageBatch`).
 
-Transforms:
+Loss functions:
+- [ ] Normalized mutual information.
+
+Data transforms:
 - [ ] Basic data augmentations.
-- [ ] Modify spatial transformations to use ``Cube`` instead of sampling ``Grid`` to define domain and codomain?
-      But note that at the moment, sampling grid determines the output shape of the ``SpatialTransform.tensor()``.
 
 Spatial transforms:
-- [ ] Fix __repr__ of transforms with "params" set to a torch.nn.Module.
+- [x] Fix __repr__ of transforms with "params" set to a torch.nn.Module.
+- [ ] More efficient implementation of cubic B-spline evaluation than using transposed convolutions.
+
+Utility functions:
+- [ ] Function to save `FreeFormTransformation` parameters in MIRTK `.dof.gz` format.
 
 Examples:
-- [ ] Implement traditional free-form deformation algorithm as an example.
-- [ ] Implement Image-and-Spatial Transformer Networks as an example.
+- Traditional free-form deformation algorithm:
+  - [x] Write example code and script for pairwise image registration using deepali.
+  - [ ] Restrict registration to foreground region of interest, especially when segmentations are given.
+  - [ ] Enable and demonstrate parallel registration of multiple pairs / source images in single batch.
+- Image-and-Spatial Transformer Networks:
+  - [ ] Write training script and test with synthetic examples used in paper.
+  - [ ] Write test-time refinement script.
 
 Tests:
 - [ ] Full test coverage of core library functions.

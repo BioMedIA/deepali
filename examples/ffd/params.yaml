@@ -1,0 +1,14 @@
+model:
+  name: FFD
+  stride: [16, 16, 10]
+energy:
+  seg: [1, MSE]
+  be: [0.001, BendingEnergy]
+optim:
+  name: Adam
+  step_size: 0.01
+  min_delta: -0.001
+  max_steps: 100
+spacing: [1.25, 1.25, 2.0]
+pyramid: [0, 1]
+levels: 3
