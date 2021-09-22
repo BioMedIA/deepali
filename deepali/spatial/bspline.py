@@ -3,8 +3,7 @@ r"""Cubic B-spline free-form deformations."""
 from __future__ import annotations
 
 from copy import copy as shallow_copy
-import math
-from typing import Callable, Optional, Sequence, TypeVar, Union, cast
+from typing import Callable, Optional, Sequence, Tuple, TypeVar, Union, cast
 
 import torch
 from torch import Tensor
@@ -46,7 +45,7 @@ class BSplineTransform(ParametricTransform, NonRigidTransform):
                 called by ``self.update()`` with arguments set and given by ``self.condition()``. When a boolean
                 argument is given, a new zero-initialized tensor is created. If ``True``, this tensor is registered
                 as optimizable module parameter.
-            stride: Number of grid points between control points (minus one). This is the stride of the
+            stride: Number of grid points between control points plus one. This is the stride of the
                 transposed convolution used to upsample the control point displacements to the sampling ``grid``
                 size. If ``None``, a stride of 1 is used. If a sequence of values is given, these must be the
                 strides for the different spatial grid dimensions in the order ``(sx, sy, sz)``. Note that
@@ -62,7 +61,7 @@ class BSplineTransform(ParametricTransform, NonRigidTransform):
             stride = (stride,) * grid.ndim
         if len(stride) != grid.ndim:
             raise ValueError(f"BSplineTransform() 'stride' must be single int or {grid.ndim} ints")
-        self.stride = tuple(reversed([int(s) for s in stride]))
+        self.stride = tuple(int(s) for s in stride)
         if groups is None:
             groups = params.shape[0] if isinstance(params, Tensor) else 1
         super().__init__(grid, groups=groups, params=params)
@@ -74,8 +73,13 @@ class BSplineTransform(ParametricTransform, NonRigidTransform):
     def data_shape(self) -> torch.Size:
         r"""Get shape of transformation parameters tensor."""
         grid = self.grid()
-        shape = tuple([math.ceil((n - 1) / s) + 3 for n, s in zip(grid.shape, self.stride)])
+        stride = self.data_stride
+        shape = tuple([max(1, (n - 1) // s) + 3 for n, s in zip(grid.shape, stride)])
         return (grid.ndim,) + shape
+
+    @property
+    def data_stride(self) -> Tuple[int, ...]:
+        return tuple(reversed([int(s) for s in self.stride]))
 
     @torch.no_grad()
     def reset_parameters(self) -> None:
@@ -95,15 +99,21 @@ class BSplineTransform(ParametricTransform, NonRigidTransform):
         Args:
             grid: New sampling grid for dense displacement field at which FFD is evaluated.
                 This function currently only supports subdivision of the control point grid,
-                i.e., the new ``grid`` must be have size ``2 * n - 1`` along each spatial
-                dimension that should be subdivided, where ``n`` is the current grid size,
-                or have the same size as the current grid for dimensions that remain the same.
+                i.e., the new ``grid`` must have size ``2 * n - 1`` along each spatial dimension
+                that should be subdivided, where ``n`` is the current grid size, or have the same
+                size as the current grid for dimensions that remain the same.
 
         Returns:
             Reference to this modified transformation object.
 
         """
         params = self.params
+        current_grid = self._grid
+        if grid.ndim != current_grid.ndim:
+            raise ValueError(
+                f"{type(self).__name__}.grid_() argument must have {current_grid.ndim} dimensions"
+            )
+        subdivide_dims = []
         if isinstance(params, Tensor):
             current_grid = self._grid
             if grid.ndim != current_grid.ndim:
@@ -111,12 +121,13 @@ class BSplineTransform(ParametricTransform, NonRigidTransform):
                     f"{type(self).__name__}.grid_() argument must have {current_grid.ndim} dimensions"
                 )
             if not grid.align_corners():
-                raise ValueError("BSplineTransform() requires 'grid.align_corners() == True'")
+                raise ValueError(
+                    f"{type(self).__name__}() requires grid.align_corners() to be True"
+                )
             if not grid.same_domain_as(current_grid):
                 raise ValueError(
                     f"{type(self).__name__}.grid_() argument must define same grid domain as current grid"
                 )
-            subdivide_dims = []
             for i in range(grid.ndim):
                 if grid.shape[i] == 2 * current_grid.shape[i] - 1:
                     subdivide_dims.append(2 + i)
@@ -124,12 +135,13 @@ class BSplineTransform(ParametricTransform, NonRigidTransform):
                     raise ValueError(
                         f"{type(self).__name__}.grid_() argument must have same size or new size '2n - 1'"
                     )
-            if subdivide_dims:
-                params = U.subdivide_cubic_bspline(params, dims=subdivide_dims)
-                super().grid_(grid)
-                self.data_(params)
-        else:
-            super().grid_(grid)
+        self._grid = grid
+        if subdivide_dims:
+            new_shape = (params.shape[0],) + self.data_shape
+            new_params = U.subdivide_cubic_bspline(params, dims=subdivide_dims)
+            for dim in subdivide_dims:
+                new_params = new_params.narrow(dim, 1, new_shape[dim])
+            self.data_(new_params.contiguous())
         return self
 
     @staticmethod
@@ -163,9 +175,10 @@ class BSplineTransform(ParametricTransform, NonRigidTransform):
 
     def evaluate_spline(self) -> Tensor:
         r"""Evaluate cubic B-spline at sampling grid points."""
+        # TODO: Transposed convolution with large control point spacing is very slow.
         data = self.data()
         grid = self.grid()
-        stride = self.stride
+        stride = self.data_stride
         if not grid.align_corners():
             raise AssertionError(
                 f"{type(self).__name__}() requires grid.align_corners() to be True"
