@@ -21,6 +21,7 @@ packages = find_namespace_packages(
 
 install_requires = [
     "dacite",
+    "pandas",
     "pyyaml",
     "SimpleITK~=2.0",
     "torch>=1.7",
