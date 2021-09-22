@@ -7,10 +7,10 @@ from typing import Dict, Optional, Tuple, Union, overload
 from torch import Tensor
 from torch.nn import Module
 
-from ...core.enum import PaddingMode, Sampling
-from ...core.grid import Grid
-from ...core.types import Scalar
-from ...modules import SampleImage
+from ..core.enum import PaddingMode, Sampling
+from ..core.grid import Grid
+from ..core.types import Scalar
+from ..modules import SampleImage
 
 from .base import SpatialTransform
 

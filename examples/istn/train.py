@@ -33,8 +33,8 @@ from torch.utils.tensorboard import SummaryWriter
 from deepali.core import DataclassConfig, functional as U, unlink_or_mkdir
 from deepali.data import ImageBatch, ImageDataset, ImageDatasetConfig, Partition
 from deepali.data import collate_samples, prepare_batch
+from deepali.data.transforms import CastImage, ResizeImage
 from deepali.modules import ToImmutableOutput
-from deepali.transforms import CastImage, ResizeImage
 from deepali.utils.cli import LOG_FORMAT, LogLevel, cuda_visible_devices
 from deepali.utils.cli import filter_warning_of_experimental_named_tensors_feature
 from deepali.utils.ignite import handlers as H

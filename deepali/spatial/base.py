@@ -13,12 +13,12 @@ from torch import Tensor
 from torch.nn import Module
 import torch.nn.functional as F
 
-from ...core import functional as U
-from ...core.grid import Axes, Grid
-from ...core.linalg import as_homogeneous_matrix
-from ...core.types import Device
-from ...data.flow import FlowFields
-from ...modules import DeviceProperty
+from ..core import functional as U
+from ..core.grid import Axes, Grid
+from ..core.linalg import as_homogeneous_matrix
+from ..core.types import Device
+from ..data.flow import FlowFields
+from ..modules import DeviceProperty
 
 
 TSpatialTransform = TypeVar("TSpatialTransform", bound="SpatialTransform")

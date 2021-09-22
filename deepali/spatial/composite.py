@@ -10,9 +10,9 @@ import torch
 from torch import Tensor
 from torch.nn import ModuleDict
 
-from ...core.grid import Axes, Grid, grid_transform_points
-from ...core.linalg import as_homogeneous_matrix, homogeneous_matmul
-from ...core.tensor import move_dim
+from ..core.grid import Axes, Grid, grid_transform_points
+from ..core.linalg import as_homogeneous_matrix, homogeneous_matmul
+from ..core.tensor import move_dim
 
 from .base import SpatialTransform
 

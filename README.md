@@ -16,7 +16,7 @@ At a granular level, *deepali* is a library that consists of the following compo
 | [deepali.losses] | Loss terms and evaluation metrics for image, point set, and surface registration. |
 | [deepali.modules] | PyTorch modules without optimizable parameters built on core functions. |
 | [deepali.networks] | Common building blocks of machine learning based registration models. We expect that most users may want to develop their own task-specific models and associated training procedures. For this, the neural network components defined here may be used alongside ``torch.nn`` to define these custom models. |
-| [deepali.transforms] | Data transformations for input pipelines, and in particular spatial transformation models whose parameters are either optimized directly as in traditional registration, or inferred by a machine learning model. |
+| [deepali.spatial] | Spatial transformation models whose parameters are either optimized directly as in traditional registration, or inferred by a machine learning model. |
 | [deepali.utils] | Optional auxiliaries for interfacing with external libraries and tools. |
 
 
@@ -25,7 +25,7 @@ At a granular level, *deepali* is a library that consists of the following compo
 [deepali.losses]: deepali/losses/
 [deepali.modules]: deepali/modules/
 [deepali.networks]: deepali/networks/
-[deepali.transforms]: deepali/transforms/
+[deepali.spatial]: deepali/spatial/
 [deepali.utils]: deepali/utils/
 
 

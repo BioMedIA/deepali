@@ -10,11 +10,11 @@ import torch
 from torch import Tensor
 from torch.nn import init
 
-from ...core import functional as U
-from ...core.enum import PaddingMode
-from ...core.grid import Grid
-from ...core import kernels as K
-from ...modules import ExpFlow
+from ..core import functional as U
+from ..core.enum import PaddingMode
+from ..core.grid import Grid
+from ..core import kernels as K
+from ..modules import ExpFlow
 
 from .base import NonRigidTransform
 from .parametric import ParametricTransform
@@ -125,8 +125,11 @@ class BSplineTransform(ParametricTransform, NonRigidTransform):
                         f"{type(self).__name__}.grid_() argument must have same size or new size '2n - 1'"
                     )
             if subdivide_dims:
-                self.data_(U.subdivide_cubic_bspline(params, dims=subdivide_dims))
-        super().grid_(grid)
+                params = U.subdivide_cubic_bspline(params, dims=subdivide_dims)
+                super().grid_(grid)
+                self.data_(params)
+        else:
+            super().grid_(grid)
         return self
 
     @staticmethod

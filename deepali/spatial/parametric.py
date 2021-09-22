@@ -7,7 +7,7 @@ import torch
 from torch import Tensor
 from torch.nn import Parameter, init
 
-from ...core.grid import Grid
+from ..core.grid import Grid
 
 from .base import ReadOnlyParameters, TSpatialTransform
 

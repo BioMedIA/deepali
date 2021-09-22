@@ -10,13 +10,13 @@ import torch
 from torch import Tensor
 from torch.nn import ModuleDict
 
-from ...core.affine import euler_rotation_angles
-from ...core.affine import euler_rotation_matrix
-from ...core.config import DataclassConfig
-from ...core.grid import Grid
-from ...core.linalg import quaternion_to_rotation_matrix
-from ...core.linalg import rotation_matrix_to_quaternion
-from ...core.types import ScalarOrTuple
+from ..core.affine import euler_rotation_angles
+from ..core.affine import euler_rotation_matrix
+from ..core.config import DataclassConfig
+from ..core.grid import Grid
+from ..core.linalg import quaternion_to_rotation_matrix
+from ..core.linalg import rotation_matrix_to_quaternion
+from ..core.types import ScalarOrTuple
 
 from .bspline import FreeFormDeformation, StationaryVelocityFreeFormDeformation
 from .composite import SequentialTransform

@@ -9,7 +9,7 @@ from torch.nn import Module
 
 from deepali.core import DataclassConfig, Grid, PaddingMode, Sampling
 from deepali.core import functional as U
-from deepali.transforms.spatial import ConfigurableTransform, ImageTransform, ParametricTransform
+from deepali.spatial import ConfigurableTransform, ImageTransform, ParametricTransform
 
 from .itn import ImageTransformerConfig, ImageTransformerNetwork
 from .stn import SpatialTransformerConfig, SpatialTransformerNetwork

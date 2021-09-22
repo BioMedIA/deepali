@@ -9,9 +9,9 @@ import torch
 from torch import Tensor
 from torch.nn import init
 
-from ...core.grid import Axes, Grid
-from ...data.flow import FlowFields
-from ...modules import ExpFlow
+from ..core.grid import Axes, Grid
+from ..data.flow import FlowFields
+from ..modules import ExpFlow
 
 from .base import NonRigidTransform
 from .parametric import ParametricTransform

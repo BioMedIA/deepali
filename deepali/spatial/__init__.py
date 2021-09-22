@@ -1,9 +1,14 @@
-r"""Spatial coordinate and image transformations."""
+r"""Spatial coordinate and image transformations.
+
+The spatial transforms defined by this Python package can be used to implement both
+traditional optimization based and machine learning based co-registration approaches.
+
+"""
 
 import sys
 from typing import Any, Optional
 
-from ...core.grid import Grid
+from ..core.grid import Grid
 
 # Base classes for type comparison and annotation
 from .base import LinearTransform  # noqa
