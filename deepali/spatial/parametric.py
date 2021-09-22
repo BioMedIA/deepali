@@ -168,15 +168,18 @@ class ParametricTransform:
                 f"Cannot replace parameters, try {type(self).__name__}.data() instead."
             )
         if not isinstance(arg, Tensor):
-            raise TypeError(f"{type(self).__name__}.data_() 'arg' must be tensor")
+            raise TypeError(f"{type(self).__name__}.data_() 'arg' must be tensor, not {type(arg)}")
         shape = self.data_shape
         if arg.ndim != len(shape) + 1:
             raise ValueError(
                 f"{type(self).__name__}.data_() 'arg' must be {len(shape) + 1}-dimensional tensor"
+                f", but arg.ndim={arg.ndim}"
             )
         shape = (arg.shape[0],) + shape
         if arg.shape != shape:
-            raise ValueError(f"{type(self).__name__}.data_() 'arg' must have shape {shape!r}")
+            raise ValueError(
+                f"{type(self).__name__}.data_() 'arg' must have shape {shape!r}, not {arg.shape!r}"
+            )
         if isinstance(params, Parameter) and not isinstance(arg, Parameter):
             self.params = Parameter(arg, params.requires_grad)
         else:
