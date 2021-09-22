@@ -7,6 +7,8 @@ from typing import Any, Dict, Mapping, Optional, Sequence, Union
 from torch import Tensor
 from torch.nn import Module, ModuleDict, ModuleList
 
+from ..core.math import max_difference
+
 
 RegistrationResult = Dict[str, Any]
 RegistrationLosses = Union[Module, ModuleDict, ModuleList, Mapping[str, Module], Sequence[Module]]
@@ -76,6 +78,43 @@ class PairwiseImageLoss(Module, metaclass=ABCMeta):
     def forward(self, source: Tensor, target: Tensor, mask: Optional[Tensor] = None) -> Tensor:
         r"""Evaluate image dissimilarity loss."""
         raise NotImplementedError(f"{type(self).__name__}.forward()")
+
+
+class NormalizedPairwiseImageLoss(PairwiseImageLoss):
+    r"""Base class of pairwise image dissimilarity criteria with implicit input normalization."""
+
+    def __init__(
+        self,
+        source: Optional[Tensor] = None,
+        target: Optional[Tensor] = None,
+        norm: Optional[Union[bool, Tensor]] = None,
+    ):
+        r"""Initialize similarity metric.
+
+        Args:
+            source: Source image from which to compute ``norm``. If ``None``, only use ``target`` if specified.
+            target: Target image from which to compute ``norm``. If ``None``, only use ``source`` if specified.
+            norm: Positive factor by which to divide loss. If ``None`` or ``True``, use ``source`` and/or ``target``.
+                If ``False`` or both ``source`` and ``target`` are ``None``, a normalization factor of one is used.
+
+        """
+        super().__init__()
+        if norm is True:
+            norm = None
+        if norm is None:
+            if target is None:
+                target = source
+            elif source is None:
+                source = target
+            if source is not None and target is not None:
+                norm = max_difference(source, target).square()
+        elif norm is False:
+            norm = None
+        assert norm is None or isinstance(norm, (float, int, Tensor))
+        self.norm = norm
+
+    def extra_repr(self) -> str:
+        return f"norm={float(self.norm):.5f}"
 
 
 class DisplacementLoss(Module, metaclass=ABCMeta):

@@ -18,6 +18,7 @@ from typing import Any
 from torch.nn import Module
 
 from .base import DisplacementLoss
+from .base import NormalizedPairwiseImageLoss
 from .base import PairwiseImageLoss
 from .base import ParamsLoss
 from .base import PointSetDistance
@@ -33,6 +34,7 @@ from .flow import TotalVariation, TV
 
 from .image import PatchwiseImageLoss, PatchLoss
 from .image import LCC, LNCC
+from .image import MSE
 from .image import SSD
 
 from .params import L1Norm, L1_Norm
@@ -46,6 +48,7 @@ from .pointset import LandmarkPointDistance, LPD
 __all__ = (
     # Base types
     "DisplacementLoss",
+    "NormalizedPairwiseImageLoss",
     "PairwiseImageLoss",
     "PatchwiseImageLoss",
     "PatchLoss",
@@ -74,6 +77,7 @@ __all__ = (
     "LPD",
     "LCC",
     "LNCC",
+    "MSE",
     "Sparsity",
     "SSD",
     "TotalVariation",

@@ -22,6 +22,7 @@ __all__ = (
     "dice_loss",
     "kld_loss",
     "lcc_loss",
+    "mse_loss",
     "ssd_loss",
     "grad_loss",
     "bending_loss",
@@ -202,6 +203,32 @@ def lcc_loss(
     loss = masked_loss(loss, mask, "lcc_loss")
     loss = reduce_loss(loss, reduction, mask)
     return loss
+
+
+def mse_loss(
+    input: Tensor,
+    target: Tensor,
+    mask: Optional[Tensor] = None,
+    norm: Optional[Union[float, Tensor]] = None,
+    reduction: str = "mean",
+) -> Tensor:
+    r"""Average normalized squared differences.
+
+    This loss is equivalent to `ssd_loss`, except that the default `reduction` is "mean".
+
+    Args:
+        input: Source image sampled on ``target`` grid.
+        target: Target image with same shape as ``input``.
+        mask: Multiplicative mask with same shape as ``input``.
+        norm: Positive factor by which to divide loss value.
+        reduction: Whether to compute "mean" or "sum" over all grid points.
+            If "none", output tensor shape is equal to the shape of the input tensors.
+
+    Returns:
+        Average normalized squared differences.
+
+    """
+    return ssd_loss(input, target, mask=mask, norm=norm, reduction=reduction)
 
 
 def ssd_loss(

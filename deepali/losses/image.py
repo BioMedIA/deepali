@@ -1,13 +1,13 @@
 r"""Image dissimilarity measures."""
 
-from typing import Optional, Union
+from typing import Optional
 
 from torch import Tensor
 
 from ..core import functional as U
-from ..core.math import max_difference
 from ..core.types import ScalarOrTuple
 
+from .base import NormalizedPairwiseImageLoss
 from .base import PairwiseImageLoss
 from . import functional as L
 
@@ -33,45 +33,20 @@ class LCC(PairwiseImageLoss):
 LNCC = LCC
 
 
-class SSD(PairwiseImageLoss):
+class SSD(NormalizedPairwiseImageLoss):
     r"""Sum of squared intensity differences."""
-
-    def __init__(
-        self,
-        source: Optional[Tensor] = None,
-        target: Optional[Tensor] = None,
-        norm: Optional[Union[bool, Tensor]] = None,
-    ):
-        r"""Initialize similarity metric.
-
-        Args:
-            source: Source image from which to compute ``norm``. If ``None``, only use ``target`` if specified.
-            target: Target image from which to compute ``norm``. If ``None``, only use ``source`` if specified.
-            norm: Positive factor by which to divide MSE loss. If ``None`` or ``True``, use ``source`` and/or ``target``.
-                If ``False`` or both ``source`` and ``target`` are ``None``, a normalization factor of one is used.
-
-        """
-        super().__init__()
-        if norm is True:
-            norm = None
-        if norm is None:
-            if target is None:
-                target = source
-            elif source is None:
-                source = target
-            if source is not None and target is not None:
-                norm = max_difference(source, target).square()
-        elif norm is False:
-            norm = None
-        assert norm is None or isinstance(norm, (float, int, Tensor))
-        self.norm = norm
 
     def forward(self, source: Tensor, target: Tensor, mask: Optional[Tensor] = None) -> Tensor:
         r"""Evaluate image dissimilarity loss."""
         return L.ssd_loss(source, target, mask=mask, norm=self.norm)
 
-    def extra_repr(self) -> str:
-        return f"norm={float(self.norm):.5f}"
+
+class MSE(NormalizedPairwiseImageLoss):
+    r"""Average squared intensity differences."""
+
+    def forward(self, source: Tensor, target: Tensor, mask: Optional[Tensor] = None) -> Tensor:
+        r"""Evaluate image dissimilarity loss."""
+        return L.mse_loss(source, target, mask=mask, norm=self.norm)
 
 
 class PatchwiseImageLoss(PairwiseImageLoss):
