@@ -68,6 +68,7 @@ Affine = AffineTransform
 AffineWithShearing = FullAffineTransform
 Disp = DisplacementFieldTransform
 DispField = DisplacementFieldTransform
+DDF = DisplacementFieldTransform
 DVF = DisplacementFieldTransform
 FFD = FreeFormDeformation
 FullAffine = FullAffineTransform
@@ -115,6 +116,7 @@ NONRIGID_TRANSFORMS = (
     "Disp",
     "DispField",
     "DisplacementFieldTransform",
+    "DDF",
     "DVF",
     "FFD",
     "FreeFormDeformation",
