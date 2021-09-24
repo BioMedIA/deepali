@@ -326,25 +326,45 @@ class Grid(object):
         r"""Sampling grid size as floating point tensor."""
         return self._round_size(self._size)
 
+    @overload
+    def size(self, i: int) -> int:
+        r"""Sampleing grid size along the specified spatial dimension."""
+        ...
+
+    @overload
     def size(self) -> torch.Size:
         r"""Sampling grid size for dimensions ordered as ``(X, ...)``."""
-        return torch.Size((int(n) for n in self.size_tensor()))
+        ...
+
+    def size(self, i: Optional[int] = None) -> Union[int, torch.Size]:
+        r"""Sampling grid size."""
+        size = self.size_tensor()
+        if i is None:
+            return torch.Size(int(n) for n in size)
+        return int(size[i])
 
     @property
     def shape(self) -> torch.Size:
         r"""Sampling grid size for dimensions ordered as ``(..., X)``."""
         return torch.Size((int(n) for n in self.size_tensor().flip(0)))
 
-    def extent(self) -> Tensor:
+    def extent(self, i: Optional[int] = None) -> Tensor:
         r"""Extent of sampling grid in physical world units."""
-        return self.spacing() * self.size_tensor()
+        if i is None:
+            return self.spacing() * self.size_tensor()
+        return self._spacing[i] * self.size(i)
 
-    def cube_extent(self) -> Tensor:
+    def cube_extent(self, i: Optional[int] = None) -> Tensor:
         r"""Extent of sampling grid cube in physical world units."""
-        n = self.size_tensor()
+        if i is None:
+            n = self.size_tensor()
+            if self._align_corners:
+                n = n.sub(1)
+            return self.spacing().mul(n)
+        n = self.size(i)
         if self._align_corners:
-            n = n.sub(1)
-        return self.spacing().mul(n)
+            n -= 1
+        return self._spacing[i] * n
 
     @overload
     def center(self) -> Tensor:
