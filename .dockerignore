@@ -1,0 +1,43 @@
+# macOS
+.DS_Store
+._.DS_Store
+
+# IDEs
+~$*
+*.swp
+
+# compilation
+__pycache__/
+*.pyc
+*.pyd
+
+# data files
+*.pt
+*.pth
+*.mha
+*.nii
+*.nii.gz
+*.npy
+*.npz
+*.ckpt-*
+*.tfevents.*
+
+# packaging
+pyproject.tmp
+*.egg-info
+.eggs/
+/build/
+/dist/
+
+# testing
+.coverage
+.tox/
+.pytest_cache/
+
+# version control
+/.git/
+
+# other
+.ipynb_checkpoints/
+/.venv/
+/venv/

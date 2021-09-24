@@ -1,0 +1,228 @@
+#!/bin/bash
+
+print_help()
+{
+  cat --<<EOF_HELP
+
+Usage: docker/run [options] <command> [args]
+
+This utility script can be used instead of "docker run" to create a new Docker container
+for remote development, execution of unit tests or examples.
+
+Options:
+  -n, --name NAME
+    Specify name of Docker container. A default name is used if not specified.
+  -t, --tag TAG
+    Specify tag of Docker image from which to create a new container. (default: deepali:USER)
+  --user USER
+    Name of container user. (default: $user)
+  --cpus N
+    Number of CPUs to expose to the Docker container (cf. docker run option --cpus). (default: $cpus)
+  --gpus I[,J...]
+    Initial value of environment variable CUDA_VISIBLE_DEVICES. (default: $gpus)
+  --memory MEMORY
+    Amount of CPU memory to allocate for Docker container (cf. docker run option --memory). (default: $memory)
+  --ports-prefix PREFIX
+    Common prefix to use for exposing ports such as SSH. Every user should use a different prefix. (default: $ports_prefix)
+  -w, --workdir PATH
+    Working directory. Set to current project directory inside container by default.
+  -q, --quiet
+    Disable verbose run script output.
+  -h, --help
+    Print help and exit.
+
+Examples:
+  docker/run [options]
+      Create new detached container with default name "${USER}_deepali". Run commands within
+      this running container with "docker exec", e.g., "docker exec $name examples/istn/train.py".
+  docker/run [options] shell
+      Create new container with default name "${USER}_deepali_shell" and run interactive bash
+      shell within. When you exit the shell, the container is stopped but not removed.
+  docker/run [options] dev|sshd
+      Create new detached container with default name "${USER}_deepali_(dev|sshd)". Use this
+      container for example, for remote development work using VS Code or PyCharm. The "dev" command by
+      default binds the source code directory from the host to the container "/workspace" directory.
+  docker/run [options] <command> <args>
+      Execute specified command inside new container with default name "${USER}_deepali_run".
+      The container is removed again once the command finishes.
+
+EOF_HELP
+}
+
+error()
+{
+  echo "$@" 1>&2
+  exit 1
+}
+
+info()
+{
+  [ $verbose -eq 0 ] || echo "$@"
+}
+
+relpath()
+{
+  # Only works if both paths are existing directories (not files)
+  # https://stackoverflow.com/a/24848739/949028
+  local s="$(cd $1 && pwd)"  # base directory
+  local d="$(cd $2 && pwd)"  # absolute directory path
+  if [ "$s" = "$d" ]; then
+    echo "."
+  else
+    local b=
+    [ -d "$s" ] || error "relpath: argument 1 must be existing directory"
+    [ -d "$d" ] || error "relpath: argument 2 must be existing directory"
+    while [ "$s" != "/" ] && [ "${d#$s/}" == "$d" ]; do
+      s="$(dirname "$s")"
+      b="../$b"
+    done
+    [ "$s" != "/" ] || s=""
+    echo "$b${d#$s/}"  # relative directory path
+  fi
+}
+
+
+# Constants
+DOCKER_DIR="$(dirname "$BASH_SOURCE")"
+PROJECT_DIR="$(cd "$DOCKER_DIR/.." && pwd)"
+
+# Parse command arguments
+name=
+image=
+user="$(id -u -n)"
+
+ports_prefix=42
+bind_source_dir=
+bind_aws_config=
+bind_ssh_config=
+workdir=
+
+cpus=16
+gpus="${CUDA_VISIBLE_DEVICES}"
+memory=32G
+shm_size=32G
+verbose=1
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -h|--help) print_help; exit 0; ;;
+    -n|--name) name="$2"; shift; ;;
+    -t|--tag) image="$2"; shift; ;;
+    -w|--workdir) workdir="$2"; shift; ;;
+    --cpus) cpus="$2"; shift; ;;
+    --gpus) gpus="$2"; shift; ;;
+    --memory) memory="$2"; shift; ;;
+    --shm-size) shm_size="$2"; shift; ;;
+    -q|--quiet) verbose=0; ;;
+    --bind-source-dir) bind_source_dir="true"; ;;
+    --bind-aws-config) bind_aws_config="true"; ;;
+    --bind-ssh-config) bind_ssh_config="true"; ;;
+    --ports-prefix) ports_prefix="$2"; shift; ;;
+    --) shift; break; ;;
+    -*) error "invalid option $1"; ;;
+    *) break; ;;
+  esac
+  shift
+done
+
+[ -n "$image" ] || image="deepali:$user"
+argv=("$@")
+
+set -e
+
+# Set "docker run" flags and default container name based on command to execute
+docker_run_flags=()
+is_dev_container="false"
+# - execute multiple commands with "docker exec"
+if [ ${#argv} -eq 0 ]; then
+  docker_run_flags+=(--detach)
+  argv=(tail -f /dev/null)
+  [ -n "$name" ] || name="${user}_deepali"
+# - interactive shell
+elif [[ ${argv[0]} == "shell" ]]; then
+  [ -n "$name" ] || name="${user}_deepali_shell"
+  docker_run_flags+=(-i -t --rm)
+  argv=("/bin/bash")
+# - remote development container
+elif [[ ${argv[0]} == "dev" ]] || [[ ${argv[0]} == "sshd" ]]; then
+  [ -n "$name" ] || name="${user}_deepali_${argv[0]}"
+  [ -n "$bind_aws_config" ] || bind_aws_config="true"
+  [ -n "$bind_ssh_config" ] || bind_ssh_config="true"
+  if [[ ${argv[0]} == "dev" ]]; then
+    is_dev_container="true"
+    [ -n "$bind_source_dir" ] || bind_source_dir="true"
+  fi
+  if [ -z $ports_prefix ]; then
+    error "Host --ports-prefix must be set!"
+  fi
+  docker_run_flags+=(
+    --detach
+    --publish="${ports_prefix}022:22"  # SSH
+    --entrypoint="/usr/bin/sudo"
+  )
+  argv=("/usr/sbin/sshd" -D)
+# - execute single command
+else
+  [ -n "$name" ] || name="${user}_deepali_run"
+  docker_run_flags+=(--rm)
+  verbose=0
+fi
+
+# Host directories to bind
+docker_run_flags+=()
+if [[ "$bind_aws_config" == "true" ]]; then
+  aws_dir="$HOME/.aws"
+  [ ! -d "$aws_dir" ] || docker_run_flags+=(--volume="$aws_dir:/home/$user/.aws:ro")
+fi
+if [[ "$bind_ssh_config" == "true" ]]; then
+  ssh_dir="$HOME/.ssh"
+  [ ! -d "$ssh_dir" ] || docker_run_flags+=(--volume="$ssh_dir:/home/$user/.ssh:ro")
+fi
+if [[ "$bind_source_dir" == "true" ]]; then
+  docker_run_flags+=(--volume="$PROJECT_DIR:/workspace:rw")
+  docker_run_flags+=(--volume="$PROJECT_DIR:$PROJECT_DIR:rw")
+fi
+
+# Working directory
+if [ -z "$workdir" ]; then
+  if [[ "$bind_source_dir" == "true" ]]; then
+    workdir="$PROJECT_DIR"
+  else
+    workdir="/workspace"
+  fi
+  subdir="$(relpath "$PROJECT_DIR" "$PWD")"
+  if [ $subdir != "." ]; then
+    workdir="$workdir/$subdir"
+  fi
+fi
+
+# Create new Docker container
+info "Start new container '$name' from image '$image'..."
+if [ -z "$gpus" ]; then
+  info "INFO: Neither CUDA_VISIBLE_DEVICES environment variable set nor docker/run option --gpus specified."
+  info "      torch.cuda.is_available() will be False unless CUDA_VISIBLE_DEVICES is set to a non-empty string!"
+  info "      This can still be done inside the container before running any command which requires a CUDA device."
+fi
+docker run \
+  --ulimit "nproc=4000" \
+  --runtime="nvidia" \
+  --env CUDA_VISIBLE_DEVICES="$gpus" \
+  --name="$name" \
+  --user="$user" \
+  --cpus="$cpus" \
+  --memory="$memory" \
+  --shm-size="$shm_size" \
+  --workdir="$workdir" \
+  "${docker_run_flags[@]}" \
+  "$image" "${argv[@]}"
+
+# Setup container for remote development
+if [[ "$is_dev_container" == "true" ]]; then
+  [ ! -f "$HOME/.gitconfig" ] || docker cp "$HOME/.gitconfig" "$name:/home/$user/.gitconfig"
+fi
+
+# Ready!
+if [[ "${argv[0]}" == "/usr/sbin/sshd" ]]; then
+  info
+  info "Container '$name' ready for connection at: $user@$(hostname):${ports_prefix}022"
+fi
