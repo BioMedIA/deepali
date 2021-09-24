@@ -166,17 +166,19 @@ def move_dim(tensor: Tensor, dim: Union[int, str], pos: int) -> Tensor:
     if dim < 0:
         dim = tensor.ndim + dim
     if pos < 0:
-        pos = tensor.ndim + pos + 1
+        pos = tensor.ndim + pos
     if pos == dim:
         return tensor
+    if dim < pos:
+        pos += 1
     tensor = tensor.rename(None)
     tensor = tensor.unsqueeze(pos)
     names.insert(pos, names[dim])
-    if pos < dim:
+    if pos <= dim:
         dim += 1
     del names[dim]
     tensor = tensor.transpose(dim, pos).squeeze(dim)
-    tensor = tensor.refine_names(*names)  # type: ignore
+    tensor = tensor.refine_names(*names)
     return tensor
 
 
