@@ -157,7 +157,7 @@ def conv(
     """
     if not isinstance(data, Tensor):
         raise TypeError("conv() 'data' must be torch.Tensor")
-    if data.ndim < 4:
+    if data.ndim < 3:
         raise ValueError("conv() 'data' must have shape (N, C, ..., X)")
     D = data.ndim - 2
     if isinstance(kernel, Tensor) and kernel.ndim == 1:
@@ -335,7 +335,12 @@ def conv1d(
         result = F.pad(result, (margin, margin), mode=padding.pad_mode(1))
         margin = 0
     conv_fn = F.conv_transpose1d if transpose else F.conv1d
-    kwargs = dict(stride=stride, dilation=dilation, padding=margin, groups=groups,)
+    kwargs = dict(
+        stride=stride,
+        dilation=dilation,
+        padding=margin,
+        groups=groups,
+    )
     if transpose:
         if output_padding is None:
             output_padding = stride_minus_kernel_padding(1, stride)
@@ -1056,7 +1061,10 @@ def grid_sample(
 
 
 def grid_sample_mask(
-    data: Tensor, grid: Tensor, threshold: float = 0, align_corners: bool = ALIGN_CORNERS,
+    data: Tensor,
+    grid: Tensor,
+    threshold: float = 0,
+    align_corners: bool = ALIGN_CORNERS,
 ) -> Tensor:
     r"""Sample binary mask at grid points.
 
@@ -1080,7 +1088,11 @@ def grid_sample_mask(
     mask = data if data.dtype == torch.bool else data > threshold
     mask = mask.to(dtype=torch.float32, device=data.device)
     return grid_sample(
-        mask, grid, mode=Sampling.LINEAR, padding=PaddingMode.ZEROS, align_corners=align_corners,
+        mask,
+        grid,
+        mode=Sampling.LINEAR,
+        padding=PaddingMode.ZEROS,
+        align_corners=align_corners,
     )
 
 
@@ -1390,7 +1402,10 @@ def spatial_derivatives(
                         for d in (d for d in range(D) if d != sdim):
                             dim = SpatialDim(d).tensor_dim(result.ndim)
                             result = conv1d(
-                                result, avg_kernel, dim=dim, padding=len(avg_kernel) // 2,
+                                result,
+                                avg_kernel,
+                                dim=dim,
+                                padding=len(avg_kernel) // 2,
                             )
                     fd_spacing = spacing[:, sdim]
                     result = finite_differences(result, sdim, mode=fd_mode, spacing=fd_spacing)
