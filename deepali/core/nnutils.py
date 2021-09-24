@@ -1,4 +1,4 @@
-from typing import Optional, Tuple
+from typing import Optional, Sequence, Tuple, overload
 
 import torch
 from torch import Size, Tensor
@@ -183,6 +183,21 @@ def unpool_output_size(
     return Size(n.tolist())
 
 
+@overload
+def same_padding(kernel_size: int, dilation: int = 1) -> int:
+    ...
+
+
+@overload
+def same_padding(kernel_size: Sequence[int], dilation: int = 1) -> Tuple[int, ...]:
+    ...
+
+
+@overload
+def same_padding(kernel_size: int, dilation: Sequence[int] = 1) -> Tuple[int, ...]:
+    ...
+
+
 def same_padding(
     kernel_size: ScalarOrTuple[int], dilation: ScalarOrTuple[int] = 1
 ) -> ScalarOrTuple[int]:
@@ -200,14 +215,37 @@ def same_padding(
     device = torch.device("cpu")
     k: Tensor = torch.atleast_1d(torch.tensor(kernel_size, dtype=torch.int, device=device))
     d: Tensor = torch.atleast_1d(torch.tensor(dilation, dtype=torch.int, device=device))
-    assert k.ndim == 1, "same_padding() 'kernel_size' must be scalar or sequence"
-    assert d.ndim == 1, "same_padding() 'dilation' must be scalar or sequence"
+    if k.ndim != 1:
+        raise ValueError("same_padding() 'kernel_size' must be scalar or sequence")
+    ndim = k.shape[0]
+    if ndim == 1 and d.shape[0] > 1:
+        ndim = d.shape[0]
+    for arg, name in zip([k, d], ["kernel_size", "dilation"]):
+        if arg.ndim != 1 or arg.shape[0] not in (1, ndim):
+            raise ValueError(f"same_padding() {name!r} must be scalar or sequence of length {ndim}")
     if k.sub(1).mul(d).fmod(2).eq(1).any():
         raise NotImplementedError(
             f"Same padding not available for kernel_size={tuple(k.tolist())} and dilation={tuple(d.tolist())}."
         )
     p = k.sub(1).div(2).mul(d).type(torch.int)
-    return p.item() if len(p) == 1 else tuple(p.tolist())
+    if isinstance(kernel_size, int) and isinstance(dilation, int):
+        return p[0].item()
+    return tuple(p.tolist())
+
+
+@overload
+def stride_minus_kernel_padding(kernel_size: int, stride: int) -> int:
+    ...
+
+
+@overload
+def stride_minus_kernel_padding(kernel_size: Sequence[int], stride: int) -> Tuple[int, ...]:
+    ...
+
+
+@overload
+def stride_minus_kernel_padding(kernel_size: int, stride: Sequence[int]) -> Tuple[int, ...]:
+    ...
 
 
 def stride_minus_kernel_padding(
@@ -218,10 +256,20 @@ def stride_minus_kernel_padding(
     device = torch.device("cpu")
     k: Tensor = torch.atleast_1d(torch.tensor(kernel_size, dtype=torch.int, device=device))
     s: Tensor = torch.atleast_1d(torch.tensor(stride, dtype=torch.int, device=device))
+    if k.ndim != 1:
+        raise ValueError("stride_minus_kernel_padding() 'kernel_size' must be scalar or sequence")
+    ndim = k.shape[0]
+    if ndim == 1 and s.shape[0] > 1:
+        ndim = s.shape[0]
+    for arg, name in zip([k, s], ["kernel_size", "stride"]):
+        if arg.ndim != 1 or arg.shape[0] not in (1, ndim):
+            raise ValueError(f"stride_minus_kernel_padding() {name!r} must be scalar or sequence of length {ndim}")
     assert k.ndim == 1, "stride_minus_kernel_padding() 'kernel_size' must be scalar or sequence"
     assert s.ndim == 1, "stride_minus_kernel_padding() 'stride' must be scalar or sequence"
     p = s.sub(k).type(torch.int)
-    return p.item() if len(p) == 1 else tuple(p.tolist())
+    if isinstance(kernel_size, int) and isinstance(stride, int):
+        return p[0].item()
+    return tuple(p.tolist())
 
 
 def upsample_padding(
