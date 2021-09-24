@@ -239,6 +239,7 @@ class StationaryVelocityFreeFormDeformation(BSplineTransform):
         stride: Optional[Union[int, Sequence[int]]] = None,
         scale: Optional[float] = None,
         steps: Optional[int] = None,
+        transpose: bool = False,
     ) -> None:
         r"""Initialize transformation parameters.
 
@@ -249,10 +250,14 @@ class StationaryVelocityFreeFormDeformation(BSplineTransform):
             stride: Number of grid points between control points (minus one).
             scale: Constant scaling factor of velocity fields.
             steps: Number of scaling and squaring steps.
+            transpose: Whether to use separable transposed convolution as implemented in AIRLab.
+                When ``False``, a more efficient implementation using multi-channel convolution followed
+                by a reshuffling of the output is performed. This more efficient and also more accurate
+                implementation is adapted from the C++ code of MIRTK (``mirtk::BSplineInterpolateImageFunction``).
 
         """
         align_corners = grid.align_corners()
-        super().__init__(grid, groups=groups, params=params, stride=stride)
+        super().__init__(grid, groups=groups, params=params, stride=stride, transpose=transpose)
         self.register_buffer("v", torch.zeros_like(self.u), persistent=False)
         self.exp = ExpFlow(scale=scale, steps=steps, align_corners=align_corners)
 
