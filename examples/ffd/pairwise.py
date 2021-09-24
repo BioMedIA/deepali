@@ -50,6 +50,7 @@ def register_pairwise(
     model_name, model_args, model_init = get_model_config(config)
     optim_name, optim_args, optim_loop = get_optim_config(config)
     levels, coarsest_level, finest_level = get_levels_config(config)
+    finest_spacing, min_size, pyramid_dims = get_pyramid_config(config)
     device = get_device_config(config, device)
     verbose = int(verbose)
     debug = int(debug)
@@ -72,9 +73,6 @@ def register_pairwise(
     source_image = normalize_data_(source_image, source_chns, **norm_params)
     # Create Gaussian image resolution pyramids
     start = timer()
-    min_size = config.get("min_size", 16)
-    finest_spacing = config.get("spacing")
-    pyramid_dims = config.get("pyramid")
     target_pyramid = target_image.pyramid(
         levels,
         start=finest_level,
@@ -102,14 +100,13 @@ def register_pairwise(
     del target_image
     del source_image
     # Initialize transformation
-    post_transform = get_post_transform(
-        config, target_pyramid[finest_level].grid(), source_pyramid[finest_level].grid(),
-    )
+    source_grid = source_pyramid[finest_level].grid()
+    finest_grid = target_pyramid[finest_level].grid()
     coarsest_grid = target_pyramid[coarsest_level].grid()
-    transform_ds_factor = model_args.pop("downsample", 1)
-    transform = new_spatial_transform(
-        model_name, grid=coarsest_grid.downsample(transform_ds_factor), groups=1, **model_args
-    )
+    post_transform = get_post_transform(config, finest_grid, source_grid)
+    transform_downsample = model_args.pop("downsample", 0)
+    transform_grid = coarsest_grid.downsample(transform_downsample)
+    transform = new_spatial_transform(model_name, grid=transform_grid, groups=1, **model_args)
     if model_init:
         if verbose > 1:
             print(f"Fitting '{model_init}'...")
@@ -145,7 +142,8 @@ def register_pairwise(
         # Initialize transformation
         if level != coarsest_level:
             start = timer()
-            transform.grid_(target_image.grid().downsample(transform_ds_factor))
+            transform_grid = target_image.grid().downsample(transform_downsample)
+            transform.grid_(transform_grid)
             if verbose > 3:
                 print(f"Subdivided control point grid in {timer() - start:.3f}s")
         grid_transform.grid_(target_image.grid())
@@ -233,7 +231,9 @@ def register_pairwise(
 
 
 def append_mask(
-    image: Image, channels: Dict[str, Tuple[int, int]], config: Dict[str, Any],
+    image: Image,
+    channels: Dict[str, Tuple[int, int]],
+    config: Dict[str, Any],
 ) -> Image:
     r"""Append foreground mask to data tensor."""
     data = image.tensor()
@@ -373,7 +373,9 @@ def load_transform(path: PathStr, grid: Grid) -> SpatialTransform:
 
 
 def get_post_transform(
-    config: Dict[str, Any], target_grid: Grid, source_grid: Grid,
+    config: Dict[str, Any],
+    target_grid: Grid,
+    source_grid: Grid,
 ) -> Optional[SpatialTransform]:
     r"""Get constant rigid transformation between image grid domains."""
     align = config.get("align", False)
@@ -525,23 +527,33 @@ def normalize_data_(
 
 def get_levels_config(config: Dict[str, Any]) -> Tuple[int, int, int]:
     r"""Get indices of coarsest and finest level from configuration."""
-    levels = config.get("levels", 4)
+    cfg = config.get("pyramid", {})
+    levels = cfg.get("levels", 4)
     if isinstance(levels, int):
         levels = (levels - 1, 0)
     if not isinstance(levels, (list, tuple)):
         raise TypeError(
-            "register_pairwise() 'config' key 'levels': value must be int, tuple, or list"
+            "register_pairwise() 'config' key 'pyramid.levels': value must be int, tuple, or list"
         )
     coarsest_level, finest_level = levels
     if finest_level > coarsest_level:
         raise ValueError(
-            "register_pairwise() 'config' key 'levels':"
+            "register_pairwise() 'config' key 'pyramid.levels':"
             + " finest level must be less or equal than coarsest level"
         )
     levels = coarsest_level + 1
-    if "max_level" in config:
-        levels = max(levels, config["max_level"])
+    if "max_level" in cfg:
+        levels = max(levels, cfg["max_level"])
     return levels, coarsest_level, finest_level
+
+
+def get_pyramid_config(config: Dict[str, Any]) -> Tuple[Optional[Union[float, Sequence[float]]], int, Optional[Union[str, int]]]:
+    r"""Get settings of Gaussian resolution pyramid from configuration."""
+    cfg = config.get("pyramid", {})
+    min_size = cfg.get("min_size", 16)
+    finest_spacing = cfg.get("spacing")
+    dims = cfg.get("dims")
+    return finest_spacing, min_size, dims
 
 
 def get_loss_config(config: Dict[str, Any]) -> Tuple[Dict[str, Dict[str, Any]], Dict[str, float]]:
@@ -747,7 +759,10 @@ def write_result_hook(
     r"""Get callback function for writing results after each evaluation."""
 
     def fn(
-        _: RegistrationEngine, num_steps: int, num_evals: int, result: RegistrationResult,
+        _: RegistrationEngine,
+        num_steps: int,
+        num_evals: int,
+        result: RegistrationResult,
     ) -> None:
         prefix = f"level_{level}_step_{num_steps:03d}_eval_{num_evals}_"
         write_result(result, grid=grid, channels=channels, outdir=outdir, prefix=prefix)

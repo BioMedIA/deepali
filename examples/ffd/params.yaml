@@ -1,15 +1,23 @@
+# Using linearly interpolated dense displacement vector field
+# model:
+#   name: DDF
+#   downsample: 2
+# Using cubic B-spline interpolation / free-form deformation
 model:
   name: FFD
-  stride: [16, 16, 10]
-  transpose: false
+  stride: [8, 8, 5]
+# Loss terms of objective function to minimize
 energy:
   seg: [1, MSE]
   be: [0.001, BendingEnergy]
+# Optimization scheme and parameters
 optim:
   name: Adam
-  step_size: 0.01
+  step_size: 0.001
   min_delta: -0.01
   max_steps: 100
-spacing: [1.25, 1.25, 2.0]
-pyramid: [0, 1]
-levels: 3
+# Gaussian resolution pyramid
+pyramid:
+  dims: ["x", "y"]
+  levels: 3
+  spacing: [1.25, 1.25, 2.0]
