@@ -16,7 +16,7 @@
                 "--source-seg", "seg_25.nii.gz",
                 "--output", "debug/transform.pt",
                 "--debug-dir", "debug",
-                "--debug", "3",
+                "--debug", "0",
                 "--verbose", "3",
                 "--device", "cuda",
             ],

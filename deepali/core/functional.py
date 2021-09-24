@@ -58,6 +58,9 @@ from .linalg import tensordot
 from .linalg import vectordot
 
 # Data operations
+from .bspline import bspline_interpolation_weights
+from .bspline import cubic_bspline_control_point_grid_size
+from .bspline import evaluate_cubic_bspline
 from .bspline import subdivide_cubic_bspline
 
 from .image import avg_pool, max_pool, min_pool
@@ -162,6 +165,7 @@ __all__ = (
     # Data operations
     "avg_pool",
     "bounding_box",
+    "bspline_interpolation_weights",
     "center_crop",
     "center_pad",
     "circle_image",
@@ -172,6 +176,7 @@ __all__ = (
     "conv1d",
     "crop",
     "cshape_image",
+    "cubic_bspline_control_point_grid_size",
     "denormalize_flow",
     "denormalize_grid",
     "distance_matrix",
@@ -179,6 +184,7 @@ __all__ = (
     "dot_channels",
     "downsample",
     "empty_image",
+    "evaluate_cubic_bspline",
     "expv",
     "flatten_channels",
     "finite_differences",

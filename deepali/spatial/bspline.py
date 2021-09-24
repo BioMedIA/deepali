@@ -3,16 +3,17 @@ r"""Cubic B-spline free-form deformations."""
 from __future__ import annotations
 
 from copy import copy as shallow_copy
-from typing import Callable, Optional, Sequence, Tuple, TypeVar, Union, cast
+from typing import Callable, List, Optional, Sequence, Tuple, TypeVar, Union, cast, overload
 
 import torch
 from torch import Tensor
 from torch.nn import init
 
-from ..core import functional as U
-from ..core.enum import PaddingMode
-from ..core.grid import Grid
 from ..core import kernels as K
+from ..core import functional as U
+from ..core.enum import SpatialDim
+from ..core.grid import Grid
+from ..core.types import ScalarOrTuple
 from ..modules import ExpFlow
 
 from .base import NonRigidTransform
@@ -31,6 +32,7 @@ class BSplineTransform(ParametricTransform, NonRigidTransform):
         groups: Optional[int] = None,
         params: Optional[Union[bool, Tensor, Callable[..., Tensor]]] = True,
         stride: Optional[Union[int, Sequence[int]]] = None,
+        transpose: bool = False,
     ) -> None:
         r"""Initialize transformation parameters.
 
@@ -51,6 +53,10 @@ class BSplineTransform(ParametricTransform, NonRigidTransform):
                 strides for the different spatial grid dimensions in the order ``(sx, sy, sz)``. Note that
                 when the control point grid is subdivided in order to double its size along each spatial
                 dimension, the stride with respect to this subdivided control point grid remains the same.
+            transpose: Whether to use separable transposed convolution as implemented in AIRLab.
+                When ``False``, a more efficient implementation using multi-channel convolution followed
+                by a reshuffling of the output is performed. This more efficient and also more accurate
+                implementation is adapted from the C++ code of MIRTK (``mirtk::BSplineInterpolateImageFunction``).
 
         """
         if not grid.align_corners():
@@ -62,6 +68,7 @@ class BSplineTransform(ParametricTransform, NonRigidTransform):
         if len(stride) != grid.ndim:
             raise ValueError(f"BSplineTransform() 'stride' must be single int or {grid.ndim} ints")
         self.stride = tuple(int(s) for s in stride)
+        self._transpose = transpose  # MUST be set before register_kernels() is called
         if groups is None:
             groups = params.shape[0] if isinstance(params, Tensor) else 1
         super().__init__(grid, groups=groups, params=params)
@@ -73,8 +80,7 @@ class BSplineTransform(ParametricTransform, NonRigidTransform):
     def data_shape(self) -> torch.Size:
         r"""Get shape of transformation parameters tensor."""
         grid = self.grid()
-        stride = self.data_stride
-        shape = tuple([max(1, (n - 1) // s) + 3 for n, s in zip(grid.shape, stride)])
+        shape = U.cubic_bspline_control_point_grid_size(grid.shape, self.data_stride)
         return (grid.ndim,) + shape
 
     @property
@@ -113,7 +119,7 @@ class BSplineTransform(ParametricTransform, NonRigidTransform):
             raise ValueError(
                 f"{type(self).__name__}.grid_() argument must have {current_grid.ndim} dimensions"
             )
-        subdivide_dims = []
+        subdivide_dims: List[SpatialDim] = []
         if isinstance(params, Tensor):
             current_grid = self._grid
             if grid.ndim != current_grid.ndim:
@@ -128,10 +134,12 @@ class BSplineTransform(ParametricTransform, NonRigidTransform):
                 raise ValueError(
                     f"{type(self).__name__}.grid_() argument must define same grid domain as current grid"
                 )
+            new_size = grid.size()
+            current_size = current_grid.size()
             for i in range(grid.ndim):
-                if grid.shape[i] == 2 * current_grid.shape[i] - 1:
-                    subdivide_dims.append(2 + i)
-                elif grid.shape[i] != current_grid.shape[i]:
+                if new_size[i] == 2 * current_size[i] - 1:
+                    subdivide_dims.append(SpatialDim(i))
+                elif new_size[i] != current_size[i]:
                     raise ValueError(
                         f"{type(self).__name__}.grid_() argument must have same size or new size '2n - 1'"
                     )
@@ -140,6 +148,7 @@ class BSplineTransform(ParametricTransform, NonRigidTransform):
             new_shape = (params.shape[0],) + self.data_shape
             new_params = U.subdivide_cubic_bspline(params, dims=subdivide_dims)
             for dim in subdivide_dims:
+                dim = dim.tensor_dim(params.ndim)
                 new_params = new_params.narrow(dim, 1, new_shape[dim])
             self.data_(new_params.contiguous())
         return self
@@ -149,11 +158,27 @@ class BSplineTransform(ParametricTransform, NonRigidTransform):
         r"""Get name of buffer for 1-dimensional kernel for given control point spacing."""
         return "kernel_stride_" + str(stride)
 
+    @overload
+    def kernel(self) -> Tuple[Tensor, ...]:
+        ...
+
+    @overload
     def kernel(self, stride: int) -> Tensor:
-        r"""Get 1-dimensional kernel for given control point spacing."""
-        name = self.kernel_name(stride)
-        kernel = getattr(self, name)
-        return kernel
+        ...
+
+    @overload
+    def kernel(self, stride: Sequence[int]) -> Tuple[Tensor, ...]:
+        ...
+
+    def kernel(
+        self, stride: Optional[ScalarOrTuple[int]] = None
+    ) -> Union[Tensor, Tuple[Tensor, ...]]:
+        r"""Get 1-dimensional kernels for given control point spacing."""
+        if stride is None:
+            stride = self.stride
+        if isinstance(stride, int):
+            return getattr(self, self.kernel_name(stride))
+        return tuple(getattr(self, self.kernel_name(s)) for s in stride)
 
     def register_kernels(self, stride: Union[int, Sequence[int]]) -> None:
         r"""Precompute cubic B-spline kernels."""
@@ -162,7 +187,11 @@ class BSplineTransform(ParametricTransform, NonRigidTransform):
         for s in stride:
             name = self.kernel_name(s)
             if not hasattr(self, name):
-                self.register_buffer(name, K.cubic_bspline1d(s))
+                if self._transpose:
+                    kernel = K.cubic_bspline1d(s)
+                else:
+                    kernel = U.bspline_interpolation_weights(degree=3, stride=s)
+                self.register_buffer(name, kernel)
 
     def deregister_kernels(self, stride: Union[int, Sequence[int]]) -> None:
         r"""Remove precomputed cubic B-spline kernels."""
@@ -175,25 +204,17 @@ class BSplineTransform(ParametricTransform, NonRigidTransform):
 
     def evaluate_spline(self) -> Tensor:
         r"""Evaluate cubic B-spline at sampling grid points."""
-        # TODO: Transposed convolution with large control point spacing is very slow.
         data = self.data()
         grid = self.grid()
-        stride = self.data_stride
         if not grid.align_corners():
             raise AssertionError(
                 f"{type(self).__name__}() requires grid.align_corners() to be True"
             )
-        u = U.conv(
-            data,
-            kernel=[self.kernel(s) for s in stride],
-            stride=stride,
-            padding=PaddingMode.ZEROS,
-            transpose=True,
+        stride = self.stride
+        kernel = self.kernel(stride)
+        u = U.evaluate_cubic_bspline(
+            data, shape=grid.shape, stride=stride, kernel=kernel, transpose=self._transpose
         )
-        i = (slice(0, u.shape[0]), slice(0, u.shape[1])) + tuple(
-            slice(s, s + grid.shape[i]) for i, s in enumerate(stride)
-        )
-        u = u[i]
         return u
 
 
