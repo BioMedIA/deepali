@@ -9,7 +9,7 @@ Data transforms:
 
 Spatial transforms:
 - [x] Fix __repr__ of transforms with "params" set to a torch.nn.Module.
-- [ ] More efficient implementation of cubic B-spline evaluation than using transposed convolutions.
+- [x] More efficient implementation of cubic B-spline evaluation than using transposed convolutions.
 
 Utility functions:
 - [ ] Function to save `FreeFormTransformation` parameters in MIRTK `.dof.gz` format.
