@@ -96,6 +96,8 @@ def bspline_interpolation_weights(
     r"""Compute B-spline interpolation weights."""
     # Adapted from MIRTK ComputeBSplineIndicesAndWeights() at
     # https://github.com/BioMedIA/MIRTK/blob/877917b1b3ec9e602f7395dbbb1270e4334fc311/Modules/Numerics/include/mirtk/BSpline.h#L670-L789
+    if degree == 3:
+        return cubic_bspline_interpolation_weights(stride, dtype=dtype, device=device)
     kernels = {}
     return_single_tensor = False
     if isinstance(stride, int):
@@ -106,16 +108,13 @@ def bspline_interpolation_weights(
             continue
         kernel = torch.empty((s, degree + 1), dtype=dtype, device=device)
         offset = torch.arange(0, 1, 1 / s, dtype=kernel.dtype, device=kernel.device)
-        offset = offset.sub(offset.floor() if degree & 1 else offset.round())
+        if degree % 2 == 0:
+            offset = offset.sub_(offset.round())
         if degree == 2:
             kernel[:, 1] = 0.75 - offset.square()
             kernel[:, 2] = offset.sub(kernel[:, 1]).add_(1).mul_(0.5)
             kernel[:, 0] = -kernel[:, [1, 2]].sum(1).sub(1)
-        elif degree == 3:
-            kernel[:, 3] = offset.pow(3).mul_(1 / 6)
-            kernel[:, 0] = offset.mul(offset.sub(1)).mul_(0.5).add_(1 / 6).sub_(kernel[:, 3])
-            kernel[:, 2] = offset.add(kernel[:, 0]).sub_(kernel[:, 3].mul(2))
-            kernel[:, 1] = -kernel[:, [0, 2, 3]].sum(1).sub(1)
+        # degree == 3: See cubic_bspline_interpolation_weights()
         elif degree == 4:
             # MIRTK code variable names: w=offset, w2=a
             a = offset.square()
@@ -147,6 +146,73 @@ def bspline_interpolation_weights(
             kernel[:, 4] = t0.sub(t1)
         else:
             raise NotImplementedError(f"B-spline interpolation for degree={degree}")
+        kernels[s] = kernel
+    kernels = tuple(kernels[s] for s in stride)
+    if return_single_tensor:
+        assert len(kernels) == 1
+        return kernels[0]
+    return kernels
+
+
+@overload
+def cubic_bspline_interpolation_weights(
+    stride: int,
+    derivative: int = 0,
+    dtype: Optional[torch.dtype] = None,
+    device: Optional[torch.device] = None,
+) -> Tensor:
+    ...
+
+
+@overload
+def cubic_bspline_interpolation_weights(
+    stride: Sequence[int],
+    derivative: int = 0,
+    dtype: Optional[torch.dtype] = None,
+    device: Optional[torch.device] = None,
+) -> Tuple[Tensor, ...]:
+    ...
+
+
+def cubic_bspline_interpolation_weights(
+    stride: ScalarOrTuple[int],
+    derivative: int = 0,
+    dtype: Optional[torch.dtype] = None,
+    device: Optional[torch.device] = None,
+) -> Union[Tensor, Tuple[Tensor, ...]]:
+    r"""Compute cubic B-spline interpolation weights."""
+    kernels = {}
+    return_single_tensor = False
+    if isinstance(stride, int):
+        stride = [stride]
+        return_single_tensor = True
+    for s in stride:
+        if s in kernels:
+            continue
+        kernel = torch.empty((s, 4), dtype=dtype, device=device)
+        offset = torch.arange(0, 1, 1 / s, dtype=kernel.dtype, device=kernel.device)
+        if derivative == 0:
+            kernel[:, 3] = offset.pow(3).mul_(1 / 6)
+            kernel[:, 0] = offset.mul(offset.sub(1)).mul_(0.5).add_(1 / 6).sub_(kernel[:, 3])
+            kernel[:, 2] = offset.add(kernel[:, 0]).sub_(kernel[:, 3].mul(2))
+            kernel[:, 1] = -kernel[:, [0, 2, 3]].sum(1).sub(1)
+        elif derivative == 1:
+            kernel[:, 3] = offset.pow(2).mul_(0.5)
+            kernel[:, 0] = offset.sub(kernel[:, 3]).sub_(0.5)
+            kernel[:, 2] = kernel[:, 0].sub(kernel[:, 3].mul(2)).add_(1)
+            kernel[:, 1] = -kernel[:, [0, 2, 3]].sum(1)
+        elif derivative == 2:
+            kernel[:, 3] = offset
+            kernel[:, 0] = -offset.sub(1)
+            kernel[:, 2] = -offset.mul(3).sub_(1)
+            kernel[:, 1] = offset.mul(3).sub_(2)
+        elif derivative == 3:
+            kernel[:, 3] = 1
+            kernel[:, 0] = -1
+            kernel[:, 2] = -3
+            kernel[:, 1] = 3
+        else:
+            kernel.fill_(0)
         kernels[s] = kernel
     kernels = tuple(kernels[s] for s in stride)
     if return_single_tensor:
@@ -220,8 +286,14 @@ def evaluate_cubic_bspline(
     # Implementation adapted from MIRTK
     else:
         if kernel is None:
-            kernel = bspline_interpolation_weights(
-                degree=3, stride=stride, dtype=data.dtype, device=data.device
+            kernel = cubic_bspline_interpolation_weights(
+                stride=stride, dtype=data.dtype, device=data.device
+            )
+        elif isinstance(kernel, Tensor):
+            kernel = [kernel] * D
+        elif not isinstance(kernel, Sequence):
+            raise TypeError(
+                "evaluate_cubic_bspline() 'kernel' must be Tensor or Sequence of tensors"
             )
         output = data
         dims = tuple(SpatialDim(dim).tensor_dim(data.ndim) for dim in range(D))

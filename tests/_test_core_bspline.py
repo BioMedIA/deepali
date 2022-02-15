@@ -13,7 +13,8 @@ from deepali.core.enum import SpatialDim
 
 
 # %% Vector field control point coefficients
-device = torch.device("cuda:0")
+# device = torch.device("cuda:0")
+device = torch.device("cpu")
 
 in_size = Size((21,))  # (X, ...)
 stride = (5,) * len(in_size)
@@ -106,7 +107,7 @@ N = cp_data.shape[0]
 C = cp_data.shape[1]
 
 conv_fn: Callable[..., Tensor] = [F.conv1d, F.conv2d, F.conv3d][D - 1]
-kernels = B.evaluate_bspline_kernels(
+kernels = B.bspline_interpolation_weights(
     degree=3, stride=stride, dtype=cp_data.dtype, device=cp_data.device
 )
 
@@ -139,7 +140,7 @@ for _ in range(3):
     )
     print(f"Elapsed time: {timer() - start:.3f}s")
 
-kernel = B.evaluate_bspline_kernels(
+kernel = B.bspline_interpolation_weights(
     degree=3, stride=stride, dtype=cp_data.dtype, device=cp_data.device
 )
 for _ in range(3):
@@ -150,5 +151,22 @@ for _ in range(3):
     print(f"Elapsed time: {timer() - start:.3f}s")
 
 assert torch.allclose(result1, result2, atol=0.01)
+
+
+# %% Cubic B-spline kernel and its derivatives
+import matplotlib.pyplot as plt
+
+fig, ax = plt.subplots(1, 1, figsize=(12, 10))
+
+stride = 7
+
+cp_data = torch.zeros((1, 1, 11))
+cp_data[0, 0, (cp_data.shape[2] - 1) // 2] = 1
+
+for derivative in range(3):
+    kernel = B.cubic_bspline_interpolation_weights(stride=stride, derivative=derivative)
+    values = B.evaluate_cubic_bspline(cp_data, stride=stride, kernel=kernel)
+    ax.plot(values[0, 0])
+
 
 # %%
