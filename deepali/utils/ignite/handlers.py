@@ -7,8 +7,7 @@ from ignite.engine import Engine, Events, State
 from torch import Tensor
 from torch.nn.modules import Module
 from torch.optim.optimizer import Optimizer
-from torch.utils.data import BatchSampler, DataLoader, IterableDataset
-from torch.utils.data.distributed import DistributedSampler
+from torch.utils.data import BatchSampler, DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
 from ...core import RE_OUTPUT_KEY_INDEX
@@ -29,17 +28,23 @@ def clamp_learning_rate(
         param_group["lr"] = max(min_learning_rate, min(param_group["lr"], max_learning_rate))
 
 
-def set_distributed_sampler_epoch(engine: Engine) -> None:
+def set_distributed_sampler_epoch(engine: Engine, epoch: Optional[int] = None) -> None:
     data = engine.state.dataloader
+    if epoch is None:
+        # -1 because this handler is usually invoked at start of epoch
     epoch = engine.state.epoch - 1
     if isinstance(data, DataLoader):
-        if isinstance(data.sampler, DistributedSampler):
-            data.sampler.set_epoch(epoch)
+        set_sampler_epoch = getattr(data.sampler, "set_epoch", None)
+        if callable(set_sampler_epoch):
+            set_sampler_epoch(epoch)
+        set_sampler_epoch = getattr(data.batch_sampler, "set_epoch", None)
+        if callable(set_sampler_epoch):
+            set_sampler_epoch(epoch)
         if isinstance(data.batch_sampler, BatchSampler):
-            if isinstance(data.batch_sampler.sampler, DistributedSampler):
-                data.batch_sampler.sampler.set_epoch(epoch)
+            set_sampler_epoch = getattr(data.batch_sampler.sampler, "set_epoch", None)
+            if callable(set_sampler_epoch):
+                set_sampler_epoch(epoch)
         data = data.dataset
-    if isinstance(data, IterableDataset):
         set_epoch = getattr(data, "set_epoch", None)
         if callable(set_epoch):
             set_epoch(epoch)
