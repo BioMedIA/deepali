@@ -32,7 +32,7 @@ def set_distributed_sampler_epoch(engine: Engine, epoch: Optional[int] = None) -
     data = engine.state.dataloader
     if epoch is None:
         # -1 because this handler is usually invoked at start of epoch
-    epoch = engine.state.epoch - 1
+        epoch = engine.state.epoch - 1
     if isinstance(data, DataLoader):
         set_sampler_epoch = getattr(data.sampler, "set_epoch", None)
         if callable(set_sampler_epoch):
@@ -45,9 +45,9 @@ def set_distributed_sampler_epoch(engine: Engine, epoch: Optional[int] = None) -
             if callable(set_sampler_epoch):
                 set_sampler_epoch(epoch)
         data = data.dataset
-        set_epoch = getattr(data, "set_epoch", None)
-        if callable(set_epoch):
-            set_epoch(epoch)
+    set_epoch = getattr(data, "set_epoch", None)
+    if callable(set_epoch):
+        set_epoch(epoch)
 
 
 def print_metrics(
@@ -79,6 +79,20 @@ def print_metrics(
         )
     )
     print(msg) if logger is None else logger.info(msg)
+
+
+def reset_iterable_dataset(engine: Engine) -> None:
+    r"""Reset iterator over engine.state.dataloader.
+
+    This handler also calls ``set_distributed_sampler_epoch(engine)`` such that the
+    epoch number is set prior to calling ``engine.set_data(engine.state.dataloader)``,
+    which invokes ``iter(engine.state.dataloader)``. This is to ensure that if the
+    latter shuffles the data using the epoch number as seed, that the dataset is
+    then shuffled with the new epoch number.
+
+    """
+    set_distributed_sampler_epoch(engine, engine.state.epoch)
+    engine.set_data(engine.state.dataloader)
 
 
 def reset_model_grads(engine: Engine, model: Module) -> None:
