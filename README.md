@@ -46,13 +46,13 @@ The following lists the main dependencies of this project. For a complete list, 
 This Python package can be installed with [pip] directly from the GitHub repository, i.e.,
 
 ```
-pip install git+https://github.com/HeartFlow/deepali.git
+pip install git+https://github.com/BioMedIA/deepali.git
 ```
 
 Alternatively, it can be installed from a previously cloned local Git repository using
 
 ```
-git clone https://github.com/HeartFlow/deepali.git
+git clone https://github.com/BioMedIA/deepali.git
 cd deepali && pip install .
 ```
 
@@ -61,7 +61,7 @@ This will install missing prerequisites from [PyPI] in the current Python enviro
 Additional optional dependencies can be installed with the command (cf. [setup.py](setup.py) `extras_require`):
 
 ```
-pip install git+https://github.com/HeartFlow/deepali.git#egg=deepali[all]
+pip install git+https://github.com/BioMedIA/deepali.git#egg=deepali[all]
 # or: pip install .[all]
 ```
 
