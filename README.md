@@ -1,8 +1,11 @@
 # deepali
 
-Image, point set, and surface registration in [PyTorch].
+An [open source](LICENSE) research library for image, point set, and surface registration in [PyTorch], which is developed and maintained by the [HeartFlow-Imperial College London] research lab at the [Biomedical Image Analysis Group].
 
 *[Deepali](https://en.wikipedia.org/wiki/Deepali)* is a Hindu/Sanskrit Indian given name, which means "joy" as in the gratification one may feel working with code built on a modern tensor library with support for automatic differentiation, and "chain of lamps" alluding to the application of the chain rule by *torch.autograd*, the concatenation of spatial coordinate transformations, and furthermore the (sequential) composition of PyTorch modules. In addition, the English words "deep" and "ali(-gnment)" partially contained in this name should highlight that this project is not only suitable for traditional non-learning based registration, but in particular facilitates deep learning based approaches to image alignment.
+
+[HeartFlow-Imperial College London]: https://www.heartflow.com/newsroom/heartflow-announces-collaborative-research-agreement-with-imperial-college-london/
+[Biomedical Image Analysis Group]: https://biomedia.doc.ic.ac.uk/
 
 
 ## Overview
@@ -15,7 +18,7 @@ At a granular level, *deepali* is a library that consists of the following compo
 | [deepali.data] | PyTorch tensor subclasses, data loader utilities, and datasets. |
 | [deepali.losses] | Loss terms and evaluation metrics for image, point set, and surface registration. |
 | [deepali.modules] | PyTorch modules without optimizable parameters built on core functions. |
-| [deepali.networks] | Common building blocks of machine learning based registration models. We expect that most users may want to develop their own task-specific models and associated training procedures. For this, the neural network components defined here may be used alongside ``torch.nn`` to define these custom models. |
+| [deepali.networks] | Common building blocks of machine learning based registration models. We expect that most users may want to develop their own task-specific models. For this, the neural network components defined here may be used alongside ``torch.nn`` and other deep learning libraries (e.g. [MONAI]) to define these custom models. |
 | [deepali.spatial] | Spatial transformation models whose parameters are either optimized directly as in traditional registration, or inferred by a machine learning model. |
 | [deepali.utils] | Optional auxiliaries for interfacing with external libraries and tools. |
 
