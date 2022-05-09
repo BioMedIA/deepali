@@ -49,11 +49,15 @@ extras_require["all"] = extras_require["dev"] + extras_require["utils"]
 
 
 setup(
-    name="deepali",
+    # Unfortunately there exists a dummy PyPI package named deepali by a user whose
+    # name is Deepali Sharma (deepali.sharma@sganalytics.com). The package appears to
+    # be unmaintained and was only a test of how to publish a PyPI package. While that
+    # package exists, use a package name that slightly differs from this project's name.
+    name="deepali-hf",
     version="0.1.0",
     description="Image, point set, and surface registration library for PyTorch.",
-    author="HeartFlow Research",
-    author_email="aschuh@heartflow.com",
+    author="HeartFlow-Imperial College London",
+    author_email="andreas.schuh@imperial.ac.uk",
     license="Apache License 2.0",
     license_files=["LICENSE"],
     classifiers=[
