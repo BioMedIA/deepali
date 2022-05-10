@@ -148,7 +148,10 @@ class ClampImage(ItemwiseTransform, Module):
     r"""Clamp image intensities to specified minimum and/or maximum value."""
 
     def __init__(
-        self, min: Optional[float] = None, max: Optional[float] = None, inplace: bool = False
+        self,
+        min: Optional[float] = None,
+        max: Optional[float] = None,
+        inplace: bool = False,
     ) -> None:
         super().__init__()
         self.min = min
@@ -401,7 +404,9 @@ def config_has_read_image_transform(config: ImageTransformConfig) -> bool:
 
 
 def prepend_read_image_transform(
-    config: ImageTransformConfig, dtype: Optional[str] = None, device: Optional[str] = None
+    config: ImageTransformConfig,
+    dtype: Optional[str] = None,
+    device: Optional[str] = None,
 ) -> ImageTransformConfig:
     r"""Insert a "read" image transform before any other image data transform."""
     if config_has_read_image_transform(config):

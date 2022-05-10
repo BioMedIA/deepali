@@ -7,7 +7,8 @@ import torch
 import torch.nn.functional as F
 from torch import Tensor
 
-from .enum import PaddingMode, Sampling, SpatialDim, SpatialDimArg, SpatialDerivativeKeys
+from .enum import PaddingMode, Sampling
+from .enum import SpatialDim, SpatialDimArg, SpatialDerivativeKeys
 from .grid import ALIGN_CORNERS, Axes, Grid, grid_transform_points
 from .kernels import gaussian1d, gaussian1d_I
 from .names import image_batch_tensor_names
@@ -436,7 +437,12 @@ def downsample(
         return data
     if levels < 0:
         return upsample(
-            data, levels=-levels, dims=dims, sigma=sigma, mode=mode, align_corners=align_corners
+            data,
+            levels=-levels,
+            dims=dims,
+            sigma=sigma,
+            mode=mode,
+            align_corners=align_corners,
         )
     grid = Grid(shape=data.shape[2:])
     if not dims:
@@ -454,7 +460,7 @@ def downsample(
         if levels > 1:
             var = sigma.new_zeros(sigma.shape)
             for level in range(levels):
-                var += sigma.mul(2 ** level).pow(2)  # type: ignore
+                var += sigma.mul(2**level).pow(2)  # type: ignore
             sigma = var.sqrt()
         if sigma.shape[0] == 1:
             sigma = sigma.repeat(grid.ndim)
@@ -521,7 +527,12 @@ def upsample(
         return data
     if levels < 0:
         return downsample(
-            data, levels=-levels, dims=dims, sigma=sigma, mode=mode, align_corners=align_corners
+            data,
+            levels=-levels,
+            dims=dims,
+            sigma=sigma,
+            mode=mode,
+            align_corners=align_corners,
         )
     grid = Grid(shape=data.shape[2:], align_corners=align_corners)
     if not dims:
@@ -537,7 +548,7 @@ def upsample(
         if levels > 1:
             var = sigma.new_zeros(sigma.shape)
             for level in range(levels):
-                var += sigma.mul(2 ** level).pow(2)  # type: ignore
+                var += sigma.mul(2**level).pow(2)  # type: ignore
             sigma = var.sqrt()
         if sigma.shape[0] == 1:
             sigma = sigma.repeat(grid.ndim)

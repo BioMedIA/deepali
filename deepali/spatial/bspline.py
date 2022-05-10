@@ -3,7 +3,8 @@ r"""Cubic B-spline free-form deformations."""
 from __future__ import annotations
 
 from copy import copy as shallow_copy
-from typing import Callable, List, Optional, Sequence, Tuple, TypeVar, Union, cast, overload
+from typing import cast, overload
+from typing import Callable, List, Optional, Sequence, Tuple, TypeVar, Union
 
 import torch
 from torch import Tensor
@@ -213,7 +214,11 @@ class BSplineTransform(ParametricTransform, NonRigidTransform):
         stride = self.stride
         kernel = self.kernel(stride)
         u = U.evaluate_cubic_bspline(
-            data, shape=grid.shape, stride=stride, kernel=kernel, transpose=self._transpose
+            data,
+            shape=grid.shape,
+            stride=stride,
+            kernel=kernel,
+            transpose=self._transpose,
         )
         return u
 

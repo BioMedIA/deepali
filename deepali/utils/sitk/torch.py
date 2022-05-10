@@ -41,7 +41,9 @@ def image_from_tensor(
 
 
 def tensor_from_image(
-    image: sitk.Image, dtype: Optional[torch.dtype] = None, device: Optional[torch.device] = None
+    image: sitk.Image,
+    dtype: Optional[torch.dtype] = None,
+    device: Optional[torch.device] = None,
 ) -> torch.Tensor:
     r"""Create image data tensor from ``SimpleITK.Image``."""
     if image.GetPixelID() == sitk.sitkUInt16:

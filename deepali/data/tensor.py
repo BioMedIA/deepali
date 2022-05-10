@@ -87,7 +87,12 @@ class DataTensor(Tensor):
     def __reduce_ex__(self, proto):
         # See also: https://github.com/pytorch/pytorch/issues/47051#issuecomment-877788874
         torch.utils.hooks.warn_if_has_hooks(self)
-        args = (self.storage(), self.storage_offset(), tuple(self.size()), self.stride())
+        args = (
+            self.storage(),
+            self.storage_offset(),
+            tuple(self.size()),
+            self.stride(),
+        )
         if self.is_quantized:
             args = args + (self.q_scale(), self.q_zero_point())
         args = args + (self.requires_grad, OrderedDict())

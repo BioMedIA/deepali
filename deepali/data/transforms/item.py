@@ -243,5 +243,8 @@ class ItemwiseTransform:
     ) -> ItemTransform:
         r"""Apply transform to specified item only."""
         return ItemTransform(
-            cls(*args, **kwargs), key=key, ignore_meta=ignore_meta, ignore_missing=ignore_missing
+            cls(*args, **kwargs),
+            key=key,
+            ignore_meta=ignore_meta,
+            ignore_missing=ignore_missing,
         )

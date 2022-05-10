@@ -47,7 +47,7 @@ def cubic_bspline_value(x: float, derivative: int = 0) -> float:
     # 0-th order derivative
     if derivative == 0:
         if t < 1:
-            return 2 / 3 + (0.5 * t - 1) * t ** 2
+            return 2 / 3 + (0.5 * t - 1) * t**2
         return -((t - 2) ** 3) / 6
     # 1st order derivative
     if derivative == 1:
@@ -307,11 +307,11 @@ def gaussian1d_I(
         size = 2 * radius + 1
         x = torch.linspace(-radius, radius, steps=size, dtype=dtype, device=device)
         norm = torch.tensor(1 / (sigma * math.sqrt(2 * math.pi)), dtype=dtype, device=device)
-        var = sigma ** 2
+        var = sigma**2
         # Note that conv1d() computes correlation, i.e., the kernel is mirrored
-        kernel = norm * torch.exp(-0.5 * x ** 2 / var) * (x / var)
+        kernel = norm * torch.exp(-0.5 * x**2 / var) * (x / var)
         if normalize:
-            kernel /= (norm * torch.exp(-0.5 * x ** 2 / var)).sum()
+            kernel /= (norm * torch.exp(-0.5 * x**2 / var)).sum()
     else:
         kernel = torch.tensor([1], dtype=dtype, device=device)
     return kernel

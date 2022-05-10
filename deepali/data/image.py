@@ -334,7 +334,12 @@ class ImageBatch(DataTensor):
             count_include_pad=count_include_pad,
         )
         grid = tuple(
-            grid.avg_pool(kernel_size, stride=stride, padding=padding, ceil_mode=ceil_mode,)
+            grid.avg_pool(
+                kernel_size,
+                stride=stride,
+                padding=padding,
+                ceil_mode=ceil_mode,
+            )
             for grid in self._grid
         )
         return self._make_instance(data, grid)
@@ -748,7 +753,13 @@ class ImageBatch(DataTensor):
             raise ValueError(
                 f"{type(self).__name__}.sample() 'arg' must be one or {len(self)} grids"
             )
-        data = U.grid_sample(data, coords, mode=mode, padding=padding, align_corners=align_corners,)
+        data = U.grid_sample(
+            data,
+            coords,
+            mode=mode,
+            padding=padding,
+            align_corners=align_corners,
+        )
         return self._make_instance(data, grid)
 
     def __repr__(self) -> str:
@@ -795,7 +806,10 @@ class Image(DataTensor):
         self.grid_(grid)
 
     def _make_instance(
-        self: TImage, data: Optional[Tensor] = None, grid: Optional[Grid] = None, **kwargs
+        self: TImage,
+        data: Optional[Tensor] = None,
+        grid: Optional[Grid] = None,
+        **kwargs,
     ) -> TImage:
         r"""Create a new instance while preserving subclass meta-data."""
         kwargs["grid"] = grid or self._grid
@@ -959,7 +973,10 @@ class Image(DataTensor):
         sitk.WriteImage(image, str(path), compress)
 
     def normalize(
-        self: TImage, mode: str = "unit", min: Optional[float] = None, max: Optional[float] = None,
+        self: TImage,
+        mode: str = "unit",
+        min: Optional[float] = None,
+        max: Optional[float] = None,
     ) -> TImage:
         r"""Normalize image intensities in [min, max]."""
         batch = self.batch()
@@ -967,7 +984,10 @@ class Image(DataTensor):
         return batch[0]
 
     def normalize_(
-        self: TImage, mode: str = "unit", min: Optional[float] = None, max: Optional[float] = None,
+        self: TImage,
+        mode: str = "unit",
+        min: Optional[float] = None,
+        max: Optional[float] = None,
     ) -> TImage:
         r"""Normalize image intensities in [min, max]."""
         batch = self.batch()

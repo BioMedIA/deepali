@@ -6,7 +6,7 @@ channels:
   - conda-forge
   - defaults
 dependencies:
-  - black=21.8b0
+  - black=22.3
   - boto3=1.18
   - dacite=1.6
   - flake8=3.9

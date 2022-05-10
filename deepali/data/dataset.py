@@ -406,7 +406,12 @@ class ImageDataset(MetaDataset):
             image_transforms_config = prepend_read_image_transform(image_transforms_config)
             item_transforms = image_transforms(image_transforms_config, key=image_name)
             transforms.extend(item_transforms)
-        return cls(config.table, paths=config.images, prefix=config.prefix, transforms=transforms)
+        return cls(
+            config.table,
+            paths=config.images,
+            prefix=config.prefix,
+            transforms=transforms,
+        )
 
 
 class GroupDataset(TorchDataset):

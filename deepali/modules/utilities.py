@@ -16,7 +16,10 @@ def has_children(module: Module) -> bool:
 
 
 def module_ids_by_class_name(
-    model: Module, duplicates: bool = False, containers: bool = False, memo: Optional[dict] = None
+    model: Module,
+    duplicates: bool = False,
+    containers: bool = False,
+    memo: Optional[dict] = None,
 ) -> Dict[str, List[int]]:
     r"""Obtain ids of module objects in model, indexed by module type name.
 

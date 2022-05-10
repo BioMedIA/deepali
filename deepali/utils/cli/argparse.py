@@ -175,7 +175,8 @@ def entry_point(
                 commands[command_name] = CommandInfo(
                     module=module_name,
                     commands=find_commands(
-                        name=module_name, path=[os.path.join(prefix, basename) for prefix in path]
+                        name=module_name,
+                        path=[os.path.join(prefix, basename) for prefix in path],
                     )
                     if ispkg
                     else None,
@@ -237,7 +238,9 @@ def entry_point(
                 else:
                     add_commands(
                         subparsers.add_parser(
-                            command_name, parents=[default_options_parser], help=module.__doc__
+                            command_name,
+                            parents=[default_options_parser],
+                            help=module.__doc__,
                         ).add_subparsers(),
                         command_info.commands,
                         argv[1:],
@@ -315,7 +318,8 @@ def main_func(
 
 
 def _func_wrapper(
-    func: Callable[[ParsedArguments], int], init: Callable[[ParsedArguments], int] = None
+    func: Callable[[ParsedArguments], int],
+    init: Callable[[ParsedArguments], int] = None,
 ) -> Callable[[ParsedArguments], int]:
     r"""Wrap command 'init' and 'func' callables."""
 

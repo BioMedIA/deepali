@@ -14,8 +14,12 @@ from torch.nn.modules import Conv2d as _Conv2d, ConvTranspose2d as _ConvTranspos
 from torch.nn.modules import Conv3d as _Conv3d, ConvTranspose3d as _ConvTranspose3d
 
 from ...core.enum import PaddingMode
-from ...core.nnutils import same_padding, stride_minus_kernel_padding
-from ...core.types import ScalarOrTuple, ScalarOrTuple1d, ScalarOrTuple2d, ScalarOrTuple3d
+from ...core.nnutils import same_padding
+from ...core.nnutils import stride_minus_kernel_padding
+from ...core.types import ScalarOrTuple
+from ...core.types import ScalarOrTuple1d
+from ...core.types import ScalarOrTuple2d
+from ...core.types import ScalarOrTuple3d
 from ...modules import ReprWithCrossReferences
 
 from .acti import ActivationFunc, activation
@@ -344,7 +348,11 @@ class ConvLayer(ReprWithCrossReferences, Sequential):
                 transposed=transposed,
             )
         # Initialize module
-        modules = {"A": ("acti", acti_fn), "N": ("norm", norm_layer), "C": ("conv", conv)}
+        modules = {
+            "A": ("acti", acti_fn),
+            "N": ("norm", norm_layer),
+            "C": ("conv", conv),
+        }
         modules = OrderedDict(modules[k] for k in order if modules[k][1] is not None)
         super().__init__(modules)
         if acti_fn is None:
@@ -421,7 +429,14 @@ def conv_module(*args, **kwargs) -> Module:
 
 def is_convolution(arg: Any) -> bool:
     r"""Whether given module is a learnable convolution."""
-    types = (_Conv1d, _Conv2d, _Conv3d, _ConvTranspose1d, _ConvTranspose2d, _ConvTranspose3d)
+    types = (
+        _Conv1d,
+        _Conv2d,
+        _Conv3d,
+        _ConvTranspose1d,
+        _ConvTranspose2d,
+        _ConvTranspose3d,
+    )
     return isinstance(arg, types)
 
 

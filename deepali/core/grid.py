@@ -953,7 +953,10 @@ class Grid(object):
         r"""Tensor of grid point coordinates with respect to specified coordinate axes."""
         axes = Axes(axes)
         coords = self.coords(
-            normalize=(axes is Axes.CUBE), align_corners=False, dtype=dtype, device=device,
+            normalize=(axes is Axes.CUBE),
+            align_corners=False,
+            dtype=dtype,
+            device=device,
         )
         if axes is not Axes.CUBE and axes is not Axes.GRID:
             coords = self.apply_transform(coords, Axes.GRID, to_axes=axes)
@@ -990,7 +993,10 @@ class Grid(object):
         return grid
 
     def resize(
-        self, size: Union[int, Size, Array], *args: int, align_corners: Optional[bool] = None,
+        self,
+        size: Union[int, Size, Array],
+        *args: int,
+        align_corners: Optional[bool] = None,
     ) -> Grid:
         r"""Create new grid of same extent with specified size.
 
@@ -1013,7 +1019,10 @@ class Grid(object):
         return self._resize(size, align_corners=align_corners)
 
     def reshape(
-        self, shape: Union[int, Shape, Array], *args: int, align_corners: Optional[bool] = None,
+        self,
+        shape: Union[int, Shape, Array],
+        *args: int,
+        align_corners: Optional[bool] = None,
     ) -> Grid:
         r"""Create new grid of same extent with specified data tensor shape.
 
@@ -1145,7 +1154,7 @@ class Grid(object):
             dims = tuple(dim for dim in range(self.ndim))
         dims = tuple(SpatialDim.from_arg(dim) for dim in dims)
         size = self._size.clone()
-        scale = 2 ** levels
+        scale = 2**levels
         for dim in dims:
             size[dim] /= scale
         size = torch.where(size.ge(min_size), size, self._size)
@@ -1176,13 +1185,16 @@ class Grid(object):
             dims = tuple(dim for dim in range(self.ndim))
         dims = tuple(SpatialDim.from_arg(dim) for dim in dims)
         size = self._size.clone()
-        scale = 2 ** levels
+        scale = 2**levels
         for dim in dims:
             size[dim] *= scale
         return self._resize(size, align_corners=align_corners)
 
     def pyramid(
-        self, levels: int, dims: Optional[Sequence[SpatialDimArg]] = None, min_size: int = 0
+        self,
+        levels: int,
+        dims: Optional[Sequence[SpatialDimArg]] = None,
+        min_size: int = 0,
     ) -> Dict[int, Grid]:
         r"""Compute image size at each image resolution pyramid level.
 
@@ -1212,10 +1224,10 @@ class Grid(object):
         if not dims:
             dims = tuple(dim for dim in range(self.ndim))
         dims = tuple(SpatialDim.from_arg(dim) for dim in dims)
-        m = sum([2 ** i for i in range(levels)]) if self._align_corners else 0
+        m = sum([2**i for i in range(levels)]) if self._align_corners else 0
         sizes = {level: list(self.size()) for level in range(levels + 1)}
         for dim in dims:
-            sizes[levels][dim] = int(0.5 + (sizes[levels][dim] + m) / (2 ** levels))
+            sizes[levels][dim] = int(0.5 + (sizes[levels][dim] + m) / (2**levels))
             for level in range(levels - 1, -1, -1):
                 sizes[level][dim] = 2 * sizes[level + 1][dim] - 1
             for level in range(1, levels + 1):
@@ -1486,12 +1498,20 @@ def grid_vectors_transform(grid: Grid, axes: Axes, to_grid: Grid, to_axes: Optio
 
 
 def grid_transform_points(
-    points: Tensor, grid: Grid, axes: Axes, to_grid: Grid, to_axes: Optional[Axes] = None,
+    points: Tensor,
+    grid: Grid,
+    axes: Axes,
+    to_grid: Grid,
+    to_axes: Optional[Axes] = None,
 ):
     return grid.transform_points(points, axes=axes, to_axes=to_axes, to_grid=to_grid)
 
 
 def grid_transform_vectors(
-    vectors: Tensor, grid: Grid, axes: Axes, to_grid: Grid, to_axes: Optional[Axes] = None,
+    vectors: Tensor,
+    grid: Grid,
+    axes: Axes,
+    to_grid: Grid,
+    to_axes: Optional[Axes] = None,
 ):
     return grid.transform_vectors(vectors, axes=axes, to_axes=to_axes, to_grid=to_grid)

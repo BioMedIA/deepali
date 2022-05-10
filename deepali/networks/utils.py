@@ -67,7 +67,15 @@ def module_output_size(module: Module, in_size: ScalarOrTuple[int]) -> ScalarOrT
         )
     # Pooling layers
     if isinstance(
-        module, (nn.AvgPool1d, nn.AvgPool2d, nn.AvgPool3d, nn.MaxPool1d, nn.MaxPool2d, nn.MaxPool3d)
+        module,
+        (
+            nn.AvgPool1d,
+            nn.AvgPool2d,
+            nn.AvgPool3d,
+            nn.MaxPool1d,
+            nn.MaxPool2d,
+            nn.MaxPool3d,
+        ),
     ):
         return pool_output_size(
             in_size,
@@ -91,7 +99,10 @@ def module_output_size(module: Module, in_size: ScalarOrTuple[int]) -> ScalarOrT
         return module.output_size
     if isinstance(module, (nn.MaxUnpool1d, nn.MaxUnpool2d, nn.MaxUnpool3d)):
         return unpool_output_size(
-            in_size, kernel_size=module.kernel_size, stride=module.stride, padding=module.padding
+            in_size,
+            kernel_size=module.kernel_size,
+            stride=module.stride,
+            padding=module.padding,
         )
     # Padding
     if isinstance(module, Pad):

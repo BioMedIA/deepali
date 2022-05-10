@@ -57,7 +57,7 @@ def round_decimals(tensor: Tensor, decimals: int = 0, out: Optional[Tensor] = No
     if not decimals:
         result = torch.round(tensor, out=out)
     else:
-        scale = 10 ** decimals
+        scale = 10**decimals
         if out is tensor:
             tensor *= scale
         else:

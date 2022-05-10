@@ -498,7 +498,11 @@ class S3Client(object):
         self.write_bytes(bucket=bucket, key=key, data=path.read_bytes())
 
     def upload_files(
-        self, path: PathStr, bucket: str, prefix: Optional[str] = None, overwrite: bool = True
+        self,
+        path: PathStr,
+        bucket: str,
+        prefix: Optional[str] = None,
+        overwrite: bool = True,
     ) -> Tuple[int, int]:
         r"""Upload local directory to S3.
 

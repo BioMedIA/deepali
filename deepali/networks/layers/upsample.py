@@ -69,7 +69,7 @@ class Upsample(Sequential):
         bias: bool = True,
         init: str = "default",
     ) -> None:
-        """Initialize upsampling layer.
+        r"""Initialize upsampling layer.
 
         Args:
             dimensions: Number of spatial dimensions of input tensor.
@@ -234,7 +234,7 @@ class Upsample(Sequential):
 
 
 class SubpixelUpsample(Module):
-    """Upsample using a subpixel CNN.
+    r"""Upsample using a subpixel CNN.
 
     This module is adapted from the MONAI project and supports 1D, 2D and 3D input images.
     The module consists of two parts. First of all, a convolutional layer is employed
@@ -271,7 +271,7 @@ class SubpixelUpsample(Module):
         init: str = "default",
         bias: Union[bool, str] = True,
     ) -> None:
-        """Initialize upsampling layer.
+        r"""Initialize upsampling layer.
 
         Args:
             dimensions: Number of spatial dimensions of the input image.
@@ -313,7 +313,7 @@ class SubpixelUpsample(Module):
             if not in_channels:
                 raise ValueError("SubpixelUpsample() 'in_channels' required")
             out_channels = out_channels or in_channels
-            conv_out_channels = out_channels * (scale_factor ** dimensions)
+            conv_out_channels = out_channels * (scale_factor**dimensions)
             if kernel_size % 2 == 0:
                 padding = ((kernel_size - 1) // 2, kernel_size // 2) * dimensions
                 pre_pad = Pad(padding=padding, mode=padding_mode)
@@ -346,7 +346,11 @@ class SubpixelUpsample(Module):
 
         if apply_pad_pool:
             pad_pool = Sequential(
-                Pad(padding=(scale_factor - 1, 0) * dimensions, mode=padding_mode, value=0),
+                Pad(
+                    padding=(scale_factor - 1, 0) * dimensions,
+                    mode=padding_mode,
+                    value=0,
+                ),
                 pooling("avg", dimensions=dimensions, kernel_size=scale_factor, stride=1),
             )
         else:
@@ -354,9 +358,11 @@ class SubpixelUpsample(Module):
         self.pad_pool = pad_pool
 
     def forward(self, x: Tensor) -> Tensor:
-        """
+        r"""
+
         Args:
             x: Tensor in shape (batch, channel, spatial_1[, spatial_2, ...).
+
         """
         x = self.conv_block(x)
         x = pixelshuffle(x, self.dimensions, self.scale_factor)
@@ -365,7 +371,7 @@ class SubpixelUpsample(Module):
 
 
 def icnr_init(weight: Tensor, upsample_factor: int, init=nn.init.kaiming_normal_) -> None:
-    """ICNR initialization for 2D/3D kernels.
+    r"""ICNR initialization for 2D/3D kernels.
 
     Adapted from MONAI project and based on Aitken et al., 2017, "Checkerboard artifact free sub-pixel convolution".
 
@@ -386,7 +392,7 @@ def icnr_init(weight: Tensor, upsample_factor: int, init=nn.init.kaiming_normal_
 
 
 def pixelshuffle(x: Tensor, dimensions: int, scale_factor: int) -> Tensor:
-    """Apply pixel shuffle to the tensor `x` with spatial dimensions `dimensions` and scaling factor `scale_factor`.
+    r"""Apply pixel shuffle to the tensor `x` with spatial dimensions `dimensions` and scaling factor `scale_factor`.
 
     See: Shi et al., 2016, "Real-Time Single Image and Video Super-Resolution
     Using an Efficient Sub-Pixel Convolutional Neural Network."
@@ -409,7 +415,7 @@ def pixelshuffle(x: Tensor, dimensions: int, scale_factor: int) -> Tensor:
     dim, factor = dimensions, scale_factor
     input_size = list(x.size())
     batch_size, channels = input_size[:2]
-    scale_divisor = factor ** dim
+    scale_divisor = factor**dim
 
     if channels % scale_divisor != 0:
         raise ValueError(

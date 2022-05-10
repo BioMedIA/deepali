@@ -17,7 +17,11 @@ from ..core.types import ScalarOrTuple
 class FilterImage(Module):
     r"""Convoles an image with a predefined filter kernel."""
 
-    def __init__(self, kernel: Optional[Tensor], padding: Optional[Union[PaddingMode, str]] = None):
+    def __init__(
+        self,
+        kernel: Optional[Tensor],
+        padding: Optional[Union[PaddingMode, str]] = None,
+    ):
         r"""Initialize parameters.
 
         Args:

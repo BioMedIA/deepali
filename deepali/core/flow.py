@@ -137,7 +137,7 @@ def expv(
     grid = Grid(shape=flow.shape[2:], align_corners=align_corners)
     grid = grid.coords(dtype=flow.dtype, device=device)
     assert grid.device == device
-    disp = flow * (scale / (2 ** steps))
+    disp = flow * (scale / 2**steps)
     assert disp.device == device
     for _ in range(steps):
         disp = disp + warp_image(

@@ -278,7 +278,13 @@ def evaluate_cubic_bspline(
         stride = tuple(reversed(stride))
         if isinstance(kernel, Sequence):
             kernel = tuple(reversed(kernel))
-        output = conv(data, kernel=kernel, stride=stride, padding=PaddingMode.ZEROS, transpose=True)
+        output = conv(
+            data,
+            kernel=kernel,
+            stride=stride,
+            padding=PaddingMode.ZEROS,
+            transpose=True,
+        )
         if shape is not None:
             output = output[
                 (slice(0, N), slice(0, C)) + tuple(slice(s, s + n) for s, n in zip(stride, shape))

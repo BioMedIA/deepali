@@ -23,7 +23,11 @@ class LCC(PairwiseImageLoss):
     def forward(self, source: Tensor, target: Tensor, mask: Optional[Tensor] = None) -> Tensor:
         r"""Evaluate image dissimilarity loss."""
         return L.lcc_loss(
-            source, target, mask=mask, kernel_size=self.kernel_size, epsilon=self.epsilon
+            source,
+            target,
+            mask=mask,
+            kernel_size=self.kernel_size,
+            epsilon=self.epsilon,
         )
 
     def extra_repr(self) -> str:

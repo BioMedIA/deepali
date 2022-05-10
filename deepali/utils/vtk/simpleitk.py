@@ -108,7 +108,11 @@ def image_data_grid(data: vtkImageData) -> Grid:
     r"""Create image grid from vtkImageData object."""
     extent = data.GetExtent()
     return Grid(
-        size=(extent[1] - extent[0] + 1, extent[3] - extent[2] + 1, extent[5] - extent[4] + 1),
+        size=(
+            extent[1] - extent[0] + 1,
+            extent[3] - extent[2] + 1,
+            extent[5] - extent[4] + 1,
+        ),
         origin=data.GetOrigin(),
         spacing=data.GetSpacing(),
     )

@@ -74,7 +74,8 @@ def conv_transposed_output_size(
     if ndim == 1 and k.shape[0] > 1:
         ndim = k.shape[0]
     for arg, name in zip(
-        [k, s, p, o, d], ["kernel_size", "stride", "padding", "output_padding", "dilation"]
+        [k, s, p, o, d],
+        ["kernel_size", "stride", "padding", "output_padding", "dilation"],
     ):
         if arg.ndim != 1 or arg.shape[0] not in (1, ndim):
             raise ValueError(
@@ -263,7 +264,9 @@ def stride_minus_kernel_padding(
         ndim = s.shape[0]
     for arg, name in zip([k, s], ["kernel_size", "stride"]):
         if arg.ndim != 1 or arg.shape[0] not in (1, ndim):
-            raise ValueError(f"stride_minus_kernel_padding() {name!r} must be scalar or sequence of length {ndim}")
+            raise ValueError(
+                f"stride_minus_kernel_padding() {name!r} must be scalar or sequence of length {ndim}"
+            )
     assert k.ndim == 1, "stride_minus_kernel_padding() 'kernel_size' must be scalar or sequence"
     assert s.ndim == 1, "stride_minus_kernel_padding() 'stride' must be scalar or sequence"
     p = s.sub(k).type(torch.int)
@@ -290,7 +293,9 @@ def upsample_padding(
 
 
 def upsample_output_padding(
-    kernel_size: ScalarOrTuple[int], scale_factor: ScalarOrTuple[int], padding: ScalarOrTuple[int]
+    kernel_size: ScalarOrTuple[int],
+    scale_factor: ScalarOrTuple[int],
+    padding: ScalarOrTuple[int],
 ) -> Tuple[int, ...]:
     r"""Output padding on one side for transposed convolution."""
     device = torch.device("cpu")

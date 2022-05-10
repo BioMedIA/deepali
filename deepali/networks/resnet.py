@@ -114,7 +114,12 @@ def classification_head(dimensions: int, in_channels: int, num_classes: int, **k
 
 
 def conv_layer(
-    level: int, is_first: bool, dimensions: int, in_channels: int, out_channels: int, **kwargs
+    level: int,
+    is_first: bool,
+    dimensions: int,
+    in_channels: int,
+    out_channels: int,
+    **kwargs,
 ) -> Module:
     r"""Convolutional layer before/between residual blocks when ``pre_conv=True``."""
     norm = kwargs.get("norm")
@@ -388,7 +393,11 @@ class ResNet(ReprWithCrossReferences, Sequential):
 
     @classmethod
     def from_depth(
-        cls: Type[ResNet], model_depth: int, dimensions: int, in_channels: int = 1, **kwargs
+        cls: Type[ResNet],
+        model_depth: int,
+        dimensions: int,
+        in_channels: int = 1,
+        **kwargs,
     ) -> ResNet:
         config = ResNetConfig.from_depth(model_depth, dimensions, in_channels, **kwargs)
         return cls.from_config(config)
