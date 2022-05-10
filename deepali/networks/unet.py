@@ -5,15 +5,17 @@ from __future__ import annotations
 from copy import deepcopy
 from collections import OrderedDict
 from dataclasses import dataclass
-from typing import Callable, Dict, Iterable, List, Mapping, Optional, Sequence, Type, Union
+from typing import Callable, Iterable, Mapping, Optional, Sequence, Type, Union
+from typing import Dict, List
 
 from torch import Tensor
 from torch.nn import Identity, Module, ModuleDict, Sequential
 
 from ..core.config import DataclassConfig
 from ..core.enum import PaddingMode
+from ..core.image import crop
 from ..core.itertools import repeat_last
-from ..core.types import ScalarOrTuple
+from ..core.types import ListOrTuple, ScalarOrTuple
 from ..modules import GetItem, ReprWithCrossReferences
 
 from .blocks import ResidualUnit
@@ -40,7 +42,7 @@ __all__ = (
 
 ModuleFactory = Union[Callable[..., Module], Type[Module]]
 
-NumChannels = Sequence[Union[int, Sequence[int]]]
+NumChannels = ListOrTuple[Union[int, Sequence[int]]]
 NumBlocks = Union[int, Sequence[int]]
 NumLayers = Optional[Union[int, Sequence[int]]]
 
@@ -53,10 +55,22 @@ def reversed_num_channels(num_channels: NumChannels) -> NumChannels:
     return rev_channels
 
 
+def decoder_num_channels_from_encoder_num_channels(
+    num_channels: NumChannels,
+) -> NumChannels:
+    r"""Get default UNetDecoderConfig.num_channels from UNetEncoderConfig.num_channels."""
+    num_channels = list(reversed_num_channels(num_channels))
+    if isinstance(num_channels[0], Sequence):
+        num_channels[0] = num_channels[0][0]
+    return tuple(num_channels)
+
+
 def first_num_channels(num_channels: NumChannels) -> int:
     r"""Get number of feature channels of first block."""
     nc = num_channels[0]
     if isinstance(nc, Sequence):
+        if not nc:
+            raise ValueError("first_num_channels() 'num_channels[0]' must not be empty")
         nc = nc[0]
     return nc
 
@@ -65,6 +79,8 @@ def last_num_channels(num_channels: NumChannels) -> int:
     r"""Get number of feature channels of last block."""
     nc = num_channels[-1]
     if isinstance(nc, Sequence):
+        if not nc:
+            raise ValueError("last_num_channels() 'num_channels[-1]' must not be empty")
         nc = nc[-1]
     return nc
 
@@ -169,6 +185,7 @@ class UNetDecoderConfig(DataclassConfig):
     conv_layer: UNetLayerConfig = UNetLayerConfig()
     upsample: Union[str, UNetUpsampleConfig] = UNetUpsampleConfig()
     join_mode: str = "cat"
+    crop_skip: bool = False
     residual: bool = False
 
     @property
@@ -211,13 +228,13 @@ class UNetDecoderConfig(DataclassConfig):
                 )
             kwargs["upsample"] = UNetUpsampleConfig(kwargs.pop("upsample_mode"))
         residual = encoder.residual if residual is None else residual
-        num_channels = reversed_num_channels(encoder.num_channels)
+        num_channels = decoder_num_channels_from_encoder_num_channels(encoder.num_channels)
         num_blocks = encoder.num_blocks
         if isinstance(num_blocks, Sequence):
-            num_blocks = tuple(reversed(repeat_last(num_blocks, encoder.num_levels))[1:])
+            num_blocks = tuple(reversed(repeat_last(num_blocks, encoder.num_levels)))
         num_layers = encoder.num_layers
         if isinstance(num_layers, Sequence):
-            num_layers = tuple(reversed(repeat_last(num_layers, encoder.num_levels))[1:])
+            num_layers = tuple(reversed(repeat_last(num_layers, encoder.num_levels)))
         return cls(
             num_channels=num_channels,
             num_blocks=num_blocks,
@@ -299,9 +316,10 @@ class UNetEncoder(ReprWithCrossReferences, Module):
     def __init__(
         self,
         dimensions: int,
-        in_channels: int = 1,
+        in_channels: Optional[int] = None,
         config: Optional[UNetEncoderConfig] = None,
         conv_block: Optional[ModuleFactory] = None,
+        input_layer: Optional[ModuleFactory] = None,
     ):
         super().__init__()
 
@@ -314,55 +332,129 @@ class UNetEncoder(ReprWithCrossReferences, Module):
                 f"{type(self).__name__} U-net must have at least two spatial resolution levels"
             )
 
+        if config.downsample.mode == "none":
+            down_stride = (1,) * config.num_levels
+        if isinstance(config.downsample.factor, int):
+            down_stride = (1,) + (config.downsample.factor,) * (config.num_levels - 1)
+        else:
+            down_stride = repeat_last(config.downsample.factor, config.num_levels)
+
         if conv_block is None:
             conv_block = ResidualUnit if config.residual else unet_conv_block
         elif not isinstance(conv_block, Module) and not callable(conv_block):
             raise TypeError(f"{type(self).__name__}() 'conv_block' must be Module or callable")
 
-        num_channels = config.num_channels
-        num_blocks = repeat_last(config.num_blocks, len(num_channels))
-        num_layers = repeat_last(config.num_layers, len(num_channels))
+        num_blocks = repeat_last(config.num_blocks, config.num_levels)
+        num_layers = repeat_last(config.num_layers, config.num_levels)
 
-        if config.downsample.mode == "none":
-            down_stride = (1,) * len(num_channels)
-        if isinstance(config.downsample.factor, int):
-            down_stride = (1,) + (config.downsample.factor,) * (len(num_channels) - 1)
-        else:
-            down_stride = repeat_last(config.downsample.factor, len(num_channels))
+        num_channels = list(config.num_channels)
+        channels = first_num_channels(num_channels)
+        for i, (s, b, nc) in enumerate(zip(down_stride, num_blocks, num_channels)):
+            if not isinstance(b, int):
+                raise TypeError(f"{type(self).__name__} 'num_blocks' must be int or Sequence[int]")
+            if b < 1:
+                raise ValueError(f"{type(self).__name__} 'num_blocks' must be positive")
+            if isinstance(nc, int):
+                nc = (nc,) * b
+                if s > 1:
+                    if config.downsample.mode == "conv":
+                        nc = (nc[0],) + nc
+                    else:
+                        nc = (channels,) + nc
+                else:
+                    nc = (nc[0],) + nc
+            elif not isinstance(nc, Sequence):
+                raise TypeError(
+                    f"{type(self).__name__}() 'num_channels' values must be int or Sequence[int]"
+                )
+            if not nc:
+                raise ValueError(
+                    f"{type(self).__name__}() 'num_channels' must not contain empty sequence"
+                )
+            num_channels[i] = list(nc)
+            channels = nc[-1]
+        num_channels: List[List[int]] = list(list(nc) for nc in num_channels)
+        channels = num_channels[0][0]
+
+        if in_channels is None:
+            in_channels = channels
+        if input_layer is None:
+            input_layer = ConvLayer if in_channels != channels else Identity
+        elif not isinstance(input_layer, Module) and not callable(input_layer):
+            raise TypeError(f"{type(self).__name__}() 'input_layer' must be Module or callable")
 
         stages = ModuleDict()
         channels = in_channels
-        for i, (s, b, l, nc) in enumerate(zip(down_stride, num_blocks, num_layers, num_channels)):
-            if isinstance(nc, int):
-                nc = (nc,) * b
-            elif isinstance(nc, Sequence):
-                b = len(nc)
-            else:
-                nc = None
-            if not nc:
-                raise ValueError(f"{type(self).__name__}() invalid 'num_channels' specification")
+        for i, (s, l, nc) in enumerate(zip(down_stride, num_layers, num_channels)):
+            assert isinstance(nc, Sequence) and len(nc) > 0
             stage = ModuleDict()
-            if s > 1 and config.downsample.mode != "conv":
-                pool_size = config.downsample.kernel_size or s
-                pool_args = dict(kernel_size=pool_size, stride=s)
-                if pool_size % 2 == 0:
-                    pool_args["padding"] = pool_size // 2 - 1
-                else:
-                    pool_args["padding"] = pool_size // 2
-                if config.downsample.mode == "avg":
-                    pool_args["count_include_pad"] = False
-                stage["pool"] = PoolLayer(
-                    config.downsample.mode, dimensions=dimensions, **pool_args
-                )
-                s = 1
-            blocks = Sequential()
-            for j, c in enumerate(nc):
-                k = config.conv_layer.kernel_size
-                p = config.conv_layer.padding
-                if s > 1:
-                    k = config.downsample.kernel_size or k
-                    if config.downsample.padding is not None:
+            if s > 1:
+                if config.downsample.mode == "conv":
+                    c = nc[0]
+                    k = config.downsample.kernel_size or config.conv_layer.kernel_size
+                    if config.downsample.padding is None:
+                        p = config.conv_layer.padding
+                    else:
                         p = config.downsample.padding
+                    d = 0
+                    if i == 0:
+                        d = config.stage_1_dilation
+                    d = d or config.conv_layer.dilation
+                    downsample = conv_block(
+                        dimensions=dimensions,
+                        in_channels=channels,
+                        out_channels=c,
+                        kernel_size=k,
+                        stride=s,
+                        dilation=d,
+                        padding=p,
+                        padding_mode=config.conv_layer.padding_mode,
+                        init=config.conv_layer.init,
+                        bias=config.conv_layer.bias,
+                        norm=config.conv_layer.norm,
+                        acti=config.conv_layer.acti,
+                        order=config.conv_layer.order,
+                        num_layers=l,
+                    )
+                    channels = c
+                else:
+                    if nc[0] != channels:
+                        raise ValueError(
+                            f"{type(self).__name__}() number of input channels of stage after pooling ({nc[0]})"
+                            f" must match number of channels of previous stage ({channels})"
+                        )
+                    pool_size = config.downsample.kernel_size or s
+                    pool_args = dict(kernel_size=pool_size, stride=s)
+                    if pool_size % 2 == 0:
+                        pool_args["padding"] = pool_size // 2 - 1
+                    else:
+                        pool_args["padding"] = pool_size // 2
+                    if config.downsample.mode == "avg":
+                        pool_args["count_include_pad"] = False
+                    downsample = PoolLayer(
+                        config.downsample.mode, dimensions=dimensions, **pool_args
+                    )
+                stage["downsample"] = downsample
+                s = 1
+            elif i == 0:
+                c = nc[0]
+                stage["input"] = input_layer(
+                    dimensions=dimensions,
+                    in_channels=channels,
+                    out_channels=c,
+                    kernel_size=config.conv_layer.kernel_size,
+                    dilation=config.stage_1_dilation or config.conv_layer.dilation,
+                    padding=config.conv_layer.padding,
+                    padding_mode=config.conv_layer.padding_mode,
+                    init=config.conv_layer.init,
+                    bias=config.conv_layer.bias,
+                    norm=config.conv_layer.norm,
+                    acti=config.conv_layer.acti,
+                    order=config.conv_layer.order,
+                )
+                channels = c
+            blocks = Sequential()
+            for j, c in enumerate(nc[1:]):
                 d = 0
                 if j == 0:
                     d = config.block_1_dilation
@@ -373,10 +465,10 @@ class UNetEncoder(ReprWithCrossReferences, Module):
                     dimensions=dimensions,
                     in_channels=channels,
                     out_channels=c,
-                    kernel_size=k,
-                    stride=s,
+                    kernel_size=config.conv_layer.kernel_size,
+                    stride=1,
                     dilation=d,
-                    padding=p,
+                    padding=config.conv_layer.padding,
                     padding_mode=config.conv_layer.padding_mode,
                     init=config.conv_layer.init,
                     bias=config.conv_layer.bias,
@@ -388,23 +480,23 @@ class UNetEncoder(ReprWithCrossReferences, Module):
                 blocks.add_module(f"block_{j + 1}", block)
                 channels = c
                 s = 1
-            # mirror full modules names of UNetDecoder, e.g.,
+            # mirror full module names of UNetDecoder, e.g.,
             # encoder.stages.stage_1.blocks.block_1.layer_1.conv
             stage["blocks"] = blocks
             stages[f"stage_{i + 1}"] = stage
 
-        self.config = deepcopy(config)
+        config = deepcopy(config)
+        config.num_channels = num_channels
+
+        self.config = config
+        self.num_channels: List[List[int]] = num_channels
         self.dimensions = dimensions
         self.in_channels = in_channels
         self.stages = stages
 
     @property
-    def num_channels(self) -> NumChannels:
-        return self.config.num_channels
-
-    @property
     def out_channels(self) -> int:
-        return last_num_channels(self.config.num_channels)
+        return self.num_channels[-1][-1]
 
     def output_size(self, in_size: ScalarOrTuple[int]) -> ScalarOrTuple[int]:
         r"""Calculate output size of last feature map for a tensor of given spatial input size."""
@@ -414,21 +506,29 @@ class UNetEncoder(ReprWithCrossReferences, Module):
         r"""Calculate output sizes of feature maps for a tensor of given spatial input size."""
         size = in_size
         fm_sizes = []
-        for stage in self.stages.values():
+        for name, stage in self.stages.items():
             assert isinstance(stage, ModuleDict)
-            if "pool" in stage:
-                size = module_output_size(stage["pool"], size)
+            if name == "stage_1":
+                size = module_output_size(stage["input"], size)
+            if "downsample" in stage:
+                size = module_output_size(stage["downsample"], size)
             size = module_output_size(stage["blocks"], size)
             fm_sizes.append(size)
         return fm_sizes
 
     def forward(self, x: Tensor) -> List[Tensor]:
         features = []
-        for stage in self.stages.values():
-            assert isinstance(stage, ModuleDict)
-            if "pool" in stage:
-                pool = stage["pool"]
-                x = pool(x)
+        for name, stage in self.stages.items():
+            if not isinstance(stage, ModuleDict):
+                raise AssertionError(
+                    f"{type(self).__name__}.forward() expected stage ModuleDict, got {type(stage)}"
+                )
+            if name == "stage_1":
+                input_layer = stage["input"]
+                x = input_layer(x)
+            if "downsample" in stage:
+                downsample = stage["downsample"]
+                x = downsample(x)
             blocks = stage["blocks"]
             x = blocks(x)
             features.append(x)
@@ -445,6 +545,7 @@ class UNetDecoder(ReprWithCrossReferences, Module):
         config: Optional[UNetDecoderConfig] = None,
         conv_block: Optional[ModuleFactory] = None,
         input_layer: Optional[ModuleFactory] = None,
+        output_all: bool = False,
     ) -> None:
         super().__init__()
 
@@ -457,28 +558,73 @@ class UNetDecoder(ReprWithCrossReferences, Module):
                 f"{type(self).__name__} U-net must have at least two spatial resolution levels"
             )
 
-        # TODO: What to do when config.num_channels[0] is a sequence of length greater than 1?
-        channels = first_num_channels(config.num_channels)
-        num_channels = config.num_channels[1:]
-        num_blocks = repeat_last(config.num_blocks, len(num_channels))
-        num_layers = repeat_last(config.num_layers, len(num_channels))
-        scale_factor = repeat_last(config.upsample.factor, len(num_channels))
+        if not isinstance(config.num_channels, Sequence):
+            raise TypeError(f"{type(self).__name__}() 'config.num_channels' must be Sequence")
+        if any(isinstance(nc, Sequence) and not nc for nc in config.num_channels):
+            raise ValueError(
+                f"{type(self).__name__}() 'config.num_channels' contains empty sequence"
+            )
+
+        num_blocks = repeat_last(config.num_blocks, config.num_levels)
+        num_layers = repeat_last(config.num_layers, config.num_levels)
+        scale_factor = repeat_last(config.upsample.factor, config.num_levels - 1)
         upsample_mode = UpsampleMode(config.upsample.mode)
         join_mode = config.join_mode
+
+        num_channels = list(config.num_channels)
+        for i, (b, nc) in enumerate(zip(num_blocks, num_channels)):
+            if not isinstance(b, int):
+                raise TypeError(f"{type(self).__name__} 'num_blocks' must be int or Sequence[int]")
+            if b < 1:
+                raise ValueError(f"{type(self).__name__} 'num_blocks' must be positive")
+            if isinstance(nc, int):
+                nc = (nc,) * (1 if i == 0 else (b + 1))
+            elif isinstance(nc, Sequence):
+                nc = list(nc)
+            else:
+                raise TypeError(
+                    f"{type(self).__name__}() 'num_channels' values must be int or Sequence[int]"
+                )
+            if not nc:
+                raise ValueError(
+                    f"{type(self).__name__}() 'num_channels' must not contain empty sequence"
+                )
+            num_channels[i] = list(nc)
+        if upsample_mode is UpsampleMode.INTERPOLATE and config.upsample.kernel_size == 0:
+            for i, nc in enumerate(num_channels[:-1]):
+                next_nc = num_channels[i + 1][0]
+                assert isinstance(nc, List) and len(nc) > 0
+                if isinstance(config.num_channels[i], int):
+                    if len(nc) == 1:
+                        nc.append(next_nc)
+                    else:
+                        nc[-1] = next_nc
+                elif nc[-1] != next_nc:
+                    raise ValueError(
+                        f"{type(self).__name__}() 'num_channels' of last feature map in"
+                        f" previous stage ({num_channels[i]}) must match number of channels"
+                        f" of first feature map ({next_nc}) of next stage when upsampling"
+                        " mode is interpolation without preconv. Either adjust 'num_channels'"
+                        " or use non-zero 'upsample.kernel_size'."
+                    )
+        channels = num_channels[0][0]
 
         if conv_block is None:
             conv_block = ResidualUnit if config.residual else unet_conv_block
         elif not isinstance(conv_block, Module) and not callable(conv_block):
             raise TypeError(f"{type(self).__name__}() 'conv_block' must be Module or callable")
 
+        if in_channels is None:
+            in_channels = channels
         if input_layer is None:
-            input_layer = ConvLayer if in_channels and in_channels != channels else Identity
+            input_layer = ConvLayer if in_channels != channels else Identity
         elif not isinstance(input_layer, Module) and not callable(input_layer):
             raise TypeError(f"{type(self).__name__}() 'input_layer' must be Module or callable")
 
-        if in_channels is None:
-            in_channels = channels
-        self.input = input_layer(
+        stages = ModuleDict()
+
+        stage = ModuleDict()
+        stage["input"] = input_layer(
             dimensions=dimensions,
             in_channels=in_channels,
             out_channels=channels,
@@ -492,28 +638,45 @@ class UNetDecoder(ReprWithCrossReferences, Module):
             acti=config.conv_layer.acti,
             order=config.conv_layer.order,
         )
+        blocks = Sequential()
+        for j, c in enumerate(num_channels[0][1:]):
+            block = conv_block(
+                dimensions=dimensions,
+                in_channels=channels,
+                out_channels=c,
+                kernel_size=config.conv_layer.kernel_size,
+                dilation=config.conv_layer.dilation,
+                padding=config.conv_layer.padding,
+                padding_mode=config.conv_layer.padding_mode,
+                init=config.conv_layer.init,
+                bias=config.conv_layer.bias,
+                norm=config.conv_layer.norm,
+                acti=config.conv_layer.acti,
+                order=config.conv_layer.order,
+                num_layers=num_layers[0],
+            )
+            blocks.add_module(f"block_{j + 1}", block)
+            channels = c
+        stage["blocks"] = blocks
+        stages["stage_1"] = stage
 
-        stages = ModuleDict()
-        for i, (s, b, l, nc) in enumerate(zip(scale_factor, num_blocks, num_layers, num_channels)):
-            if isinstance(nc, int):
-                nc = (nc,) * b
-            elif isinstance(nc, Sequence):
-                b = len(nc)
-            else:
-                nc = None
-            if not nc:
-                raise ValueError(f"{type(self).__name__}() invalid 'num_channels' specification")
+        for i, (s, l, nc) in enumerate(zip(scale_factor, num_layers[1:], num_channels[1:])):
+            assert isinstance(nc, Sequence) and len(nc) > 1
             stage = ModuleDict()
             if upsample_mode is UpsampleMode.INTERPOLATE and config.upsample.kernel_size != 0:
                 p = config.upsample.padding
                 if p is None:
                     p = config.conv_layer.padding
+                k = config.upsample.kernel_size
+                if k is None:
+                    k = config.conv_layer.kernel_size
+                d = config.upsample.dilation or config.conv_layer.dilation
                 pre_conv = ConvLayer(
                     dimensions=dimensions,
                     in_channels=channels,
                     out_channels=nc[0],
-                    kernel_size=config.upsample.kernel_size or config.conv_layer.kernel_size,
-                    dilation=config.upsample.dilation or config.conv_layer.dilation,
+                    kernel_size=k,
+                    dilation=d,
                     padding=p,
                     padding_mode=config.conv_layer.padding_mode,
                     init=config.conv_layer.init,
@@ -560,12 +723,17 @@ class UNetDecoder(ReprWithCrossReferences, Module):
                 blocks.add_module(f"block_{j + 1}", block)
                 channels = c
             stage["blocks"] = blocks
-            stages[f"stage_{i + 1}"] = stage
+            stages[f"stage_{i + 2}"] = stage
 
-        self.config = deepcopy(config)
+        config = deepcopy(config)
+        config.num_channels = num_channels
+
+        self.config = config
         self.dimensions = dimensions
         self.in_channels = in_channels
+        self.num_channels: List[List[int]] = num_channels
         self.stages = stages
+        self.output_all = output_all
 
     @classmethod
     def from_encoder(
@@ -579,12 +747,8 @@ class UNetDecoder(ReprWithCrossReferences, Module):
         return cls(dimensions=encoder.dimensions, config=config)
 
     @property
-    def num_channels(self) -> NumChannels:
-        return self.config.num_channels
-
-    @property
     def out_channels(self) -> int:
-        return last_num_channels(self.config.num_channels)
+        return self.num_channels[-1][-1]
 
     def output_size(self, in_size: ScalarOrTuple[int]) -> ScalarOrTuple[int]:
         r"""Calculate output size for an initial feature map of given spatial input size."""
@@ -592,43 +756,58 @@ class UNetDecoder(ReprWithCrossReferences, Module):
 
     def output_sizes(self, in_size: ScalarOrTuple[int]) -> List[ScalarOrTuple[int]]:
         r"""Calculate output sizes for an initial feature map of given spatial input size."""
-        size = module_output_size(self.input, in_size)
-        out_sizes = [size]
-        for stage in self.stages.values():
+        size = in_size
+        out_sizes = []
+        for name, stage in self.stages.items():
             if not isinstance(stage, ModuleDict):
                 raise AssertionError(
                     f"{type(self).__name__}.out_sizes() expected stage ModuleDict, got {type(stage)}"
                 )
-            size = module_output_size(stage["upsample"], size)
+            if name == "stage_1":
+                size = module_output_size(stage["input"], size)
+            if "upsample" in stage:
+                size = module_output_size(stage["upsample"], size)
             size = module_output_size(stage["blocks"], size)
             out_sizes.append(size)
         return out_sizes
 
-    def forward(self, features: Sequence[Tensor]) -> List[Tensor]:
+    def forward(self, features: Sequence[Tensor]) -> Union[Tensor, List[Tensor]]:
         if not isinstance(features, Sequence):
             raise TypeError(f"{type(self).__name__}() 'features' must be Sequence")
         features = list(features)
-        if len(features) != len(self.stages) + 1:
+        if len(features) != len(self.stages):
             raise ValueError(
-                f"{type(self).__name__}() 'features' must contain {len(self.stages) + 1} tensors"
+                f"{type(self).__name__}() 'features' must contain {len(self.stages)} tensors"
             )
         x: Tensor = features.pop()
-        x = self.input(x)
-        output = [x]
-        for stage in self.stages.values():
+        output: List[Tensor] = []
+        for name, stage in self.stages.items():
             if not isinstance(stage, ModuleDict):
                 raise AssertionError(
                     f"{type(self).__name__}.forward() expected stage ModuleDict, got {type(stage)}"
                 )
-            skip = features.pop()
-            upsample = stage["upsample"]
-            join = stage["join"]
             blocks = stage["blocks"]
-            x = upsample(x)
-            x = join([x, skip])
+            if name == "stage_1":
+                input_layer = stage["input"]
+                x = input_layer(x)
+            else:
+                skip = features.pop()
+                upsample = stage["upsample"]
+                join = stage["join"]
+                x = upsample(x)
+                if self.config.crop_skip:
+                    margin = tuple(n - m for m, n in zip(x.shape[2:], skip.shape[2:]))
+                    assert all(m >= 0 and m % 2 == 0 for m in margin)
+                    margin = tuple(m // 2 for m in margin)
+                    skip = crop(skip, margin=margin)
+                x = join([x, skip])
+                del skip
             x = blocks(x)
-            output.append(x)
-        return output
+            if self.output_all:
+                output.append(x)
+        if self.output_all:
+            return output
+        return x
 
 
 class SequentialUNet(ReprWithCrossReferences, Sequential):
@@ -646,7 +825,7 @@ class SequentialUNet(ReprWithCrossReferences, Sequential):
     def __init__(
         self,
         dimensions: int,
-        in_channels: int,
+        in_channels: Optional[int] = None,
         out_channels: Optional[int] = None,
         config: Optional[UNetConfig] = None,
         conv_block: Optional[ModuleFactory] = None,
@@ -670,6 +849,7 @@ class SequentialUNet(ReprWithCrossReferences, Sequential):
             config=config.encoder,
             conv_block=conv_block,
         )
+        in_channels = self.encoder.in_channels
 
         # Upsamling path with skip connections
         self.decoder = UNetDecoder(
@@ -678,6 +858,7 @@ class SequentialUNet(ReprWithCrossReferences, Sequential):
             config=config.decoder,
             conv_block=conv_block,
             input_layer=bridge_layer,
+            output_all=output_layer is None and not out_channels,
         )
 
         # Optional output layer
@@ -685,12 +866,10 @@ class SequentialUNet(ReprWithCrossReferences, Sequential):
         if not out_channels and config.output is not None:
             out_channels = config.output.channels
         if output_layer is None:
-            if out_channels == channels and config.output is None:
-                self.add_module("output", GetItem(-1))
+            if self.decoder.output_all:
+                out_channels = self.decoder.num_channels
             elif out_channels:
                 output_layer = ConvLayer
-            else:
-                out_channels = self.decoder.num_channels
         if output_layer is not None:
             out_channels = out_channels or in_channels
             if config.output is None:
@@ -709,10 +888,8 @@ class SequentialUNet(ReprWithCrossReferences, Sequential):
                 acti=config.output.acti,
                 order=config.output.order,
             )
-            output = [("input", GetItem(-1)), ("layer", output)]
-            output = Sequential(OrderedDict(output))
             self.add_module("output", output)
-        self.out_channels: Union[int, Sequence[int]] = out_channels
+        self.out_channels: Union[int, List[int]] = out_channels
 
     @property
     def dimensions(self) -> int:
@@ -723,7 +900,7 @@ class SequentialUNet(ReprWithCrossReferences, Sequential):
         return self.encoder.in_channels
 
     @property
-    def num_channels(self) -> NumChannels:
+    def num_channels(self) -> List[List[int]]:
         return self.decoder.num_channels
 
     @property
@@ -745,7 +922,7 @@ class UNet(ReprWithCrossReferences, Module):
     def __init__(
         self,
         dimensions: int,
-        in_channels: int,
+        in_channels: Optional[int] = None,
         out_channels: Optional[int] = None,
         output_modules: Optional[Mapping[str, Module]] = None,
         output_indices: Optional[Union[Mapping[str, int], int]] = None,
@@ -777,6 +954,7 @@ class UNet(ReprWithCrossReferences, Module):
             config=config.encoder,
             conv_block=conv_block,
         )
+        in_channels = self.encoder.in_channels
 
         # Upsamling path with skip connections
         self.decoder = UNetDecoder(
@@ -785,6 +963,7 @@ class UNet(ReprWithCrossReferences, Module):
             config=config.decoder,
             conv_block=conv_block,
             input_layer=bridge_layer,
+            output_all=True,
         )
 
         # Optional output layer
@@ -845,7 +1024,7 @@ class UNet(ReprWithCrossReferences, Module):
         return self.encoder.in_channels
 
     @property
-    def num_channels(self) -> NumChannels:
+    def num_channels(self) -> List[List[int]]:
         return self.decoder.num_channels
 
     @property
@@ -892,7 +1071,7 @@ class UNet(ReprWithCrossReferences, Module):
 
     def output_sizes(
         self, in_size: ScalarOrTuple[int]
-    ) -> Union[Dict[ScalarOrTuple[int]], List[ScalarOrTuple[int]]]:
+    ) -> Union[Dict[str, ScalarOrTuple[int]], List[ScalarOrTuple[int]]]:
         enc_out_size = self.encoder.output_size(in_size)
         dec_out_sizes = self.decoder.output_sizes(enc_out_size)
         if self.output_is_tensor():
@@ -905,9 +1084,8 @@ class UNet(ReprWithCrossReferences, Module):
         return out_sizes
 
     def forward(self, x: Tensor) -> Union[Tensor, Dict[str, Tensor], List[Tensor]]:
-        features = self.encoder(x)
-        features = self.decoder(features)
         outputs = {}
+        features = self.decoder(self.encoder(x))
         for name, output in self.output_modules.items():
             outputs[name] = output(features)
         if not outputs:
