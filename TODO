@@ -14,6 +14,9 @@ Spatial transforms:
 Utility functions:
 - [ ] Function to save `FreeFormTransformation` parameters in MIRTK `.dof.gz` format.
 
+Neural networks:
+- [x] Follow MONAI and rename `dimensions` argument of `__init__` functions to `spatial_dims`.
+
 Examples:
 - Traditional free-form deformation algorithm:
   - [x] Write example code and script for pairwise image registration using deepali.

@@ -11,7 +11,7 @@ class ImageTransformerNetwork(UNet):
 
     def __init__(
         self,
-        dimensions: int,
+        spatial_dims: int,
         in_channels: int = 1,
         config: Union[str, ImageTransformerConfig] = "default",
     ) -> None:
@@ -21,12 +21,15 @@ class ImageTransformerNetwork(UNet):
             raise TypeError(
                 "ImageTransformerNetwork() 'config' must be str or ImageTransformerConfig"
             )
-        if dimensions < 2 or dimensions > 3:
-            raise ValueError("ImageTransformerNetwork() 'dimensions' must be 2 or 3")
+        if spatial_dims < 2 or spatial_dims > 3:
+            raise ValueError("ImageTransformerNetwork() 'spatial_dims' must be 2 or 3")
         if in_channels < 1:
             raise ValueError("ImageTransformerNetwork() 'in_channels' must be positive")
         super().__init__(
-            dimensions=dimensions, in_channels=in_channels, out_channels=in_channels, config=config
+            spatial_dims=spatial_dims,
+            in_channels=in_channels,
+            out_channels=in_channels,
+            config=config,
         )
 
 

@@ -55,7 +55,7 @@ class Upsample(Sequential):
 
     def __init__(
         self,
-        dimensions: int,
+        spatial_dims: int,
         in_channels: Optional[int] = None,
         out_channels: Optional[int] = None,
         scale_factor: Union[Sequence[Union[int, float]], Union[int, float]] = 2,
@@ -72,7 +72,7 @@ class Upsample(Sequential):
         r"""Initialize upsampling layer.
 
         Args:
-            dimensions: Number of spatial dimensions of input tensor.
+            spatial_dims: Number of spatial dimensions of input tensor.
             in_channels: Number of channels of the input tensor.
             out_channels: Number of channels of the output tensor. Defaults to `in_channels`.
             scale_factor: Multiplier for spatial size. Has to match input size if it is a tuple.
@@ -97,7 +97,7 @@ class Upsample(Sequential):
         if out_channels is None:
             out_channels = in_channels
         upsample_mode = UpsampleMode.DECONV if mode == "default" else UpsampleMode(mode)
-        padding_mode = PaddingMode(padding_mode).conv_mode(dimensions)
+        padding_mode = PaddingMode(padding_mode).conv_mode(spatial_dims)
 
         if upsample_mode == UpsampleMode.DECONV:
 
@@ -107,10 +107,10 @@ class Upsample(Sequential):
                 )
 
             if isinstance(scale_factor, (int, float)):
-                scale_factor = (scale_factor,) * dimensions
-            elif len(scale_factor) != dimensions:
+                scale_factor = (scale_factor,) * spatial_dims
+            elif len(scale_factor) != spatial_dims:
                 raise ValueError(
-                    f"{type(self).__name__}() 'scale_factor' must be scalar or sequence of length {dimensions}"
+                    f"{type(self).__name__}() 'scale_factor' must be scalar or sequence of length {spatial_dims}"
                 )
             try:
                 scale_factor = tuple(int(s) for s in scale_factor)
@@ -122,10 +122,10 @@ class Upsample(Sequential):
             if kernel_size is None:
                 kernel_size = scale_factor
             elif isinstance(kernel_size, (int, float)):
-                kernel_size = (kernel_size,) * dimensions
-            elif len(kernel_size) != dimensions:
+                kernel_size = (kernel_size,) * spatial_dims
+            elif len(kernel_size) != spatial_dims:
                 raise ValueError(
-                    f"{type(self).__name__}() 'kernel_size' must be scalar or sequence of length {dimensions}"
+                    f"{type(self).__name__}() 'kernel_size' must be scalar or sequence of length {spatial_dims}"
                 )
             if any(k < s for k, s in zip(kernel_size, scale_factor)):
                 raise ValueError(
@@ -138,7 +138,7 @@ class Upsample(Sequential):
             output_padding = upsample_output_padding(kernel_size, scale_factor, padding)
 
             deconv = convolution(
-                dimensions=dimensions,
+                spatial_dims=spatial_dims,
                 in_channels=in_channels,
                 out_channels=out_channels,
                 kernel_size=kernel_size,
@@ -161,14 +161,14 @@ class Upsample(Sequential):
                     if kernel_size is None:
                         kernel_size = 1
                     if isinstance(kernel_size, int):
-                        kernel_size = (kernel_size,) * dimensions
+                        kernel_size = (kernel_size,) * spatial_dims
                     elif not isinstance(kernel_size, Sequence):
                         raise TypeError(
                             f"{type(self).__name__}() 'kernel_size' must be int or Sequence[int]"
                         )
-                    elif len(kernel_size) != dimensions:
+                    elif len(kernel_size) != spatial_dims:
                         raise ValueError(
-                            f"{type(self).__name__}() 'kernel_size' must be int or {dimensions}-tuple"
+                            f"{type(self).__name__}() 'kernel_size' must be int or {spatial_dims}-tuple"
                         )
                     if any(k < 1 for k in kernel_size):
                         raise ValueError(f"{type(self).__name__}() 'kernel_size' must be positive")
@@ -181,7 +181,7 @@ class Upsample(Sequential):
                     else:
                         padding = tuple(ks // 2 for ks in kernel_size)
                     pre_conv = convolution(
-                        dimensions=dimensions,
+                        spatial_dims=spatial_dims,
                         in_channels=in_channels,
                         out_channels=out_channels,
                         kernel_size=kernel_size,
@@ -197,7 +197,7 @@ class Upsample(Sequential):
                     )
                 self.add_module("preconv", pre_conv)
 
-            mode = Sampling(sampling).interpolate_mode(dimensions)
+            mode = Sampling(sampling).interpolate_mode(spatial_dims)
             upsample = nn.Upsample(
                 scale_factor=scale_factor, mode=mode, align_corners=align_corners
             )
@@ -216,7 +216,7 @@ class Upsample(Sequential):
                 kernel_size = 3
 
             module = SubpixelUpsample(
-                dimensions=dimensions,
+                spatial_dims=spatial_dims,
                 in_channels=in_channels,
                 out_channels=out_channels,
                 scale_factor=scale_factor_,
@@ -238,7 +238,7 @@ class SubpixelUpsample(Module):
 
     This module is adapted from the MONAI project and supports 1D, 2D and 3D input images.
     The module consists of two parts. First of all, a convolutional layer is employed
-    to increase the number of channels into: ``in_channels * (scale_factor ** dimensions)``.
+    to increase the number of channels into: ``in_channels * (scale_factor ** spatial_dims)``.
     Secondly, a pixel shuffle manipulation is utilized to aggregate the feature maps from
     low resolution space and build the super resolution space. The first part of the module
     is not fixed, a sequential layer can be used to replace the default single layer.
@@ -260,7 +260,7 @@ class SubpixelUpsample(Module):
 
     def __init__(
         self,
-        dimensions: int,
+        spatial_dims: int,
         in_channels: Optional[int],
         out_channels: Optional[int] = None,
         scale_factor: Union[int, float] = 2,
@@ -274,14 +274,14 @@ class SubpixelUpsample(Module):
         r"""Initialize upsampling layer.
 
         Args:
-            dimensions: Number of spatial dimensions of the input image.
+            spatial_dims: Number of spatial dimensions of the input image.
             in_channels: Number of channels of the input image.
             out_channels: Optional number of channels of the output image.
             scale_factor: Multiplier for spatial size. Must be castable to ``int``. Defaults to 2.
             conv_block: A conv block to extract feature maps before upsampling.
 
                 - When ``"default"``, one reserved conv layer will be utilized.
-                - When ``torch..nn.Module``, the output number of channels must be divisible by ``(scale_factor ** dimensions)``.
+                - When ``torch..nn.Module``, the output number of channels must be divisible by ``(scale_factor ** spatial_dims)``.
 
             apply_pad_pool: If True the upsampled tensor is padded then average pooling is applied with a kernel the
                 size of `scale_factor` with a stride of 1. This implements the nearest neighbour resize convolution
@@ -306,23 +306,23 @@ class SubpixelUpsample(Module):
         if init in ("icnr", "ICNR"):
             init = "default"
 
-        self.dimensions = dimensions
+        self.spatial_dims = spatial_dims
         self.scale_factor = scale_factor
 
         if conv_block == "default":
             if not in_channels:
                 raise ValueError("SubpixelUpsample() 'in_channels' required")
             out_channels = out_channels or in_channels
-            conv_out_channels = out_channels * (scale_factor**dimensions)
+            conv_out_channels = out_channels * (scale_factor**spatial_dims)
             if kernel_size % 2 == 0:
-                padding = ((kernel_size - 1) // 2, kernel_size // 2) * dimensions
+                padding = ((kernel_size - 1) // 2, kernel_size // 2) * spatial_dims
                 pre_pad = Pad(padding=padding, mode=padding_mode)
                 padding = 0
             else:
                 pre_pad = None
                 padding = kernel_size // 2
             conv_block = convolution(
-                dimensions=dimensions,
+                spatial_dims=spatial_dims,
                 in_channels=in_channels,
                 out_channels=conv_out_channels,
                 kernel_size=kernel_size,
@@ -347,11 +347,11 @@ class SubpixelUpsample(Module):
         if apply_pad_pool:
             pad_pool = Sequential(
                 Pad(
-                    padding=(scale_factor - 1, 0) * dimensions,
+                    padding=(scale_factor - 1, 0) * spatial_dims,
                     mode=padding_mode,
                     value=0,
                 ),
-                pooling("avg", dimensions=dimensions, kernel_size=scale_factor, stride=1),
+                pooling("avg", spatial_dims=spatial_dims, kernel_size=scale_factor, stride=1),
             )
         else:
             pad_pool = Identity()
@@ -365,7 +365,7 @@ class SubpixelUpsample(Module):
 
         """
         x = self.conv_block(x)
-        x = pixelshuffle(x, self.dimensions, self.scale_factor)
+        x = pixelshuffle(x, self.spatial_dims, self.scale_factor)
         x = self.pad_pool(x)
         return x
 
@@ -391,8 +391,8 @@ def icnr_init(weight: Tensor, upsample_factor: int, init=nn.init.kaiming_normal_
     weight.data.copy_(kernel)
 
 
-def pixelshuffle(x: Tensor, dimensions: int, scale_factor: int) -> Tensor:
-    r"""Apply pixel shuffle to the tensor `x` with spatial dimensions `dimensions` and scaling factor `scale_factor`.
+def pixelshuffle(x: Tensor, spatial_dims: int, scale_factor: int) -> Tensor:
+    r"""Apply pixel shuffle to the tensor `x` with spatial dimensions `spatial_dims` and scaling factor `scale_factor`.
 
     See: Shi et al., 2016, "Real-Time Single Image and Video Super-Resolution
     Using an Efficient Sub-Pixel Convolutional Neural Network."
@@ -401,18 +401,18 @@ def pixelshuffle(x: Tensor, dimensions: int, scale_factor: int) -> Tensor:
 
     Args:
         x: Input tensor
-        dimensions: number of spatial dimensions, typically 2 or 3 for 2D or 3D
+        spatial_dims: number of spatial dimensions, typically 2 or 3 for 2D or 3D
         scale_factor: factor to rescale the spatial dimensions by, must be >=1
 
     Returns:
         Reshuffled version of `x`.
 
     Raises:
-        ValueError: When input channels of `x` are not divisible by (scale_factor ** dimensions)
+        ValueError: When input channels of `x` are not divisible by (scale_factor ** spatial_dims)
 
     """
 
-    dim, factor = dimensions, scale_factor
+    dim, factor = spatial_dims, scale_factor
     input_size = list(x.size())
     batch_size, channels = input_size[:2]
     scale_divisor = factor**dim
@@ -420,7 +420,7 @@ def pixelshuffle(x: Tensor, dimensions: int, scale_factor: int) -> Tensor:
     if channels % scale_divisor != 0:
         raise ValueError(
             f"pixelshuffle() number of input channels ({channels}) must be evenly"
-            f" divisible by scale_factor ** dimensions ({factor}**{dim}={scale_divisor})"
+            f" divisible by scale_factor ** spatial_dims ({factor}**{dim}={scale_divisor})"
         )
 
     org_channels = channels // scale_divisor

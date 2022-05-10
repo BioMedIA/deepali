@@ -74,7 +74,7 @@ def test_residual_unit() -> None:
 
     x = torch.tensor([[[1.0, -2.0, 3.0, 4.0, -5.0]]])
 
-    block = ResidualUnit(dimensions=1, in_channels=1, order="nac")
+    block = ResidualUnit(spatial_dims=1, in_channels=1, order="nac")
     assert isinstance(block, nn.Module)
     assert isinstance(block, SkipConnection)
     assert isinstance(block.func, nn.Sequential)
@@ -87,15 +87,15 @@ def test_residual_unit() -> None:
     assert isinstance(y, Tensor)
     assert y.eq(x + x).all()
 
-    block = ResidualUnit(dimensions=1, in_channels=1, out_channels=2)
-    assert block.dimensions == 1
+    block = ResidualUnit(spatial_dims=1, in_channels=1, out_channels=2)
+    assert block.spatial_dims == 1
     assert block.in_channels == 1
     assert block.out_channels == 2
     assert isinstance(block.skip, nn.Conv1d)
     assert block.skip.out_channels == 2
 
     block = ResidualUnit(
-        dimensions=1,
+        spatial_dims=1,
         in_channels=1,
         out_channels=2,
         acti="relu",
@@ -111,7 +111,7 @@ def test_residual_unit() -> None:
     assert not isinstance(block.join, nn.Sequential)
 
     block = ResidualUnit(
-        dimensions=1,
+        spatial_dims=1,
         in_channels=1,
         out_channels=2,
         acti="relu",

@@ -21,10 +21,10 @@ def input_tensor(request) -> Tensor:
 
 @pytest.mark.parametrize("input_tensor", [2, 3], indirect=True)
 def test_unet_without_output_layer(input_tensor: Tensor) -> None:
-    dimensions = input_tensor.ndim - 2
+    spatial_dims = input_tensor.ndim - 2
     in_channels = input_tensor.shape[1]
 
-    model = UNet(dimensions=dimensions, in_channels=in_channels)
+    model = UNet(spatial_dims=spatial_dims, in_channels=in_channels)
     model.eval()
     print(model)
 
@@ -49,11 +49,11 @@ def test_unet_without_output_layer(input_tensor: Tensor) -> None:
 
 @pytest.mark.parametrize("input_tensor", [2, 3], indirect=True)
 def test_unet_with_single_output_layer(input_tensor: Tensor) -> None:
-    dimensions = input_tensor.ndim - 2
+    spatial_dims = input_tensor.ndim - 2
     in_channels = input_tensor.shape[1]
     out_channels = in_channels
 
-    model = UNet(dimensions=dimensions, in_channels=in_channels, out_channels=out_channels)
+    model = UNet(spatial_dims=spatial_dims, in_channels=in_channels, out_channels=out_channels)
     print(model)
 
     assert model.output_is_tensor() is True
@@ -70,7 +70,7 @@ def test_unet_with_single_output_layer(input_tensor: Tensor) -> None:
 @pytest.mark.parametrize("input_tensor", [2, 3], indirect=True)
 def test_unet_with_multiple_output_layers(input_tensor: Tensor) -> None:
 
-    dimensions = input_tensor.ndim - 2
+    spatial_dims = input_tensor.ndim - 2
     config = UNetConfig()
 
     output_modules = {}
@@ -78,13 +78,17 @@ def test_unet_with_multiple_output_layers(input_tensor: Tensor) -> None:
     for i, channels in enumerate(config.decoder.num_channels):
         name = f"output_{i + 1}"
         output = convolution(
-            dimensions=dimensions, in_channels=channels, out_channels=1, kernel_size=1, bias=False
+            spatial_dims=spatial_dims,
+            in_channels=channels,
+            out_channels=1,
+            kernel_size=1,
+            bias=False,
         )
         output_modules[name] = output
         output_indices[name] = i
 
     model = UNet(
-        dimensions=dimensions,
+        spatial_dims=spatial_dims,
         in_channels=1,
         output_modules=output_modules,
         output_indices=output_indices,
@@ -101,25 +105,3 @@ def test_unet_with_multiple_output_layers(input_tensor: Tensor) -> None:
     assert len(output) == len(output_modules)
     assert set(output.keys()) == set(output_modules.keys())
     assert all(isinstance(x, Tensor) for x in output.values())
-
-
-@pytest.mark.parametrize("input_tensor", [2, 3], indirect=True)
-def test_nnunet(input_tensor: Tensor) -> None:
-    dimensions = input_tensor.ndim - 2
-    channels = input_tensor.shape[1]
-    config = UNetConfig.nnunet(dimensions, input_tensor.shape[2:])
-
-    max_ds = 2 ** (config.encoder.num_levels - 1)
-    assert all(n // max_ds > 1 for n in input_tensor.shape[2:])
-
-    model = UNet(dimensions=dimensions, in_channels=channels, out_channels=channels, config=config)
-    model.eval()
-    print(model)
-
-    assert model.output_is_tensor() is True
-    assert model.output_is_dict() is False
-    assert model.output_is_tuple() is False
-
-    output_tensor = model(input_tensor)
-    assert isinstance(output_tensor, Tensor)
-    assert output_tensor.shape == input_tensor.shape

@@ -22,7 +22,7 @@ class InputConfig(DataclassConfig):
     channels: int = 1
 
     @property
-    def dimensions(self) -> int:
+    def spatial_dims(self) -> int:
         return len(self.size)
 
     @property
@@ -114,7 +114,7 @@ class ImageAndSpatialTransformerNetwork(Module):
 
 
 def create_istn(config: ImageAndSpatialTransformerConfig) -> ImageAndSpatialTransformerNetwork:
-    itn = ImageTransformerNetwork(config.input.dimensions, config.input.channels, config.itn)
+    itn = ImageTransformerNetwork(config.input.spatial_dims, config.input.channels, config.itn)
     itn_output_size = itn.output_size(config.input.size)
     stn = SpatialTransformerNetwork(2 * itn.out_channels, itn_output_size, config.stn)
     return ImageAndSpatialTransformerNetwork(itn=itn, stn=stn)

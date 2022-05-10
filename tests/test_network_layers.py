@@ -87,7 +87,7 @@ def test_convolution() -> None:
     assert conv.output_padding == (1, 1, 1)
 
     conv = conv_module(
-        dimensions=3,
+        spatial_dims=3,
         in_channels=6,
         out_channels=16,
         kernel_size=3,
@@ -248,22 +248,22 @@ def test_norm_layer() -> None:
 
     # Batch normalization
     with pytest.raises(ValueError):
-        norm_layer("batch", dimensions=3)
+        norm_layer("batch", spatial_dims=3)
     with pytest.raises(ValueError):
-        normalization("batch", dimensions=1)
+        normalization("batch", spatial_dims=1)
     with pytest.raises(ValueError):
         normalization("batch", num_features=32)
-    norm = norm_layer("batch", dimensions=1, num_features=16)
+    norm = norm_layer("batch", spatial_dims=1, num_features=16)
     assert isinstance(norm, nn.BatchNorm1d)
     assert norm.affine is True
     assert norm.num_features == 16
     assert norm.bias.shape == (16,)
-    norm = normalization("batch", dimensions=2, num_features=32)
+    norm = normalization("batch", spatial_dims=2, num_features=32)
     assert isinstance(norm, nn.BatchNorm2d)
     assert norm.affine is True
     assert norm.num_features == 32
     assert norm.bias.shape == (32,)
-    norm = norm_layer("BatchNorm", dimensions=3, num_features=64)
+    norm = norm_layer("BatchNorm", spatial_dims=3, num_features=64)
     assert isinstance(norm, nn.BatchNorm3d)
     assert norm.affine is True
     assert norm.num_features == 64
@@ -273,7 +273,7 @@ def test_norm_layer() -> None:
     with pytest.raises(ValueError):
         norm_layer("group", 3)
     with pytest.raises(ValueError):
-        norm_layer("group", dimensions=1)
+        norm_layer("group", spatial_dims=1)
     norm = norm_layer("group", num_features=32)
     assert isinstance(norm, nn.GroupNorm)
     assert norm.num_groups == 1
@@ -294,13 +294,13 @@ def test_norm_layer() -> None:
     with pytest.raises(ValueError):
         norm_layer("layer")
     with pytest.raises(ValueError):
-        norm_layer("layer", dimensions=1)
+        norm_layer("layer", spatial_dims=1)
     norm = normalization("layer", num_features=32)
     assert isinstance(norm, nn.GroupNorm)
     assert norm.num_groups == 32
     assert norm.num_channels == 32
     assert norm.affine is True
-    norm = norm_layer("LayerNorm", dimensions=1, num_features=64, affine=False)
+    norm = norm_layer("LayerNorm", spatial_dims=1, num_features=64, affine=False)
     assert isinstance(norm, nn.GroupNorm)
     assert norm.num_groups == 64
     assert norm.num_channels == 64
@@ -310,22 +310,22 @@ def test_norm_layer() -> None:
     with pytest.raises(ValueError):
         norm_layer("instance", 2)
     with pytest.raises(ValueError):
-        norm_layer("instance", dimensions=1)
+        norm_layer("instance", spatial_dims=1)
     with pytest.raises(ValueError):
         normalization("instance", num_features=32)
-    norm = norm_layer("instance", dimensions=1, num_features=32)
+    norm = norm_layer("instance", spatial_dims=1, num_features=32)
     assert isinstance(norm, nn.InstanceNorm1d)
-    norm = norm_layer("instance", dimensions=2, num_features=32)
+    norm = norm_layer("instance", spatial_dims=2, num_features=32)
     assert isinstance(norm, nn.InstanceNorm2d)
-    norm = normalization("instance", dimensions=3, num_features=32)
+    norm = normalization("instance", spatial_dims=3, num_features=32)
     assert isinstance(norm, nn.InstanceNorm3d)
     assert norm.num_features == 32
     assert norm.affine is False
-    norm = normalization("InstanceNorm", dimensions=3, num_features=32, affine=True)
+    norm = normalization("InstanceNorm", spatial_dims=3, num_features=32, affine=True)
     assert isinstance(norm, nn.InstanceNorm3d)
     assert norm.num_features == 32
     assert norm.affine is True
-    norm = NormLayer("instance", dimensions=3, num_features=64)
+    norm = NormLayer("instance", spatial_dims=3, num_features=64)
     assert isinstance(norm.func, nn.InstanceNorm3d)
     assert norm.func.num_features == 64
     assert norm.func.affine is False

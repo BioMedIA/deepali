@@ -61,21 +61,21 @@ class SpatialTransformEncoder(Module):
 
     def __init__(
         self,
-        dimensions: int,
+        spatial_dims: int,
         in_channels: int,
         bias_enabled: bool = True,
         bias_init: str = "uniform",
     ) -> None:
         super().__init__()
 
-        assert 2 <= dimensions <= 3
+        assert 2 <= spatial_dims <= 3
         acti = ReLU(inplace=True)
         ks = 3
 
         def conv(m: int, n: int, **kwargs) -> Module:
             bias = bias_init if bias_enabled else False
             pad = ks // 2
-            return convolution(dimensions, m, n, kernel_size=ks, padding=pad, bias=bias, **kwargs)
+            return convolution(spatial_dims, m, n, kernel_size=ks, padding=pad, bias=bias, **kwargs)
 
         blocks = [
             [
@@ -108,14 +108,14 @@ class SpatialTransformEncoder(Module):
         return len(self.blocks)
 
     @property
-    def dimensions(self) -> int:
+    def spatial_dims(self) -> int:
         conv = self.blocks[0][0]
         if isinstance(conv, Conv2d):
             return 2
         elif isinstance(conv, Conv3d):
             return 3
         raise AssertionError(
-            f"{type(self).__name__}.dimensions expected first convolution to be Conv2d or Conv3d"
+            f"{type(self).__name__}.spatial_dims expected first convolution to be Conv2d or Conv3d"
         )
 
     @property
@@ -193,10 +193,10 @@ class SpatialTransformEncoder(Module):
     def output_shape(self, in_shape: Sequence[int], index: int = -1) -> Size:
         r"""Shape of i-th output feature map."""
         in_channels = self.input_channels()
-        if len(in_shape) != self.dimensions + 2 or in_shape[1] != in_channels:
+        if len(in_shape) != self.spatial_dims + 2 or in_shape[1] != in_channels:
             raise ValueError(
                 f"{type(self).__name__}.output_shape() 'in_shape' must be of the form"
-                f" (N, {in_channels}, {'Y, X' if self.dimensions == 2 else 'Z, Y, X'})"
+                f" (N, {in_channels}, {'Y, X' if self.spatial_dims == 2 else 'Z, Y, X'})"
             )
         nblocks = self.nblocks
         if index < -nblocks or index >= nblocks:
@@ -224,7 +224,7 @@ class AffineTransformDecoder(Module):
 
     def __init__(
         self,
-        dimensions: int,
+        spatial_dims: int,
         features: int,
         hidden: int = 32,
         max_angle: float = math.pi / 4,
@@ -236,7 +236,7 @@ class AffineTransformDecoder(Module):
         r"""Initialize affine transformation decoder.
 
         Args:
-            dimensions: Number of spatial dimensions.
+            spatial_dims: Number of spatial dimensions.
             features: Number of input features.
             hidden: Number of hidden units.
             max_angle: Maximum rotation angle with respect to unit cube domain.
@@ -246,13 +246,13 @@ class AffineTransformDecoder(Module):
 
         """
         super().__init__()
-        if dimensions < 2 or dimensions > 3:
+        if spatial_dims < 2 or spatial_dims > 3:
             raise ValueError(f"{type(self).__name__}() 'ndim' must be 2 or 3")
-        self.dimensions = dimensions
+        self.spatial_dims = spatial_dims
         self.linear = Sequential(Linear(features, hidden), ReLU(inplace=True))
-        self.offset = Linear(hidden, dimensions, bias=init, init=init)
-        self.angles = Linear(hidden, 1 if dimensions == 2 else dimensions, bias=init, init=init)
-        self.scales = Linear(hidden, dimensions, bias=init, init=init)
+        self.offset = Linear(hidden, spatial_dims, bias=init, init=init)
+        self.angles = Linear(hidden, 1 if spatial_dims == 2 else spatial_dims, bias=init, init=init)
+        self.scales = Linear(hidden, spatial_dims, bias=init, init=init)
         self.max_angle = max_angle
         self.max_offset = max_offset
         self.max_scale_log = math.log(max_scale)
@@ -267,7 +267,7 @@ class AffineTransformDecoder(Module):
         Returns:
             When ``self.as_matrix == True``, dictionary with key 'affine' with value
             corresponding to the homogeneous coordinate transformation matrix as tensor
-            of shape ``(N, D, D + 1)`` where ``D == self.dimensions``. Otherwise, dictionary
+            of shape ``(N, D, D + 1)`` where ``D == self.spatial_dims``. Otherwise, dictionary
             keys 'angles', 'offset', and 'scales' contain the separately predicted affine
             transformation parameters.
 
@@ -302,8 +302,8 @@ class VectorFieldDecoder(Module):
     ) -> None:
         if in_channels < 0:
             raise ValueError(f"{type(self).__name__}() 'in_channels' must be positive")
-        dimensions = len(in_size)
-        if dimensions < 1 or dimensions > 3:
+        spatial_dims = len(in_size)
+        if spatial_dims < 1 or spatial_dims > 3:
             raise ValueError(f"{type(self).__name__}() 'in_size' must be sequence of length 2 or 3")
 
         super().__init__()
@@ -311,14 +311,14 @@ class VectorFieldDecoder(Module):
         self._in_channels = in_channels
         self._in_size = Size(in_size)
         self.normalize_flow = normalize_flow
-        interp_mode = "bilinear" if dimensions == 2 else "trilinear"
+        interp_mode = "bilinear" if spatial_dims == 2 else "trilinear"
 
         def conv(m: int, n: int) -> ConvLayer:
             ks = 3
             bias = bias_init if bias_enabled else False
             norm = "batch" if batch_norm_enabled else None
             acti = "relu"
-            return ConvLayer(dimensions, m, n, kernel_size=ks, bias=bias, norm=norm, acti=acti)
+            return ConvLayer(spatial_dims, m, n, kernel_size=ks, bias=bias, norm=norm, acti=acti)
 
         self.blocks = ModuleList(
             [
@@ -328,7 +328,7 @@ class VectorFieldDecoder(Module):
                 conv(16, 8),
             ]
         )
-        self.head = convolution(dimensions, 8, dimensions, kernel_size=3, padding=1)
+        self.head = convolution(spatial_dims, 8, spatial_dims, kernel_size=3, padding=1)
         self.up = Upsample(scale_factor=2, mode=interp_mode, align_corners=False)
 
     @property
@@ -336,7 +336,7 @@ class VectorFieldDecoder(Module):
         return len(self.blocks)
 
     @property
-    def dimensions(self) -> int:
+    def spatial_dims(self) -> int:
         return len(self.in_size)
 
     @property
@@ -349,7 +349,7 @@ class VectorFieldDecoder(Module):
 
     @property
     def out_channels(self) -> int:
-        return self.dimensions
+        return self.spatial_dims
 
     @property
     def out_size(self) -> Size:
@@ -373,7 +373,7 @@ class VectorFieldDecoder(Module):
         else:
             batch_size = in_shape[0]
             input_shape = self.input_shape(batch_size)
-            if len(in_shape) != self.dimensions + 2 or in_shape != input_shape:
+            if len(in_shape) != self.spatial_dims + 2 or in_shape != input_shape:
                 raise ValueError(
                     f"{type(self).__name__}.output_shape() 'in_shape' must be"
                     f" (N, {', '.join((str(n) for n in input_shape[1:]))}"
@@ -443,10 +443,10 @@ class SpatialTransformerNetwork(Module):
         self.config = config
         self._in_channels = in_channels
         self._in_size = Size(in_size)
-        dimensions = len(in_size)
+        spatial_dims = len(in_size)
         # Encoder of concatenated input images
         self.encoder = SpatialTransformEncoder(
-            dimensions=dimensions,
+            spatial_dims=spatial_dims,
             in_channels=in_channels,
             bias_enabled=config.bias_enabled,
             bias_init=config.bias_init,
@@ -458,9 +458,9 @@ class SpatialTransformerNetwork(Module):
         if has_affine_component(config.transform):
             ds_factor = 2
             features = fm_channels * Size((n // ds_factor for n in fm_size)).numel()
-            self.pool = pooling("avg", dimensions=dimensions, kernel_size=ds_factor)
+            self.pool = pooling("avg", spatial_dims=spatial_dims, kernel_size=ds_factor)
             self.affine = AffineTransformDecoder(
-                dimensions=dimensions,
+                spatial_dims=spatial_dims,
                 features=features,
                 hidden=config.affine_nodes,
                 max_angle=config.affine_max_angle,
@@ -484,7 +484,7 @@ class SpatialTransformerNetwork(Module):
             self.vfield = None
 
     @property
-    def dimensions(self) -> int:
+    def spatial_dims(self) -> int:
         r"""Number of spatial dimensions."""
         return len(self.in_size)
 
@@ -508,7 +508,7 @@ class SpatialTransformerNetwork(Module):
     @property
     def out_channels(self) -> int:
         r"""Number of output channels of vector field parameters or 0."""
-        return 0 if self.vfield is None else self.dimensions
+        return 0 if self.vfield is None else self.spatial_dims
 
     @property
     def out_size(self) -> Size:
@@ -527,7 +527,7 @@ class SpatialTransformerNetwork(Module):
         else:
             batch_size = in_shape[0]
             input_shape = self.input_shape(batch_size)
-            if len(in_shape) != self.dimensions + 2 or in_shape != input_shape:
+            if len(in_shape) != self.spatial_dims + 2 or in_shape != input_shape:
                 raise ValueError(
                     f"{type(self).__name__}.output_shape() 'in_shape' must be"
                     f" (N, {', '.join((str(n) for n in input_shape[1:]))}"
@@ -535,7 +535,7 @@ class SpatialTransformerNetwork(Module):
         size = self.output_size()
         if not size:
             return Size()
-        return Size((batch_size, self.dimensions)) + size[::-1]
+        return Size((batch_size, self.spatial_dims)) + size[::-1]
 
     def output_size(self, in_size: Optional[ScalarOrTuple[int]] = None) -> ScalarOrTuple[int]:
         r"""Calculate spatial size of output vector field parameters."""

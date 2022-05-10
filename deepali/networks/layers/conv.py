@@ -274,7 +274,7 @@ class ConvLayer(ReprWithCrossReferences, Sequential):
 
     def __init__(
         self,
-        dimensions: int,
+        spatial_dims: int,
         in_channels: int,
         out_channels: int,
         kernel_size: ScalarOrTuple[int],
@@ -292,10 +292,10 @@ class ConvLayer(ReprWithCrossReferences, Sequential):
         transposed: bool = False,
         conv: Optional[Module] = None,
     ) -> None:
-        if dimensions < 0 or dimensions > 3:
-            raise ValueError("ConvLayer() 'dimensions' must be 1, 2, or 3")
+        if spatial_dims < 0 or spatial_dims > 3:
+            raise ValueError("ConvLayer() 'spatial_dims' must be 1, 2, or 3")
         if isinstance(kernel_size, Integral):
-            kernel_size = (kernel_size,) * dimensions
+            kernel_size = (kernel_size,) * spatial_dims
         if padding is None:
             padding = same_padding(kernel_size, dilation)
         # Order of layer operations
@@ -323,7 +323,7 @@ class ConvLayer(ReprWithCrossReferences, Sequential):
         else:
             norm_after_conv = order.index("C") < order.index("N")
             num_features = out_channels if norm_after_conv else in_channels
-            norm_layer = normalization(norm, dimensions=dimensions, num_features=num_features)
+            norm_layer = normalization(norm, spatial_dims=spatial_dims, num_features=num_features)
         # Convolution layer
         if bias is None:
             bias = True
@@ -333,7 +333,7 @@ class ConvLayer(ReprWithCrossReferences, Sequential):
             output_padding = stride_minus_kernel_padding(1, stride)
         if conv is None:
             conv = convolution(
-                dimensions,
+                spatial_dims,
                 in_channels,
                 out_channels,
                 kernel_size=kernel_size,
@@ -359,7 +359,7 @@ class ConvLayer(ReprWithCrossReferences, Sequential):
             self.acti = None
         if norm_layer is None:
             self.norm = None
-        self.dimensions = dimensions
+        self.spatial_dims = spatial_dims
         self.in_channels = in_channels
         self.out_channels = out_channels
         self.order = order
@@ -371,7 +371,7 @@ class ConvLayer(ReprWithCrossReferences, Sequential):
 
 
 def convolution(
-    dimensions: int,
+    spatial_dims: int,
     in_channels: int,
     out_channels: int,
     kernel_size: ScalarOrTuple[int],
@@ -406,19 +406,19 @@ def convolution(
     )
     # Specify non-default padding_mode only if used so conv.extra_repr() does not show it
     if any(n != 0 for n in ((padding,) if isinstance(padding, int) else padding)):
-        kwargs["padding_mode"] = padding_mode.conv_mode(dimensions)
+        kwargs["padding_mode"] = padding_mode.conv_mode(spatial_dims)
     if transposed:
         if output_padding is None:
             output_padding = stride_minus_kernel_padding(1, stride)
         kwargs["output_padding"] = output_padding
-    if dimensions == 1:
+    if spatial_dims == 1:
         conv_type = ConvTranspose1d if transposed else Conv1d
-    elif dimensions == 2:
+    elif spatial_dims == 2:
         conv_type = ConvTranspose2d if transposed else Conv2d
-    elif dimensions == 3:
+    elif spatial_dims == 3:
         conv_type = ConvTranspose3d if transposed else Conv3d
     else:
-        raise ValueError("convolution() 'dimensions' must be 1, 2, or 3")
+        raise ValueError("convolution() 'spatial_dims' must be 1, 2, or 3")
     return conv_type(in_channels, out_channels, **kwargs)
 
 

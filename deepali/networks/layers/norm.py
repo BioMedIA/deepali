@@ -17,7 +17,7 @@ NormArg = Union[NormFunc, str, Mapping[str, Any], Sequence, None]
 def normalization(
     arg: NormArg,
     *args,
-    dimensions: Optional[int] = None,
+    spatial_dims: Optional[int] = None,
     num_features: Optional[int] = None,
     **kwargs,
 ) -> Module:
@@ -27,7 +27,7 @@ def normalization(
         arg: Custom normalization function or module, or name of normalization layer with optional keyword arguments.
         args: Positional arguments passed to normalization layer.
         num_features: Number of input features.
-        dimensions: Number of spatial dimensions of input tensors.
+        spatial_dims: Number of spatial dimensions of input tensors.
         kwargs: Additional keyword arguments for normalization layer. Overrides keyword arguments given as second
             tuple item when ``arg`` is a ``(name, kwargs)`` tuple instead of a string.
 
@@ -69,13 +69,13 @@ def normalization(
     if norm_name in ("none", "identity"):
         norm = nn.Identity()
     elif norm_name in ("batch", "batchnorm"):
-        if dimensions is None:
-            raise ValueError("normalization() 'dimensions' required for 'batch' norm")
-        if dimensions < 0 or dimensions > 3:
-            raise ValueError("normalization() 'dimensions' must be 1, 2, or 3")
+        if spatial_dims is None:
+            raise ValueError("normalization() 'spatial_dims' required for 'batch' norm")
+        if spatial_dims < 0 or spatial_dims > 3:
+            raise ValueError("normalization() 'spatial_dims' must be 1, 2, or 3")
         if num_features is None:
             raise ValueError("normalization() 'num_features' required for 'batch' norm")
-        norm_type = (nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d)[dimensions - 1]
+        norm_type = (nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d)[spatial_dims - 1]
         norm = norm_type(num_features, *args, **norm_args)
     elif norm_name in ("group", "groupnorm"):
         num_groups = norm_args.pop("num_groups", 1)
@@ -91,13 +91,13 @@ def normalization(
         # (see also https://arxiv.org/abs/1803.08494, Figure 2).
         norm = nn.GroupNorm(num_features, num_features, *args, **norm_args)
     elif norm_name in ("instance", "instancenorm"):
-        if dimensions is None:
-            raise ValueError("normalization() 'dimensions' required for 'instance' norm")
-        if dimensions < 0 or dimensions > 3:
-            raise ValueError("normalization() 'dimensions' must be 1, 2, or 3")
+        if spatial_dims is None:
+            raise ValueError("normalization() 'spatial_dims' required for 'instance' norm")
+        if spatial_dims < 0 or spatial_dims > 3:
+            raise ValueError("normalization() 'spatial_dims' must be 1, 2, or 3")
         if num_features is None:
             raise ValueError("normalization() 'num_features' required for 'instance' norm")
-        norm_type = (nn.InstanceNorm1d, nn.InstanceNorm2d, nn.InstanceNorm3d)[dimensions - 1]
+        norm_type = (nn.InstanceNorm1d, nn.InstanceNorm2d, nn.InstanceNorm3d)[spatial_dims - 1]
         norm = norm_type(num_features, *args, **norm_args)
     else:
         raise ValueError("normalization() unknown layer type {norm_name!r}")
@@ -138,13 +138,13 @@ class NormLayer(LambdaLayer):
         self,
         arg: NormArg,
         *args,
-        dimensions: Optional[int] = None,
+        spatial_dims: Optional[int] = None,
         num_features: Optional[int] = None,
         **kwargs: Mapping[str, Any],
     ) -> None:
         if callable(arg):
             norm = partial(arg, *args, **kwargs) if args or kwargs else arg
         else:
-            kwargs.update(dict(dimensions=dimensions, num_features=num_features))
+            kwargs.update(dict(spatial_dims=spatial_dims, num_features=num_features))
             norm = normalization(arg, *args, **kwargs)
         super().__init__(norm)

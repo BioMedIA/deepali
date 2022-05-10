@@ -38,7 +38,7 @@ POOLING_TYPES = {
 def pooling(
     arg: PoolArg,
     *args: Any,
-    dimensions: Optional[int] = None,
+    spatial_dims: Optional[int] = None,
     **kwargs,
 ) -> Module:
     r"""Get pooling layer.
@@ -47,7 +47,7 @@ def pooling(
         arg: Custom pooling function or module, or name of pooling layer with optional keyword arguments.
             When ``arg`` is a callable but not of type ``torch.nn.Module``, it is wrapped in a ``PoolLayer``.
             If ``None`` or 'identity', an instance of ``torch.nn.Identity`` is returned.
-        dimensions: Number of spatial dimensions of input tensors.
+        spatial_dims: Number of spatial dimensions of input tensors.
         args: Arguments to pass to init function of pooling layer. If ``arg`` is a callable, the given arguments
             are passed to the function each time it is called as arguments.
         kwargs: Additional keyword arguments for initialization of pooling layer. Overrides keyword arguments given as
@@ -88,14 +88,14 @@ def pooling(
     if pool_type is None:
         raise ValueError(f"pooling() unknown pooling layer {pool_name!r}")
     if isinstance(pool_type, Sequence):
-        if dimensions is None:
-            raise ValueError(f"pooling() 'dimensions' required for pooling layer {pool_name!r}")
+        if spatial_dims is None:
+            raise ValueError(f"pooling() 'spatial_dims' required for pooling layer {pool_name!r}")
         try:
-            pool_type = pool_type[dimensions - 1]
+            pool_type = pool_type[spatial_dims - 1]
         except IndexError:
             pool_type = None
         if pool_type is None:
-            raise ValueError(f"pooling({pool_name!r}) does not support dimensions={dimensions}")
+            raise ValueError(f"pooling({pool_name!r}) does not support spatial_dims={spatial_dims}")
     pool_args.update(kwargs)
     module = pool_type(*args, **pool_args)
     return module
@@ -112,11 +112,11 @@ class PoolLayer(LambdaLayer):
         self,
         arg: PoolArg,
         *args: Any,
-        dimensions: Optional[int] = None,
+        spatial_dims: Optional[int] = None,
         **kwargs,
     ) -> None:
         if callable(arg):
             pool = partial(arg, *args, **kwargs) if args or kwargs else arg
         else:
-            pool = pooling(arg, *args, dimensions=dimensions, **kwargs)
+            pool = pooling(arg, *args, spatial_dims=spatial_dims, **kwargs)
         super().__init__(pool)

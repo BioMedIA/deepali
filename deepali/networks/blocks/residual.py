@@ -36,7 +36,7 @@ class ResidualUnit(SkipConnection):
 
     def __init__(
         self,
-        dimensions: int,
+        spatial_dims: int,
         in_channels: int,
         out_channels: Optional[int] = None,
         num_channels: Optional[int] = None,
@@ -60,7 +60,7 @@ class ResidualUnit(SkipConnection):
         r"""Initialize residual unit.
 
         Args:
-            dimensions: Number of spatial input and output dimensions.
+            spatial_dims: Number of spatial input and output dimensions.
             in_channels: Number of input feature maps.
             out_channels: Number of output feature maps.
             num_channels: Number of input feature maps to spatial convolutions.
@@ -112,8 +112,8 @@ class ResidualUnit(SkipConnection):
                 and the other residual unit will share references to the same convolution modules.
 
         """
-        if dimensions < 0 or dimensions > 3:
-            raise ValueError("ResidualUnit() 'dimensions' must be 1, 2, or 3")
+        if spatial_dims < 0 or spatial_dims > 3:
+            raise ValueError("ResidualUnit() 'spatial_dims' must be 1, 2, or 3")
         order = order.upper()
         if len(set(order)) != len(order) or "C" not in order or "A" not in order:
             raise ValueError(
@@ -157,7 +157,7 @@ class ResidualUnit(SkipConnection):
             else:
                 raise ValueError("ResidualUnit() 'pre_conv' must be 'conv' or 'conv1'")
             conv = ConvLayer(
-                dimensions=dimensions,
+                spatial_dims=spatial_dims,
                 in_channels=in_channels,
                 out_channels=num_channels,
                 kernel_size=pre_kernel_size,
@@ -181,7 +181,7 @@ class ResidualUnit(SkipConnection):
                 assert isinstance(other_layer, ConvLayer)
                 other_conv = other_layer.conv
             conv = ConvLayer(
-                dimensions=dimensions,
+                spatial_dims=spatial_dims,
                 in_channels=in_channels if is_first_layer else num_channels,
                 out_channels=num_channels,
                 kernel_size=kernel_size,
@@ -213,7 +213,7 @@ class ResidualUnit(SkipConnection):
             else:
                 raise ValueError("ResidualUnit() 'post_conv' must be 'conv' or 'conv1'")
             conv = ConvLayer(
-                dimensions=dimensions,
+                spatial_dims=spatial_dims,
                 in_channels=num_channels,
                 out_channels=out_channels,
                 kernel_size=post_kernel_size,
@@ -267,7 +267,7 @@ class ResidualUnit(SkipConnection):
             conv_args.update(skip)
             if "padding" not in conv_args:
                 conv_args["padding"] = same_padding(conv_args["kernel_size"], conv_args["dilation"])
-            skip = convolution(dimensions, in_channels, out_channels, **conv_args)
+            skip = convolution(spatial_dims, in_channels, out_channels, **conv_args)
         elif not callable(skip):
             raise TypeError("ResidualUnit() 'skip' must be str, dict, callable, or None")
         # Function used to combine input with residual tensor
@@ -280,7 +280,7 @@ class ResidualUnit(SkipConnection):
             join.add_module("acti", post_acti)
         # Initialize parent class and set module attributes
         super().__init__(residual, name="residual", skip=skip, join=join)
-        self.dimensions = dimensions
+        self.spatial_dims = spatial_dims
         self.in_channels = in_channels
         self.out_channels = out_channels
         self.num_channels = num_channels

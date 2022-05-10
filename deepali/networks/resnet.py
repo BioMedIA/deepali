@@ -44,7 +44,7 @@ class ResNetConfig(DataclassConfig):
     r"""Configuration of residual network architecture."""
 
     # Input shape
-    dimensions: int
+    spatial_dims: int
     in_channels: int = 1
 
     # cf. ResNet and ResidualUnit
@@ -69,10 +69,10 @@ class ResNetConfig(DataclassConfig):
 
     @classmethod
     def from_depth(
-        cls, model_depth: int, dimensions: int, in_channels: int = 1, **kwargs
+        cls, model_depth: int, spatial_dims: int, in_channels: int = 1, **kwargs
     ) -> ResNetConfig:
         r"""Get default ResNet configuration for given depth."""
-        config = cls(dimensions=dimensions, in_channels=in_channels, **kwargs)
+        config = cls(spatial_dims=spatial_dims, in_channels=in_channels, **kwargs)
         if model_depth == 10:
             config.num_blocks = (1, 1, 1, 1)
             config.num_layers = 2
@@ -106,9 +106,9 @@ class ResNetConfig(DataclassConfig):
         return config
 
 
-def classification_head(dimensions: int, in_channels: int, num_classes: int, **kwargs) -> Module:
+def classification_head(spatial_dims: int, in_channels: int, num_classes: int, **kwargs) -> Module:
     r"""Image classification head for ResNet model."""
-    pool = pooling("AdaptiveAvg", dimensions=dimensions, output_size=1)
+    pool = pooling("AdaptiveAvg", spatial_dims=spatial_dims, output_size=1)
     fc = Linear(in_channels, num_classes)
     return Sequential(pool, Flatten(), fc)
 
@@ -116,7 +116,7 @@ def classification_head(dimensions: int, in_channels: int, num_classes: int, **k
 def conv_layer(
     level: int,
     is_first: bool,
-    dimensions: int,
+    spatial_dims: int,
     in_channels: int,
     out_channels: int,
     **kwargs,
@@ -131,16 +131,16 @@ def conv_layer(
         if "A" in order and order.index("A") < order.index("C"):
             acti = None
     kwargs.update(dict(norm=norm, acti=acti, order=order))
-    return ConvLayer(dimensions, in_channels, out_channels, **kwargs)
+    return ConvLayer(spatial_dims, in_channels, out_channels, **kwargs)
 
 
-def input_layer(dimensions: int, in_channels: int, out_channels: int, **kwargs) -> Module:
+def input_layer(spatial_dims: int, in_channels: int, out_channels: int, **kwargs) -> Module:
     r"""First convolutional ResNet layer."""
     order = kwargs.get("order", "cna").upper()
     norm = None if "N" in order and order.index("N") < order.index("C") else kwargs.get("norm")
     kwargs.update(dict(kernel_size=7, padding=3, stride=2, norm=norm, acti=None, order=order))
-    conv = ConvLayer(dimensions, in_channels, out_channels, **kwargs)
-    pool = pooling("max", dimensions=dimensions, kernel_size=3, stride=2, padding=1)
+    conv = ConvLayer(spatial_dims, in_channels, out_channels, **kwargs)
+    pool = pooling("max", spatial_dims=spatial_dims, kernel_size=3, stride=2, padding=1)
     return Sequential(conv, pool)
 
 
@@ -157,7 +157,7 @@ class ResNet(ReprWithCrossReferences, Sequential):
 
     def __init__(
         self,
-        dimensions: int,
+        spatial_dims: int,
         in_channels: int = 1,
         num_channels: ScalarOrTuple[int] = (64, 128, 256, 512),
         num_blocks: ScalarOrTuple[int] = (3, 4, 6, 3),
@@ -186,7 +186,7 @@ class ResNet(ReprWithCrossReferences, Sequential):
         r"""Initialize layers.
 
         Args:
-            dimension: Number of spatial tensor dimensions.
+            spatial_dims: Number of spatial tensor dimensions.
             in_channels: Number of input channels.
             num_channels: Number of feature channels at each level.
             num_blocks: Number of residual blocks at each level.
@@ -260,7 +260,7 @@ class ResNet(ReprWithCrossReferences, Sequential):
         else:
             channels = max(1, int(num_channels[0] * expansion + 0.5))
             layer = input_layer(
-                dimensions=dimensions,
+                spatial_dims=spatial_dims,
                 in_channels=in_channels,
                 out_channels=channels,
                 kernel_size=kernel_size,
@@ -284,7 +284,7 @@ class ResNet(ReprWithCrossReferences, Sequential):
                     deconv_out_channels = n
                     channels = n
                 deconv = deconv_layer(
-                    dimensions=dimensions,
+                    spatial_dims=spatial_dims,
                     in_channels=deconv_in_channels,
                     out_channels=deconv_out_channels,
                     scale_factor=1 / s,
@@ -301,7 +301,7 @@ class ResNet(ReprWithCrossReferences, Sequential):
                 conv = conv_layer(
                     level=i,
                     is_first=is_first,
-                    dimensions=dimensions,
+                    spatial_dims=spatial_dims,
                     in_channels=channels,
                     out_channels=n,
                     kernel_size=kernel_size,
@@ -318,7 +318,7 @@ class ResNet(ReprWithCrossReferences, Sequential):
             block = None
             for j in range(b):
                 block = resnet_block(
-                    dimensions=dimensions,
+                    spatial_dims=spatial_dims,
                     in_channels=channels,
                     out_channels=n,
                     num_channels=m,
@@ -354,9 +354,9 @@ class ResNet(ReprWithCrossReferences, Sequential):
             )
             if num_classes:
                 head_kwargs["num_classes"] = num_classes
-            head = output_layer(dimensions, channels, **head_kwargs)
+            head = output_layer(spatial_dims, channels, **head_kwargs)
             self.add_module("output_layer", head)
-        self.dimensions = dimensions
+        self.spatial_dims = spatial_dims
         self.in_channels = in_channels
         self.out_channels = channels
         self.num_classes = num_classes or None
@@ -364,7 +364,7 @@ class ResNet(ReprWithCrossReferences, Sequential):
     @classmethod
     def from_config(cls: Type[ResNet], config: ResNetConfig) -> ResNet:
         return cls(
-            dimensions=config.dimensions,
+            spatial_dims=config.spatial_dims,
             in_channels=config.in_channels,
             num_channels=config.num_channels,
             num_blocks=config.num_blocks,
@@ -395,11 +395,11 @@ class ResNet(ReprWithCrossReferences, Sequential):
     def from_depth(
         cls: Type[ResNet],
         model_depth: int,
-        dimensions: int,
+        spatial_dims: int,
         in_channels: int = 1,
         **kwargs,
     ) -> ResNet:
-        config = ResNetConfig.from_depth(model_depth, dimensions, in_channels, **kwargs)
+        config = ResNetConfig.from_depth(model_depth, spatial_dims, in_channels, **kwargs)
         return cls.from_config(config)
 
     def init_conv_modules(self) -> ResNet:

@@ -7,5 +7,5 @@ def test_resnet() -> None:
     r"""Test construction of ResNet model."""
 
     # ResNet-34 for ImageNet classification
-    model = ResNet.from_depth(model_depth=34, dimensions=2, in_channels=3, num_classes=1000)
+    model = ResNet.from_depth(model_depth=34, spatial_dims=2, in_channels=3, num_classes=1000)
     summary(model, input_size=(1, 3, 256, 256), depth=10, device="cpu")

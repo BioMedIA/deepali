@@ -258,7 +258,7 @@ class UNetConfig(DataclassConfig):
 
 
 def unet_conv_block(
-    dimensions: int,
+    spatial_dims: int,
     in_channels: int,
     out_channels: int,
     kernel_size: ScalarOrTuple[int] = 3,
@@ -283,7 +283,7 @@ def unet_conv_block(
 
     def conv_layer(m: int, n: int, s: int, d: int) -> ConvLayer:
         return ConvLayer(
-            dimensions=dimensions,
+            spatial_dims=spatial_dims,
             in_channels=m,
             out_channels=n,
             kernel_size=kernel_size,
@@ -315,7 +315,7 @@ class UNetEncoder(ReprWithCrossReferences, Module):
 
     def __init__(
         self,
-        dimensions: int,
+        spatial_dims: int,
         in_channels: Optional[int] = None,
         config: Optional[UNetEncoderConfig] = None,
         conv_block: Optional[ModuleFactory] = None,
@@ -401,7 +401,7 @@ class UNetEncoder(ReprWithCrossReferences, Module):
                         d = config.stage_1_dilation
                     d = d or config.conv_layer.dilation
                     downsample = conv_block(
-                        dimensions=dimensions,
+                        spatial_dims=spatial_dims,
                         in_channels=channels,
                         out_channels=c,
                         kernel_size=k,
@@ -432,14 +432,14 @@ class UNetEncoder(ReprWithCrossReferences, Module):
                     if config.downsample.mode == "avg":
                         pool_args["count_include_pad"] = False
                     downsample = PoolLayer(
-                        config.downsample.mode, dimensions=dimensions, **pool_args
+                        config.downsample.mode, spatial_dims=spatial_dims, **pool_args
                     )
                 stage["downsample"] = downsample
                 s = 1
             elif i == 0:
                 c = nc[0]
                 stage["input"] = input_layer(
-                    dimensions=dimensions,
+                    spatial_dims=spatial_dims,
                     in_channels=channels,
                     out_channels=c,
                     kernel_size=config.conv_layer.kernel_size,
@@ -462,7 +462,7 @@ class UNetEncoder(ReprWithCrossReferences, Module):
                     d = d or config.stage_1_dilation
                 d = d or config.conv_layer.dilation
                 block = conv_block(
-                    dimensions=dimensions,
+                    spatial_dims=spatial_dims,
                     in_channels=channels,
                     out_channels=c,
                     kernel_size=config.conv_layer.kernel_size,
@@ -490,7 +490,7 @@ class UNetEncoder(ReprWithCrossReferences, Module):
 
         self.config = config
         self.num_channels: List[List[int]] = num_channels
-        self.dimensions = dimensions
+        self.spatial_dims = spatial_dims
         self.in_channels = in_channels
         self.stages = stages
 
@@ -540,7 +540,7 @@ class UNetDecoder(ReprWithCrossReferences, Module):
 
     def __init__(
         self,
-        dimensions: int,
+        spatial_dims: int,
         in_channels: Optional[int] = None,
         config: Optional[UNetDecoderConfig] = None,
         conv_block: Optional[ModuleFactory] = None,
@@ -625,7 +625,7 @@ class UNetDecoder(ReprWithCrossReferences, Module):
 
         stage = ModuleDict()
         stage["input"] = input_layer(
-            dimensions=dimensions,
+            spatial_dims=spatial_dims,
             in_channels=in_channels,
             out_channels=channels,
             kernel_size=config.conv_layer.kernel_size,
@@ -641,7 +641,7 @@ class UNetDecoder(ReprWithCrossReferences, Module):
         blocks = Sequential()
         for j, c in enumerate(num_channels[0][1:]):
             block = conv_block(
-                dimensions=dimensions,
+                spatial_dims=spatial_dims,
                 in_channels=channels,
                 out_channels=c,
                 kernel_size=config.conv_layer.kernel_size,
@@ -672,7 +672,7 @@ class UNetDecoder(ReprWithCrossReferences, Module):
                     k = config.conv_layer.kernel_size
                 d = config.upsample.dilation or config.conv_layer.dilation
                 pre_conv = ConvLayer(
-                    dimensions=dimensions,
+                    spatial_dims=spatial_dims,
                     in_channels=channels,
                     out_channels=nc[0],
                     kernel_size=k,
@@ -689,7 +689,7 @@ class UNetDecoder(ReprWithCrossReferences, Module):
                 pre_conv = "default"
             if s > 1:
                 upsample = Upsample(
-                    dimensions=dimensions,
+                    spatial_dims=spatial_dims,
                     in_channels=channels,
                     out_channels=nc[0],
                     scale_factor=s,
@@ -706,7 +706,7 @@ class UNetDecoder(ReprWithCrossReferences, Module):
             blocks = Sequential()
             for j, c in enumerate(nc[1:]):
                 block = conv_block(
-                    dimensions=dimensions,
+                    spatial_dims=spatial_dims,
                     in_channels=channels,
                     out_channels=c,
                     kernel_size=config.conv_layer.kernel_size,
@@ -729,7 +729,7 @@ class UNetDecoder(ReprWithCrossReferences, Module):
         config.num_channels = num_channels
 
         self.config = config
-        self.dimensions = dimensions
+        self.spatial_dims = spatial_dims
         self.in_channels = in_channels
         self.num_channels: List[List[int]] = num_channels
         self.stages = stages
@@ -744,7 +744,7 @@ class UNetDecoder(ReprWithCrossReferences, Module):
     ) -> UNetDecoder:
         r"""Create U-net decoder given U-net encoder configuration."""
         config = UNetDecoderConfig.from_encoder(encoder, residual=residual, **kwargs)
-        return cls(dimensions=encoder.dimensions, config=config)
+        return cls(spatial_dims=encoder.spatial_dims, config=config)
 
     @property
     def out_channels(self) -> int:
@@ -824,7 +824,7 @@ class SequentialUNet(ReprWithCrossReferences, Sequential):
 
     def __init__(
         self,
-        dimensions: int,
+        spatial_dims: int,
         in_channels: Optional[int] = None,
         out_channels: Optional[int] = None,
         config: Optional[UNetConfig] = None,
@@ -844,7 +844,7 @@ class SequentialUNet(ReprWithCrossReferences, Sequential):
 
         # Downsampling path
         self.encoder = UNetEncoder(
-            dimensions=dimensions,
+            spatial_dims=spatial_dims,
             in_channels=in_channels,
             config=config.encoder,
             conv_block=conv_block,
@@ -853,7 +853,7 @@ class SequentialUNet(ReprWithCrossReferences, Sequential):
 
         # Upsamling path with skip connections
         self.decoder = UNetDecoder(
-            dimensions=dimensions,
+            spatial_dims=spatial_dims,
             in_channels=self.encoder.out_channels,
             config=config.decoder,
             conv_block=conv_block,
@@ -875,7 +875,7 @@ class SequentialUNet(ReprWithCrossReferences, Sequential):
             if config.output is None:
                 config.output = UNetOutputConfig()
             output = output_layer(
-                dimensions=dimensions,
+                spatial_dims=spatial_dims,
                 in_channels=channels,
                 out_channels=out_channels,
                 kernel_size=config.output.kernel_size,
@@ -892,8 +892,8 @@ class SequentialUNet(ReprWithCrossReferences, Sequential):
         self.out_channels: Union[int, List[int]] = out_channels
 
     @property
-    def dimensions(self) -> int:
-        return self.encoder.dimensions
+    def spatial_dims(self) -> int:
+        return self.encoder.spatial_dims
 
     @property
     def in_channels(self) -> int:
@@ -921,7 +921,7 @@ class UNet(ReprWithCrossReferences, Module):
 
     def __init__(
         self,
-        dimensions: int,
+        spatial_dims: int,
         in_channels: Optional[int] = None,
         out_channels: Optional[int] = None,
         output_modules: Optional[Mapping[str, Module]] = None,
@@ -949,7 +949,7 @@ class UNet(ReprWithCrossReferences, Module):
 
         # Downsampling path
         self.encoder = UNetEncoder(
-            dimensions=dimensions,
+            spatial_dims=spatial_dims,
             in_channels=in_channels,
             config=config.encoder,
             conv_block=conv_block,
@@ -958,7 +958,7 @@ class UNet(ReprWithCrossReferences, Module):
 
         # Upsamling path with skip connections
         self.decoder = UNetDecoder(
-            dimensions=dimensions,
+            spatial_dims=spatial_dims,
             in_channels=self.encoder.out_channels,
             config=config.decoder,
             conv_block=conv_block,
@@ -983,7 +983,7 @@ class UNet(ReprWithCrossReferences, Module):
             if config.output is None:
                 config.output = UNetOutputConfig()
             output = output_layer(
-                dimensions=dimensions,
+                spatial_dims=spatial_dims,
                 in_channels=channels,
                 out_channels=out_channels,
                 kernel_size=config.output.kernel_size,
@@ -1016,8 +1016,8 @@ class UNet(ReprWithCrossReferences, Module):
             self.output_modules[name] = output
 
     @property
-    def dimensions(self) -> int:
-        return self.encoder.dimensions
+    def spatial_dims(self) -> int:
+        return self.encoder.spatial_dims
 
     @property
     def in_channels(self) -> int:
