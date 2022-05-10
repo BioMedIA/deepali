@@ -5,7 +5,7 @@ from __future__ import annotations
 from copy import deepcopy
 from collections import OrderedDict
 from dataclasses import dataclass
-from typing import Callable, Iterable, Mapping, Optional, Sequence, Type, Union
+from typing import Callable, Iterable, Mapping, NamedTuple, Optional, Sequence, Tuple, Type, Union
 from typing import Dict, List
 
 from torch import Tensor
@@ -15,6 +15,7 @@ from ..core.config import DataclassConfig
 from ..core.enum import PaddingMode
 from ..core.image import crop
 from ..core.itertools import repeat_last
+from ..core.nnutils import as_immutable_container
 from ..core.types import ListOrTuple, ScalarOrTuple
 from ..modules import GetItem, ReprWithCrossReferences
 
@@ -516,7 +517,7 @@ class UNetEncoder(ReprWithCrossReferences, Module):
             fm_sizes.append(size)
         return fm_sizes
 
-    def forward(self, x: Tensor) -> List[Tensor]:
+    def forward(self, x: Tensor) -> Tuple[Tensor, ...]:
         features = []
         for name, stage in self.stages.items():
             if not isinstance(stage, ModuleDict):
@@ -532,7 +533,7 @@ class UNetEncoder(ReprWithCrossReferences, Module):
             blocks = stage["blocks"]
             x = blocks(x)
             features.append(x)
-        return features
+        return tuple(features)
 
 
 class UNetDecoder(ReprWithCrossReferences, Module):
@@ -771,7 +772,7 @@ class UNetDecoder(ReprWithCrossReferences, Module):
             out_sizes.append(size)
         return out_sizes
 
-    def forward(self, features: Sequence[Tensor]) -> Union[Tensor, List[Tensor]]:
+    def forward(self, features: Sequence[Tensor]) -> Union[Tensor, Tuple[Tensor, ...]]:
         if not isinstance(features, Sequence):
             raise TypeError(f"{type(self).__name__}() 'features' must be Sequence")
         features = list(features)
@@ -806,7 +807,7 @@ class UNetDecoder(ReprWithCrossReferences, Module):
             if self.output_all:
                 output.append(x)
         if self.output_all:
-            return output
+            return tuple(output)
         return x
 
 
@@ -1083,7 +1084,7 @@ class UNet(ReprWithCrossReferences, Module):
             out_sizes[name] = module_output_size(module, dec_out_sizes)
         return out_sizes
 
-    def forward(self, x: Tensor) -> Union[Tensor, Dict[str, Tensor], List[Tensor]]:
+    def forward(self, x: Tensor) -> Union[Tensor, NamedTuple, Tuple[Tensor, ...]]:
         outputs = {}
         features = self.decoder(self.encoder(x))
         for name, output in self.output_modules.items():
@@ -1092,4 +1093,4 @@ class UNet(ReprWithCrossReferences, Module):
             return features
         if len(outputs) == 1 and self.out_channels:
             return next(iter(outputs.values()))
-        return outputs
+        return as_immutable_container(outputs)
