@@ -3,10 +3,17 @@ r"""Auxiliary types and functions to work with dataset partitions."""
 from __future__ import annotations
 
 from enum import Enum
-from typing import Sequence, Tuple, Union
+from itertools import accumulate
+from typing import List, Optional, Sequence, Tuple, Union
+
+from torch import Generator, default_generator, randperm
 
 
-__all__ = ("Partition", "dataset_split_lengths")
+__all__ = (
+    "Partition",
+    "dataset_split_lengths",
+    "random_split_indices",
+)
 
 
 class Partition(Enum):
@@ -70,3 +77,24 @@ def dataset_split_lengths(
     lengths[1] = max(0, lengths[1] + (total - sum(lengths)))
     assert sum(lengths) == total
     return tuple(lengths)
+
+
+def random_split_indices(
+    lengths: Sequence[int],
+    generator: Optional[Generator] = default_generator,
+) -> List[List[int]]:
+    r"""Randomly split dataset indices into non-overlapping sets of given lengths.
+
+    Args:
+        lengths: Lengths of splits to be produced.
+        generator: Generator used for the random permutation.
+
+    Returns:
+        Lists of specified ``lengths`` with randomly selected indices in ``[0, sum(lengths))``.
+
+    """
+    subsets = []
+    indices = randperm(sum(lengths), generator=generator).tolist()
+    for offset, length in zip(accumulate(lengths), lengths):
+        subsets.append(indices[offset - length : offset])
+    return subsets
