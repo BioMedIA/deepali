@@ -23,6 +23,9 @@ ScalarOrTuple4d = Union[T, Tuple[T, T, T, T]]
 ScalarOrTuple5d = Union[T, Tuple[T, T, T, T, T]]
 ScalarOrTuple6d = Union[T, Tuple[T, T, T, T, T, T]]
 
+# Cannot use Sequence type annotation when using torch.jit.ScriptModule
+ListOrTuple = Union[List[T], Tuple[T, ...]]
+
 Device = torch.device  # Union[torch.device, str], PyTorch uses Optional[torch.device] annotation
 DType = torch.dtype
 Name = Optional[str]  # Optional tensor dimension name
