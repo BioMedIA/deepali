@@ -6,7 +6,7 @@ import torch
 from torch import Tensor
 
 from deepali.networks.layers import convolution
-from deepali.networks.unet import UNet, UNetConfig
+from deepali.networks.unet import UNet, UNetConfig, last_num_channels
 
 
 @pytest.fixture(scope="function")
@@ -42,7 +42,7 @@ def test_unet_without_output_layer(input_tensor: Tensor) -> None:
 
     for i, output_tensor in enumerate(output):
         ds = 2 ** (model.num_levels - 1 - i)
-        channels = model.num_channels[i]
+        channels = last_num_channels(model.num_channels[i])
         shape = (input_tensor.shape[0], channels) + tuple(n // ds for n in input_tensor.shape[2:])
         assert output_tensor.shape == shape
 
