@@ -816,6 +816,61 @@ def center_pad(
     return F.pad(data, pad, mode=mode, value=value)
 
 
+def region_of_interest(
+    data: Tensor,
+    start: ScalarOrTuple[int],
+    size: ScalarOrTuple[int],
+    padding: Union[PaddingMode, str, float] = PaddingMode.CONSTANT,
+    value: float = 0,
+) -> Tensor:
+    r"""Extract region of interest from image tensor.
+
+    Args:
+        data: Input tensor of shape ``(N, C, ..., X)``.
+        start: Indices of lower left corner of region of interest, e.g., ``(x, y, z)``.
+        size: Size of region of interest, e.g., ``(nx, ny, nz)``.
+        padding: Padding mode to use when extrapolating input image or constant fill value.
+        value: Fill value to use when ``padding=Padding.CONSTANT``.
+
+    Returns:
+        Tensor of shape ``(N, C, ..., X)`` with spatial size equal to ``size``.
+
+    """
+    if not isinstance(data, Tensor):
+        raise TypeError("region_of_interest() 'data' must be torch.Tensor")
+    if data.dim() < 4:
+        raise ValueError("region_of_interest() 'data' must be tensor of shape (N, C, ..., X)")
+    sdim = data.dim() - 2
+    num = []
+    # Parse start index
+    if isinstance(start, int):
+        start = (start,) * sdim
+    elif not isinstance(start, Sequence) or not all(isinstance(n, int) for n in start):
+        raise TypeError("region_of_interest() 'start' must be int or sequence of ints")
+    elif len(start) != 3:
+        raise ValueError(f"region_of_interest() 'start' must be int or sequence of length {sdim}")
+    # Parse ROI size
+    if isinstance(size, int):
+        size = (size,) * sdim
+    elif not isinstance(size, Sequence) or not all(isinstance(n, int) for n in size):
+        raise TypeError("region_of_interest() 'size' must be int or sequence of ints")
+    elif len(size) != 3:
+        raise ValueError(f"region_of_interest() 'size' must be int or sequence of length {sdim}")
+    # Padding mode and fill value
+    if isinstance(padding, (PaddingMode, str)):
+        mode = PaddingMode.from_arg(padding)
+        value = value
+    elif isinstance(padding, (int, float)):
+        mode = PaddingMode.CONSTANT
+        value = padding
+    else:
+        raise TypeError("region_of_interest() 'padding' must be str, Padding, or fill value")
+    # Compute size of margins to crop/pad
+    num = [[start[i], data.shape[data.ndim - 1 - i] - (start[i] + size[i])] for i in range(sdim)]
+    num = [n for nn in num for n in nn]
+    return crop(data, num=num, mode=mode, value=value)
+
+
 def fill_border(
     data: Tensor, margin: ScalarOrTuple[int], value: float = 0, inplace: bool = False
 ) -> Tensor:

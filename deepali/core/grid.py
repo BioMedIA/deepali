@@ -1387,6 +1387,23 @@ class Grid(object):
             device=self.device,
         )
 
+    def region_of_interest(self, start: Union[int, Array], size: Union[int, Array]) -> Grid:
+        r"""Get region of interest grid."""
+        start = cat_scalars(start, num=self.ndim, device=self.device)
+        if not is_int_dtype(start.dtype):
+            raise TypeError(
+                f"Grid.region_of_interest() 'start' must be scalar or array of integer values, got dtype={start.dtype}"
+            )
+        size = cat_scalars(size, num=self.ndim, device=self.device)
+        if not is_int_dtype(size.dtype):
+            raise TypeError(
+                f"Grid.region_of_interest() 'size' must be scalar or array of integer values, got dtype={size.dtype}"
+            )
+        grid_size = self.size()
+        num = [[start[i], grid_size[i] - (start[i] + size[i])] for i in range(self.ndim)]
+        num = [n for nn in num for n in nn]
+        return self.crop(num=num)
+
     def same_domain_as(self, other: Grid) -> bool:
         """Check if this and another grid cover the same cube domain."""
         if other is self:

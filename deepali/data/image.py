@@ -602,6 +602,29 @@ class ImageBatch(DataTensor):
         grid = tuple(grid.center_pad(size) for grid in self._grid)
         return self._make_instance(data, grid)
 
+    def region_of_interest(
+        self: TImageBatch,
+        start: Union[int, Array],
+        size: Union[int, Array],
+        padding: Union[PaddingMode, str, float] = PaddingMode.CONSTANT,
+        value: float = 0,
+    ) -> TImageBatch:
+        r"""Extract region of interest from images in batch.
+
+        Args:
+            start: Indices of first spatial point to include in region of interest.
+            size: Size of region of interest.
+            padding: Image extrapolation mode or fill value.
+            value: Fill value to use when ``padding=Padding.CONSTANT``.
+
+        Returns:
+            Image batch of extracted image region of interest.
+
+        """
+        data = U.region_of_interest(self, start, size, padding=padding, value=value)
+        grid = tuple(grid.region_of_interest(start, size) for grid in self._grid)
+        return self._make_instance(data, grid)
+
     def conv(
         self: TImageBatch, kernel: Tensor, padding: Union[PaddingMode, str, int] = None
     ) -> TImageBatch:
@@ -1115,6 +1138,12 @@ class Image(DataTensor):
         r"""Pad image to specified minimum size."""
         batch = self.batch()
         batch = batch.center_pad(size, *args, mode=mode, value=value)
+        return batch[0]
+
+    def region_of_interest(self: TImage, *args, **kwargs) -> TImage:
+        r"""Extract image region of interest."""
+        batch = self.batch()
+        batch = batch.region_of_interest(*args, **kwargs)
         return batch[0]
 
     def conv(self: TImage, kernel: Tensor, padding: Union[PaddingMode, str, int] = None) -> TImage:
