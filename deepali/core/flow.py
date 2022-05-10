@@ -370,7 +370,7 @@ def warp_image(
 
     """
     if data.ndim < 4:
-        raise ValueError("warp() expected tensor 'data' of shape (N, C, ..., X)")
+        raise ValueError("warp_image() expected tensor 'data' of shape (N, C, ..., X)")
     grid = check_sample_grid("warp", data, grid)
     N = grid.shape[0]
     D = grid.shape[-1]
@@ -379,12 +379,12 @@ def warp_image(
             flow = flow.unsqueeze(0)
         elif flow.ndim != data.ndim:
             raise ValueError(
-                f"warp() expected 'flow' tensor with {data.ndim - 1} or {data.ndim} dimensions"
+                f"warp_image() expected 'flow' tensor with {data.ndim - 1} or {data.ndim} dimensions"
             )
         if flow.shape[0] != N:
             flow = flow.expand(N, *flow.shape[1:])
         if flow.shape[0] != N or flow.shape[-1] != D:
-            msg = f"warp() expected tensor 'flow' of shape (..., X, {D})"
+            msg = f"warp_image() expected tensor 'flow' of shape (..., X, {D})"
             msg += f" or (1, ..., X, {D})" if N == 1 else f" or (1|{N}, ..., X, {D})"
             raise ValueError(msg)
         grid = grid + flow
