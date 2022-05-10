@@ -5,6 +5,7 @@ from typing import Optional, Sequence, Union
 
 import torch
 from torch import Tensor
+from torch.nn.functional import binary_cross_entropy_with_logits, logsigmoid
 
 from ..core.enum import SpatialDerivativeKeys
 from ..core.grid import Grid
@@ -17,6 +18,8 @@ from ..core.types import Array, ScalarOrTuple
 
 
 __all__ = (
+    "balanced_binary_cross_entropy_with_logits",
+    "binary_cross_entropy_with_logits",
     "label_smoothing",
     "dice_score",
     "dice_loss",
@@ -32,8 +35,13 @@ __all__ = (
     "diffusion_loss",
     "divergence_loss",
     "elasticity_loss",
+    "focal_loss_with_logits",
     "total_variation_loss",
     "tv_loss",
+    "tversky_index",
+    "tversky_index_with_logits",
+    "tversky_loss",
+    "tversky_loss_with_logits",
     "inverse_consistency_loss",
     "masked_loss",
     "reduce_loss",
@@ -77,6 +85,51 @@ def label_smoothing(
     if alpha > 0:
         target = (1 - alpha) * target + alpha * (1 - target) / (target.size(1) - 1)
     return target
+
+
+def balanced_binary_cross_entropy_with_logits(
+    logits: Tensor,
+    target: Tensor,
+    weight: Optional[Tensor] = None,
+    reduction: str = "mean",
+) -> Tensor:
+    r"""Balanced binary cross entropy.
+
+    Shruti Jadon (2020) A survey of loss functions for semantic segmentation.
+    https://arxiv.org/abs/2006.14822
+
+    Args:
+        logits: Logits of binary predictions as tensor of shape ``(N, 1, ..., X)``.
+        target: Target label probabilities as tensor of shape ``(N, 1, ..., X)``.
+        weight: Voxelwise label weight tensor of shape ``(N, 1, ..., X)``.
+        reduction: Either ``none``, ``mean``, or ``sum``.
+
+    Returns:
+        Balanced binary cross entropy (bBCE). If ``reduction="none"``, the returned tensor has shape
+        ``(N, 1, ..., X)`` with bBCE for each element. Otherwise, it is reduced into a scalar.
+
+    """
+    if logits.ndim < 3 or logits.shape[1] != 1:
+        raise ValueError(
+            "balanced_binary_cross_entropy_with_logits() 'logits' must have shape (N, 1, ..., X)"
+        )
+    if target.ndim < 3 or target.shape[1] != 1:
+        raise ValueError(
+            "balanced_binary_cross_entropy_with_logits() 'target' must have shape (N, 1, ..., X)"
+        )
+    if logits.shape[0] != target.shape[0]:
+        raise ValueError(
+            "balanced_binary_cross_entropy_with_logits() 'logits' and 'target' must have matching batch size"
+        )
+    neg_weight = target.flatten(1).mean(-1).reshape((-1,) + (1,) * (target.ndim - 1))
+    pos_weight = 1 - neg_weight
+    log_y_pred: Tensor = logsigmoid(logits)
+    loss_pos = -log_y_pred.mul(target)
+    loss_neg = logits.sub(log_y_pred).mul(1 - target)
+    loss = loss_pos.mul(pos_weight).add(loss_neg.mul(neg_weight))
+    loss = masked_loss(loss, weight, "balanced_binary_cross_entropy_with_logits", inplace=True)
+    loss = reduce_loss(loss, reduction=reduction)
+    return loss
 
 
 def dice_score(
@@ -143,6 +196,309 @@ def dice_loss(
     return loss
 
 
+def tversky_index(
+    input: Tensor,
+    target: Tensor,
+    weight: Optional[Tensor] = None,
+    alpha: Optional[float] = None,
+    beta: Optional[float] = None,
+    epsilon: float = 1e-15,
+    normalize: bool = False,
+    binarize: bool = False,
+    reduction: str = "mean",
+) -> Tensor:
+    r"""Tversky index as described in https://arxiv.org/abs/1706.05721.
+
+    Args:
+        input: Binary predictions as tensor of shape ``(N, 1, ..., X)``
+            or multi-class prediction tensor of shape ``(N, C, ..., X)``.
+        target: Target labels as tensor of shape ``(N, ..., X)``, binary classification target
+            of shape ``(N, 1, ..., X)``, or one-hot encoded tensor of shape ``(N, C, ..., X)``.
+        weight: Voxelwise label weight tensor of shape ``(N, ..., X)`` or ``(N, 1|C, ..., X)``..
+        alpha: False positives multiplier. Set to ``1 - beta`` if ``None``.
+        beta: False negatives multiplier.
+        epsilon: Constant used to avoid division by zero.
+        normalize: Whether to normalize ``input`` predictions using ``sigmoid`` or ``softmax``.
+        binarize: Whether to round normalized predictions to 0 or 1, respectively. If ``False``,
+            soft normalized predictions (and target scores) are used. In order for the Tversky
+            index to be identical to Dice, this option must be set to ``True`` and ``alpha=beta=0.5``.
+        reduction: Either ``none``, ``mean``, or ``sum``.
+
+    Returns:
+        Tversky index (TI). If ``reduction="none"``, the returned tensor has shape ``(N, C)``
+        with TI for each batch. Otherwise, the TI values are reduced into a scalar.
+
+    """
+    if alpha is None and beta is None:
+        alpha = beta = 0.5
+    elif alpha is None:
+        alpha = 1 - beta
+    elif beta is None:
+        beta = 1 - alpha
+    if not isinstance(input, Tensor):
+        raise TypeError("tversky_index() 'input' must be torch.Tensor")
+    if not isinstance(target, Tensor):
+        raise TypeError("tversky_index() 'target' must be torch.Tensor")
+    if input.ndim < 3 or input.shape[1] < 1:
+        raise ValueError(
+            "tversky_index() 'input' must be have shape (N, 1, ..., X) or (N, C>1, ..., X)"
+        )
+    if target.ndim < 2 or target.shape[1] < 1:
+        raise ValueError(
+            "tversky_index() 'target' must be have shape (N, ..., X), (N, 1, ..., X), or (N, C>1, ..., X)"
+        )
+    if target.shape[0] != input.shape[0]:
+        raise ValueError(
+            "tversky_index() 'input' and 'target' batch size must be identical"
+            f", got {input.shape[0]} != {target.shape[0]}"
+        )
+    input = input.float()
+    if input.shape[1] == 1:
+        y_pred = input.sigmoid() if normalize else input
+    else:
+        y_pred = input.softmax(1) if normalize else input
+    if binarize:
+        y_pred = y_pred.round()
+    num_classes = max(2, y_pred.shape[1])
+    if target.ndim == input.ndim:
+        y = target.type(y_pred.dtype)
+        if target.shape[1] == 1:
+            if num_classes > 2:
+                raise ValueError(
+                    "tversky_index() 'target' has shape (N, 1, ..., X)"
+                    f", but 'input' is multi-class prediction (C={num_classes})"
+                )
+            if y_pred.shape[1] == 2:
+                y_pred = y_pred.narrow(1, 1, 1)
+        else:
+            if target.shape[1] != num_classes:
+                raise ValueError(
+                    "tversky_index() 'target' has shape (N, C, ..., X)"
+                    f", but C does not match 'input' with C={num_classes}"
+                )
+            if y_pred.shape[1] == 1:
+                y = y.narrow(1, 1, 1)
+        if binarize:
+            y = y.round()
+    elif target.ndim + 1 == y_pred.ndim:
+        if num_classes == 2 and y_pred.shape[1] == 1:
+            y = target.unsqueeze(1).ge(0.5).type(y_pred.dtype)
+            if binarize:
+                y = y.round()
+        else:
+            y = as_one_hot_tensor(target, num_classes, dtype=y_pred.dtype)
+    else:
+        raise ValueError(
+            "tversky_index() 'target' must be tensor of shape (N, ..., X) or (N, C, ... X)"
+        )
+    if y.shape != y_pred.shape:
+        raise ValueError("tversky_index() 'input' and 'target' shapes must be compatible")
+    if weight is not None:
+        if weight.ndim + 1 == y.ndim:
+            weight = weight.unsqueeze(1)
+        if weight.ndim != y.ndim:
+            raise ValueError("tversky_index() 'weight' shape must be (N, ..., X) or (N, C, ..., X)")
+        if weight.shape[0] != target.shape[0]:
+            raise ValueError(
+                "tversky_index() 'weight' batch size does not match 'input' and 'target'"
+            )
+        if weight.shape[1] == 1:
+            weight = weight.repeat((1,) + (num_classes,) + (1,) * (weight.ndim - 2))
+        if weight.shape != y.shape:
+            raise ValueError(
+                "tversky_index() 'weight' shape must be compatible with 'input' and 'target'"
+            )
+    intersection = dot_channels(y_pred, y, weight=weight)
+    fps = dot_channels(y_pred, 1 - y, weight=weight).mul_(alpha)
+    fns = dot_channels(1 - y_pred, y, weight=weight).mul_(beta)
+    numerator = intersection.add_(epsilon)
+    denominator = numerator.add(fps).add(fns)
+    loss = numerator.div(denominator)
+    loss = reduce_loss(loss, reduction)
+    return loss
+
+
+def tversky_index_with_logits(
+    logits: Tensor,
+    target: Tensor,
+    weight: Optional[Tensor] = None,
+    alpha: Optional[float] = None,
+    beta: Optional[float] = None,
+    epsilon: float = 1e-15,
+    binarize: bool = False,
+    reduction: str = "mean",
+) -> Tensor:
+    r"""Tversky index as described in https://arxiv.org/abs/1706.05721.
+
+    Args:
+        logits: Binary prediction logits as tensor of shape ``(N, 1, ..., X)``.
+        target: Target labels as tensor of shape ``(N, ..., X)`` or ``(N, 1, ..., X)``.
+        weight: Voxelwise label weight tensor of shape ``(N, ..., X)`` or ``(N, 1, ..., X)``.
+        alpha: False positives multiplier. Set to ``1 - beta`` if ``None``.
+        beta: False negatives multiplier.
+        epsilon: Constant used to avoid division by zero.
+        normalize: Whether to normalize ``input`` predictions using ``sigmoid`` or ``softmax``.
+        binarize: Whether to round normalized predictions to 0 or 1, respectively. If ``False``,
+            soft normalized predictions (and target scores) are used. In order for the Tversky
+            index to be identical to Dice, this option must be set to ``True`` and ``alpha=beta=0.5``.
+        reduction: Either ``none``, ``mean``, or ``sum``.
+
+    Returns:
+        Tversky index (TI). If ``reduction="none"``, the returned tensor has shape ``(N, 1)``
+        with TI for each batch. Otherwise, the TI values are reduced into a scalar.
+
+    """
+    return tversky_index(
+        logits,
+        target,
+        weight=weight,
+        alpha=alpha,
+        beta=beta,
+        epsilon=epsilon,
+        normalize=True,
+        binarize=binarize,
+        reduction=reduction,
+    )
+
+
+def tversky_loss(
+    input: Tensor,
+    target: Tensor,
+    weight: Optional[Tensor] = None,
+    alpha: Optional[float] = None,
+    beta: Optional[float] = None,
+    gamma: Optional[float] = None,
+    epsilon: float = 1e-15,
+    normalize: bool = False,
+    binarize: bool = False,
+    reduction: str = "mean",
+) -> Tensor:
+    r"""Tversky loss as described in https://arxiv.org/abs/1706.05721.
+
+    Args:
+        input: Normalized logits of binary predictions as tensor of shape ``(N, C, ..., X)``.
+        target: Target label probabilities as tensor of shape ``(N, C, ..., X)``.
+        weight: Voxelwise label weight tensor of shape ``(N, ..., X)`` or ``(N, 1, ..., X)``.
+        alpha: False positives multiplier. Set to ``1 - beta`` if ``None``.
+        beta: False negatives multiplier.
+        gamma: Exponent used for focal Tverksy loss.
+        epsilon: Constant used to avoid division by zero.
+        normalize: Whether to normalize ``input`` predictions using ``sigmoid`` or ``softmax``.
+        binarize: Whether to round normalized predictions to 0 or 1, respectively. If ``False``,
+            soft normalized predictions (and target scores) are used. In order for the Tversky
+            index to be identical to Dice, this option must be set to ``True`` and ``alpha=beta=0.5``.
+        reduction: Either ``none``, ``mean``, or ``sum``.
+
+    Returns:
+        One minus Tversky index (TI) to the power of gamma. If ``reduction="none"``, the returned
+        tensor has shape ``(N, C)`` with the loss for each batch. Otherwise, a scalar is returned.
+
+    """
+    ti = tversky_index(
+        input,
+        target,
+        weight=weight,
+        alpha=alpha,
+        beta=beta,
+        gamma=gamma,
+        epsilon=epsilon,
+        normalize=normalize,
+        binarize=binarize,
+        reduction="none",
+    )
+    one = torch.tensor(1, dtype=ti.dtype, device=ti.device)
+    loss = one.sub(ti)
+    if gamma:
+        if gamma > 1:
+            loss = loss.pow_(gamma)
+        elif gamma < 1:
+            raise ValueError("tversky_loss() 'gamma' must be greater than or equal to 1")
+    loss = reduce_loss(loss, reduction)
+    return loss
+
+
+def tversky_loss_with_logits(
+    logits: Tensor,
+    target: Tensor,
+    weight: Optional[Tensor] = None,
+    alpha: Optional[float] = None,
+    beta: Optional[float] = None,
+    gamma: Optional[float] = None,
+    epsilon: float = 1e-15,
+    binarize: bool = False,
+    reduction: str = "mean",
+) -> Tensor:
+    r"""Tversky loss as described in https://arxiv.org/abs/1706.05721.
+
+    Args:
+        logits: Binary prediction logits as tensor of shape ``(N, 1, ..., X)``.
+        target: Target labels as tensor of shape ``(N, ..., X)`` or ``(N, 1, ..., X)``.
+        weight: Voxelwise label weight tensor of shape ``(N, ..., X)`` or ``(N, 1, ..., X)``.
+        alpha: False positives multiplier. Set to ``1 - beta`` if ``None``.
+        beta: False negatives multiplier.
+        gamma: Exponent used for focal Tverksy loss.
+        epsilon: Constant used to avoid division by zero.
+        normalize: Whether to normalize ``input`` predictions using ``sigmoid`` or ``softmax``.
+        binarize: Whether to round normalized predictions to 0 or 1, respectively. If ``False``,
+            soft normalized predictions (and target scores) are used. In order for the Tversky
+            index to be identical to Dice, this option must be set to ``True`` and ``alpha=beta=0.5``.
+        reduction: Either ``none``, ``mean``, or ``sum``.
+
+    Returns:
+        One minus Tversky index (TI) to the power of gamma. If ``reduction="none"``, the returned
+        tensor has shape ``(N, C)`` with the loss for each batch. Otherwise, a scalar is returned.
+
+    """
+    return tversky_loss(
+        logits,
+        target,
+        weight=weight,
+        alpha=alpha,
+        beta=beta,
+        gamma=gamma,
+        epsilon=epsilon,
+        normalize=True,
+        binarize=binarize,
+        reduction=reduction,
+    )
+
+
+def focal_loss_with_logits(
+    input: Tensor,
+    target: Tensor,
+    weight: Optional[Tensor] = None,
+    alpha: float = 0.25,
+    gamma: float = 2,
+    reduction: str = "mean",
+) -> Tensor:
+    """Loss used in RetinaNet for dense detection: https://arxiv.org/abs/1708.02002.
+
+    Args:
+        input: Logits of the predictions for each example.
+        target: A tensor with the same shape as ``input``. Stores the binary classification
+            label for each element in inputs (0 for the negative class and 1 for the positive class).
+        weight: Multiplicative mask tensor with same shape as ``input``.
+        alpha: Weighting factor in [0, 1] to balance positive vs negative examples or -1 for ignore.
+        gamma: Exponent of the modulating factor (1 - p_t) to balance easy vs hard examples.
+        reduction: Either ``none``, ``mean``, or ``sum``.
+
+    Returns:
+        Loss tensor with the reduction option applied.
+
+    """
+    # https://www.kaggle.com/bigironsphere/loss-function-library-keras-pytorch#Focal-Loss
+    bce = binary_cross_entropy_with_logits(input, target, reduction="none")
+    one = torch.tensor(1, dtype=bce.dtype, device=bce.device)
+    loss = one.sub(torch.exp(-bce)).pow(gamma).mul(bce)
+    if alpha >= 0:
+        if alpha > 1:
+            raise ValueError("focal_loss() 'alpha' must be in [0, 1]")
+        loss = target.mul(alpha).add(one.sub(target).mul(1 - alpha)).mul(loss)
+    loss = masked_loss(loss, weight, "focal_loss_with_logits", inplace=True)
+    loss = reduce_loss(loss, reduction)
+    return loss
+
+
 def kld_loss(mean: Tensor, logvar: Tensor, reduction: str = "mean") -> Tensor:
     r"""Kullback-Leibler divergence in case of zero-mean and isotropic unit variance normal prior distribution.
 
@@ -182,7 +538,11 @@ def lcc_loss(
 
     def pool(data: Tensor) -> Tensor:
         return avg_pool(
-            data, kernel_size=kernel_size, stride=1, padding=None, count_include_pad=False
+            data,
+            kernel_size=kernel_size,
+            stride=1,
+            padding=None,
+            count_include_pad=False,
         )
 
     if not torch.is_tensor(input):
@@ -375,7 +735,8 @@ def bending_loss(
     derivs = spatial_derivatives(u, mode=mode, which=which, sigma=sigma, spacing=spacing)
     derivs = torch.cat([deriv.unsqueeze(-1) for deriv in derivs.values()], dim=-1)
     derivs *= torch.tensor(
-        [2 if SpatialDerivativeKeys.is_mixed(key) else 1 for key in which], device=u.device
+        [2 if SpatialDerivativeKeys.is_mixed(key) else 1 for key in which],
+        device=u.device,
     )
     loss = derivs.pow(2).sum(-1)
     loss = reduce_loss(loss, reduction)
@@ -624,7 +985,12 @@ def inverse_consistency_loss(
     return error
 
 
-def masked_loss(loss: Tensor, mask: Optional[Tensor] = None, name: Optional[str] = None) -> Tensor:
+def masked_loss(
+    loss: Tensor,
+    mask: Optional[Tensor] = None,
+    name: Optional[str] = None,
+    inplace: bool = False,
+) -> Tensor:
     r"""Multiply loss with an optionally specified spatial mask."""
     if mask is None:
         return loss
@@ -634,11 +1000,15 @@ def masked_loss(loss: Tensor, mask: Optional[Tensor] = None, name: Optional[str]
         raise TypeError(f"{name}() 'mask' must be tensor")
     if mask.shape[0] != 1 and mask.shape[0] != loss.shape[0]:
         raise ValueError(f"{name}() 'mask' must have same batch size as 'target' or batch size 1")
-    if mask.shape[1] != 1 and mask.shape[1] != loss.shape[0]:
+    if mask.shape[1] != 1 and mask.shape[1] != loss.shape[1]:
         raise ValueError(f"{name}() 'mask' must have same number of channels as 'target' or only 1")
     if mask.shape[2:] != loss.shape[2:]:
         raise ValueError(f"{name}() 'mask' must have same spatial shape as 'target'")
-    return loss.mul_(mask)
+    if inplace:
+        loss = loss.mul_(mask)
+    else:
+        loss = loss.mul(mask)
+    return loss
 
 
 def reduce_loss(loss: Tensor, reduction: str = "mean", mask: Optional[Tensor] = None) -> Tensor:
