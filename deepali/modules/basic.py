@@ -30,6 +30,22 @@ class GetItem(Module):
         return repr(self.key)
 
 
+class Narrow(Module):
+    r"""Narrowed version of input tensor."""
+
+    def __init__(self, dim: int, start: int, length: int) -> None:
+        super().__init__()
+        self.dim = dim
+        self.start = start
+        self.length = length
+
+    def forward(self, x: Tensor) -> Tensor:
+        return x.narrow(self.dim, self.start, self.length)
+
+    def extra_repr(self) -> str:
+        return f"dim={self.dim}, start={self.start}, length={self.length}"
+
+
 class Pad(Module):
     r"""Pad tensor."""
 

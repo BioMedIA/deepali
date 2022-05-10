@@ -7,6 +7,7 @@ models to perform predefined operations with in general no optimizable parameter
 """
 
 from .basic import GetItem
+from .basic import Narrow
 from .basic import Pad
 from .basic import Reshape
 from .basic import View
@@ -40,6 +41,7 @@ __all__ = (
     "GetItem",
     "LambdaFunc",
     "LambdaLayer",
+    "Narrow",
     "Pad",
     "ReprWithCrossReferences",
     "Reshape",
