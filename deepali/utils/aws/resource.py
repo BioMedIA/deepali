@@ -91,7 +91,7 @@ class Resource(object):
 
         with Resource.from_uri("s3://bucket/key") as res:
             # request download to local storage
-            path = res.pull()
+            path = res.pull().path
             # use local storage object referenced by path
         # local copy of storage object has been deleted
 
@@ -101,7 +101,7 @@ class Resource(object):
 
         res = Resource.from_uri("s3://bucket/key")
         try:
-            path = res.pull()
+            path = res.pull().path
             # use local storage object referenced by path
         finally:
             # delete local copy of storage object
@@ -349,7 +349,15 @@ class Resource(object):
 
         """
         if type(self) is not Resource:
-            Resource.delete(self)
+            try:
+                shutil.rmtree(self.path)
+            except FileNotFoundError:
+                pass
+            except NotADirectoryError:
+                try:
+                    self.path.unlink()
+                except FileNotFoundError:
+                    pass
         return self
 
     def __str__(self: T) -> str:
