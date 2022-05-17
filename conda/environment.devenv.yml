@@ -1,0 +1,37 @@
+channels:
+  - anaconda
+  - conda-forge
+  - pytorch
+dependencies:
+  # Python version
+  - python =3.9
+  # PyTorch
+  - cudatoolkit =11.2.2  # ["osx" not in get_env("PLATFORM")]
+  - pytorch =1.9.1
+  - pytorch-gpu =1.9.1  # ["linux" in get_env("PLATFORM")]
+  # Developer tools
+  - black =22.3
+  - flake8 =4.0
+  - flake8-black =0.3.3
+  - ipykernel
+  - jupyter
+  - notebook
+  - pytest =6.2
+  # Main libraries
+  - dacite =1.6
+  - pytorch-ignite =0.4
+  - numpy =1.22
+  - pandas =1.4
+  - pyyaml =6.0
+  - SimpleITK =2.0
+  - typing-extensions =4.2
+  # Utility libraries
+  - boto3 =1.18
+  - scipy =1.8
+  - tensorboard =2.8
+  - vtk =9.1
+  # Tests
+  - pip =21.2
+  - pip:
+    - torchinfo==1.5
+name: deepali

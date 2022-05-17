@@ -1,5 +1,9 @@
-ARG BASE_IMAGE=pytorch/pytorch:1.9.0-cuda11.1-cudnn8-runtime
+ARG BASE_IMAGE=pytorch/pytorch:1.9.1-cuda11.1-cudnn8-runtime
 FROM $BASE_IMAGE
+
+ENV MAMBA_NO_BANNER=1
+ENV PIP_DISABLE_PIP_VERSION_CHECK=1
+ENV PIP_NO_CACHE_DIR=1
 
 # Packages
 RUN apt-get update \
@@ -11,21 +15,12 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/* \
     && mkdir /run/sshd
 
-# Python
-ARG PYTHON_VERSION=
-RUN [ -z $PYTHON_VERSION ] \
-    || [ $PYTHON_VERSION = $(/opt/conda/bin/python --version | cut -d' ' -f2) ] \
-    || conda install -c anaconda python=${PYTHON_VERSION}
-ENV PIP_DISABLE_PIP_VERSION_CHECK=1
-ENV PIP_NO_CACHE_DIR=1
-
 # Prerequisites
-ARG CONDA_YAML="conda.yaml"
-COPY "$CONDA_YAML" "/workspace/conda.yaml"
+COPY conda/environment.linux-64.yml /tmp/environment.yml
 RUN conda update -n base -c defaults conda \
-    && conda env update --name base --file "/workspace/conda.yaml" --prune \
+    && conda env update --name base --file /tmp/environment.yml --prune \
     && conda clean -ay \
-    && rm -f "/workspace/conda.yaml"
+    && rm -f /tmp/environment.yml
 
 # Install deepali
 COPY . "/workspace"
