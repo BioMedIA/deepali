@@ -1,2 +1,67 @@
+# See also: https://setuptools.pypa.io/en/latest/userguide/pyproject_config.html
+[build-system]
+requires = ["setuptools>=61.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+
+[project]
+# Unfortunately there exists a dummy PyPI package named deepali by a user whose
+# name is Deepali Sharma (deepali.sharma@sganalytics.com). The package appears to
+# be unmaintained and was only a test of how to publish a PyPI package. While that
+# package exists, use a package name that slightly differs from this project's name.
+name = "deepali-hf"
+description = "Image, point set, and surface registration library for PyTorch."
+readme = "README.md"
+license = {text = "Apache-2.0"}
+version = "0.1.0"
+
+authors = [
+    {name = "Andreas Schuh", email = "andreas.schuh@imperial.ac.uk"}
+]
+
+classifiers=[
+    "Development Status :: 2 - Pre-Alpha",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3 :: Only",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Image Processing",
+    "Typing :: Typed",
+]
+
+requires-python = ">=3.7"
+
+dependencies = [
+    "dacite",
+    "pandas",
+    "pyyaml",
+    "SimpleITK~=2.0",
+    "torch>=1.7",
+    "typing-extensions",
+]
+
+[project.optional-dependencies]
+dev = [
+    "black",
+    "flake8",
+    "flake8-black",
+    "pytest",
+    "torchinfo",
+]
+utils = [
+    "boto3",
+    "ignite>=0.4",
+    "numpy",
+    "scipy",
+    "SimpleITK~=2.0",
+    "vtk~=9.0"
+]
+
+
+[tool.setuptools.packages.find]
+where = ["."]
+namespaces = true
+
+
 [tool.black]
 line-length = 100
