@@ -4,11 +4,13 @@ channels:
   - pytorch
 dependencies:
   # Python version
+  - pip =22.1
   - python =3.9
   # PyTorch
   - cudatoolkit =11.2.2  # ["osx" not in get_env("PLATFORM")]
   - pytorch =1.9.1
   - pytorch-gpu =1.9.1  # ["linux" in get_env("PLATFORM")]
+  - pytorch-ignite =0.4
   # Developer tools
   - black =22.3
   - flake8 =4.0
@@ -19,7 +21,6 @@ dependencies:
   - pytest =6.2
   # Main libraries
   - dacite =1.6
-  - pytorch-ignite =0.4
   - numpy =1.22
   - pandas =1.4
   - pyyaml =6.0
@@ -31,7 +32,5 @@ dependencies:
   - tensorboard =2.8
   - vtk =9.1
   # Tests
-  - pip =21.2
-  - pip:
-    - torchinfo==1.5
+  - torchinfo =1.6
 name: deepali

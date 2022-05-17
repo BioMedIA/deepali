@@ -5,11 +5,11 @@ NAME = deepali
 ROOT = ..
 
 # Commands
-CONDA = conda
-CONDA_OPTS =
+CONDA = mamba
+CONDA_OPTS = --no-banner
 CONDA_DEVENV = conda devenv
 CONDA_LOCK = conda-lock
-CONDA_LOCK_OPTS =
+CONDA_LOCK_OPTS = --mamba
 
 # Name of conda-devenv configuration file
 DEVENV = environment.devenv.yml
@@ -84,16 +84,13 @@ render:
 	fi
 
 
-env: prune-env install
+env: update-env install
 
 create-env:
 	@$(CONDA) $(CONDA_OPTS) create --name $(NAME) --file environment.$(PLATFORM).lock
 
 update-env:
-	@$(CONDA) $(CONDA_OPTS) update --name $(NAME) --file environment.$(PLATFORM).lock
-
-prune-env:
 	@$(CONDA) $(CONDA_OPTS) update --name $(NAME) --file environment.$(PLATFORM).lock --prune
 
 install:
-	@$(CONDA) $(CONDA_OPTS) run --name $(NAME) pip install $(PIP_INSTALL_OPTS) ./$(ROOT)
+	@$(CONDA) $(CONDA_OPTS) run --name $(NAME) pip install $(PIP_INSTALL_OPTS) ./$(ROOT)[utils]

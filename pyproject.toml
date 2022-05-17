@@ -1,6 +1,6 @@
 # See also: https://setuptools.pypa.io/en/latest/userguide/pyproject_config.html
 [build-system]
-requires = ["setuptools>=61.0.0", "wheel"]
+requires = ["setuptools>=61.0.0", "setuptools-scm[toml]", "wheel"]
 build-backend = "setuptools.build_meta"
 
 
@@ -13,7 +13,7 @@ name = "deepali-hf"
 description = "Image, point set, and surface registration library for PyTorch."
 readme = "README.md"
 license = {text = "Apache-2.0"}
-version = "0.1.0"
+dynamic = ["version"]
 
 authors = [
     {name = "Andreas Schuh", email = "andreas.schuh@imperial.ac.uk"}
@@ -50,7 +50,7 @@ dev = [
 ]
 utils = [
     "boto3",
-    "ignite>=0.4",
+    "pytorch-ignite>=0.4",
     "numpy",
     "scipy",
     "SimpleITK~=2.0",

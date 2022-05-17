@@ -56,35 +56,19 @@ git clone https://github.com/BioMedIA/deepali.git
 cd deepali && pip install .
 ```
 
-This will install missing prerequisites from [PyPI] in the current Python environment.
+This will install missing dependencies in the current Python environment from [PyPI]. To use [conda] for installing the required dependencies, create a conda environment with pre-installed dependencies **before** running `pip install`. For further information on how to create and manage project dependencies using conda, see [conda/README.md](conda/README.md).
 
-Additional optional dependencies can be installed with the command (cf. [setup.py](setup.py) `extras_require`):
-
-```
-pip install git+https://github.com/BioMedIA/deepali.git#egg=deepali[all]
-# or: pip install .[all]
-```
-
-When using a recent Python version for which no binary VTK wheels are available, VTK must be pre-installed with `conda install -c conda-forge vtk==9` in a virtual environment created similar to below before executing above pip command. As of July 2021, VTK 9.0.3 is available on PyPI for Python 3.6, 3.7, 3.8, and 3.9.
-
-In order to use [conda] (e.g., [Miniconda]), we recommend to first create a new environment as follows
+Additional optional dependencies of the `deepali.utils` library can be installed with the command:
 
 ```
-conda env create --name deepali --file deepali/conda.yaml
+pip install git+https://github.com/BioMedIA/deepali.git#egg=deepali[utils]
+# or: pip install .[utils]
 ```
-
-or to install the prerequisites in an existing conda environment, respectively, i.e.,
-
-```
-conda env update --file deepali/conda.yaml
-```
-
-This must be done **before** executing the above `pip install` command!
 
 Developers and contributors of this project may install it in development mode using
 
 ```
-pip install --editable .[dev]
+pip install --editable .[dev,utils]
 ```
 
 This will link the source tree of the package in the Python environment.

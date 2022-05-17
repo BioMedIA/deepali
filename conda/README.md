@@ -39,9 +39,11 @@ where `PLATFORM` is one of the following values.
 The following tools are required to update the generated dependency files.
 
 1. Install [Miniconda](https://docs.conda.io/en/latest/miniconda.html): Package dependency management tool.
-2. Install [conda-devenv](https://conda-devenv.readthedocs.io/en/latest/): Advanced conda environment configuration such as conditional dependencies.
+2. Install [mamba](https://mamba.readthedocs.io/en/latest/): Faster dependency resolution and more informative error messages.
+   - `conda install mamba=0.23 --name base --channel conda-forge`
+3. Install [conda-devenv](https://conda-devenv.readthedocs.io/en/latest/): Advanced conda environment configuration such as conditional dependencies.
    - `conda install conda-devenv=2.3 --name base --channel conda-forge`
-3. Install [conda-lock](https://conda-incubator.github.io/conda-lock/): Lock versions of dependencies and generate explicit lockfiles.
+4. Install [conda-lock](https://conda-incubator.github.io/conda-lock/): Lock versions of dependencies and generate explicit lockfiles.
    - `conda install conda-lock=1.0 --name base --channel conda-forge`
 
 After editing the `environment.devenv.yml` file to add, remove, or update required and optional dependencies, run the following command to re-generate the `environment.conda-lock.yml` and `environment.*.lock` files.

@@ -19,9 +19,9 @@ metadata:
   - url: pytorch
     used_env_vars: []
   content_hash:
-    linux-64: ac58b75a1f64b8175e9ee0f83d25309cd1ef75768f61c7ff45a724d9eb0e73e1
-    osx-64: ea58f298b4dd98e0388c947ade1d0e8d0cb247c5ec97fe185e8713e45782ff9b
-    win-64: 967b9c6f4aa98c19512be8922ca449b590e97d18fa0e60691c1891d0298a9f62
+    linux-64: 42dca9a50a7c5cd19123b14027fa52e54972629bf6dd5adf5a0bec14ad3da78a
+    osx-64: c5893200bca4c8c469f38a0b692c4711224a77de83d138760123737a678d2155
+    win-64: dd119839178335c5aee65c906d6b7b0e7d52b0d5bb751c30745e03bfd2cb74be
   platforms:
   - linux-64
   - osx-64
@@ -3028,18 +3028,18 @@ package:
   version: 2.8.1
 - category: main
   dependencies:
-    python: '>=3.9,<3.10.0a0'
+    python: '>=3.7'
     setuptools: ''
     wheel: ''
   hash:
-    md5: f1784d8ead44611187bd6455b801f0ac
-    sha256: 074904df323637c2b7aca5e63b7aebbc15ffd73d64444a94e3ed1332722f841b
+    md5: bc23e31a667caa608150cbd34b4e4796
+    sha256: eb0e670734d688693936df67882e8880361a91e974baf92a01546c8845b69e46
   manager: conda
   name: pip
   optional: false
   platform: linux-64
-  url: https://conda.anaconda.org/anaconda/linux-64/pip-21.2.4-py39h06a4308_0.tar.bz2
-  version: 21.2.4
+  url: https://conda.anaconda.org/conda-forge/noarch/pip-22.1-pyhd8ed1ab_0.tar.bz2
+  version: '22.1'
 - category: main
   dependencies:
     prompt-toolkit: '>=3.0.20,<3.0.21.0a0'
@@ -3371,6 +3371,19 @@ package:
   platform: linux-64
   url: https://conda.anaconda.org/conda-forge/linux-64/simpleitk-2.0.2-py39h156e488_1.tar.bz2
   version: 2.0.2
+- category: main
+  dependencies:
+    python: '>=3.6'
+    pytorch: '>=1.6'
+  hash:
+    md5: fa284c5b254ac0c469936d265b8f9950
+    sha256: 8aa4421ccb156a2a6a439070db7fd864f6133da3026bee9f9bc3b14a34104fa3
+  manager: conda
+  name: torchinfo
+  optional: false
+  platform: linux-64
+  url: https://conda.anaconda.org/conda-forge/noarch/torchinfo-1.6.6-pyhd8ed1ab_0.tar.bz2
+  version: 1.6.6
 - category: main
   dependencies:
     debugpy: '>=1.0.0,<2.0'
@@ -3834,17 +3847,6 @@ package:
   platform: linux-64
   url: https://conda.anaconda.org/anaconda/linux-64/jupyter-1.0.0-py39h06a4308_7.tar.bz2
   version: 1.0.0
-- category: main
-  dependencies: {}
-  hash:
-    sha256: 69e76209af9130a1a03cfc7ad1ed0f0ef56f3f7a0685877409b07b9ce6c5dcbc
-  manager: pip
-  name: torchinfo
-  optional: false
-  platform: linux-64
-  source: null
-  url: https://files.pythonhosted.org/packages/e5/cf/dbc2fc569d95f5a5fca80c45afcaf2788194573f7bc4561050148a2a96d2/torchinfo-1.5.0-py3-none-any.whl
-  version: 1.5.0
 - category: main
   dependencies: {}
   hash:
@@ -6435,18 +6437,18 @@ package:
   version: 2.8.1
 - category: main
   dependencies:
-    python: '>=3.9,<3.10.0a0'
+    python: '>=3.7'
     setuptools: ''
     wheel: ''
   hash:
-    md5: f2efff126a7e987b9ba96dc8657f89f1
-    sha256: 7d04d5a59425ae75a3fc979b3a5ec444c0e939440b789022aff642037ff12c1e
+    md5: bc23e31a667caa608150cbd34b4e4796
+    sha256: eb0e670734d688693936df67882e8880361a91e974baf92a01546c8845b69e46
   manager: conda
   name: pip
   optional: false
   platform: osx-64
-  url: https://conda.anaconda.org/anaconda/osx-64/pip-21.2.4-py39hecd8cb5_0.tar.bz2
-  version: 21.2.4
+  url: https://conda.anaconda.org/conda-forge/noarch/pip-22.1-pyhd8ed1ab_0.tar.bz2
+  version: '22.1'
 - category: main
   dependencies:
     prompt-toolkit: '>=3.0.20,<3.0.21.0a0'
@@ -6837,6 +6839,19 @@ package:
   version: 2.0.2
 - category: main
   dependencies:
+    python: '>=3.6'
+    pytorch: '>=1.6'
+  hash:
+    md5: fa284c5b254ac0c469936d265b8f9950
+    sha256: 8aa4421ccb156a2a6a439070db7fd864f6133da3026bee9f9bc3b14a34104fa3
+  manager: conda
+  name: torchinfo
+  optional: false
+  platform: osx-64
+  url: https://conda.anaconda.org/conda-forge/noarch/torchinfo-1.6.6-pyhd8ed1ab_0.tar.bz2
+  version: 1.6.6
+- category: main
+  dependencies:
     appnope: ''
     debugpy: '>=1.0.0,<2.0'
     ipython: '>=7.23.1'
@@ -7165,17 +7180,6 @@ package:
   platform: osx-64
   url: https://conda.anaconda.org/conda-forge/noarch/tensorboard-2.8.0-pyhd8ed1ab_1.tar.bz2
   version: 2.8.0
-- category: main
-  dependencies: {}
-  hash:
-    sha256: 69e76209af9130a1a03cfc7ad1ed0f0ef56f3f7a0685877409b07b9ce6c5dcbc
-  manager: pip
-  name: torchinfo
-  optional: false
-  platform: osx-64
-  source: null
-  url: https://files.pythonhosted.org/packages/e5/cf/dbc2fc569d95f5a5fca80c45afcaf2788194573f7bc4561050148a2a96d2/torchinfo-1.5.0-py3-none-any.whl
-  version: 1.5.0
 - category: main
   dependencies: {}
   hash:
@@ -9516,18 +9520,18 @@ package:
   version: 5.3.0
 - category: main
   dependencies:
-    python: '>=3.9,<3.10.0a0'
+    python: '>=3.7'
     setuptools: ''
     wheel: ''
   hash:
-    md5: f09537a77313a8190384646d1b4683e7
-    sha256: 2d62c1c2257825a0f47d7037b3040f99cb62bbe41be69c8b6f5e7a879c094919
+    md5: bc23e31a667caa608150cbd34b4e4796
+    sha256: eb0e670734d688693936df67882e8880361a91e974baf92a01546c8845b69e46
   manager: conda
   name: pip
   optional: false
   platform: win-64
-  url: https://conda.anaconda.org/anaconda/win-64/pip-21.2.4-py39haa95532_0.tar.bz2
-  version: 21.2.4
+  url: https://conda.anaconda.org/conda-forge/noarch/pip-22.1-pyhd8ed1ab_0.tar.bz2
+  version: '22.1'
 - category: main
   dependencies:
     prompt-toolkit: '>=3.0.20,<3.0.21.0a0'
@@ -9631,6 +9635,19 @@ package:
   platform: win-64
   url: https://conda.anaconda.org/anaconda/noarch/tensorboard-plugin-wit-1.6.0-py_0.tar.bz2
   version: 1.6.0
+- category: main
+  dependencies:
+    python: '>=3.6'
+    pytorch: '>=1.6'
+  hash:
+    md5: fa284c5b254ac0c469936d265b8f9950
+    sha256: 8aa4421ccb156a2a6a439070db7fd864f6133da3026bee9f9bc3b14a34104fa3
+  manager: conda
+  name: torchinfo
+  optional: false
+  platform: win-64
+  url: https://conda.anaconda.org/conda-forge/noarch/torchinfo-1.6.6-pyhd8ed1ab_0.tar.bz2
+  version: 1.6.6
 - category: main
   dependencies:
     aiosignal: '>=1.1.2'
@@ -10258,15 +10275,4 @@ package:
   platform: win-64
   url: https://conda.anaconda.org/conda-forge/noarch/tensorboard-2.8.0-pyhd8ed1ab_1.tar.bz2
   version: 2.8.0
-- category: main
-  dependencies: {}
-  hash:
-    sha256: 69e76209af9130a1a03cfc7ad1ed0f0ef56f3f7a0685877409b07b9ce6c5dcbc
-  manager: pip
-  name: torchinfo
-  optional: false
-  platform: win-64
-  source: null
-  url: https://files.pythonhosted.org/packages/e5/cf/dbc2fc569d95f5a5fca80c45afcaf2788194573f7bc4561050148a2a96d2/torchinfo-1.5.0-py3-none-any.whl
-  version: 1.5.0
 version: 1
