@@ -19,9 +19,9 @@ metadata:
   - url: pytorch
     used_env_vars: []
   content_hash:
-    linux-64: 14a4dd26adace1a0c54c01bff400e68c8be93bfe804134845b071cbad00dbbaf
-    osx-64: c654f60a0d8cd27fe7c0aaa635cfaf4a9efa74b6b6babb83cab22dac2f701161
-    win-64: 6d4e81c587b87ef35e880af42ad6e812367ffb4a245b7e35ade76a64234c9fc8
+    linux-64: 5e196d1fb45d917a0918a416a29952c55b61f2fbd17561eee6a48e6de4790dc6
+    osx-64: 04dface5dc1ecdb0480649558a10a0ed4e60a744d8dc7ee2353faf0215f930a9
+    win-64: e4ff27d764fae37ab2eba9cf9d127d0ad890e6876902aefa47b08b0f4fce721a
   platforms:
   - linux-64
   - osx-64
@@ -2663,6 +2663,19 @@ package:
   version: '21.3'
 - category: main
   dependencies:
+    python: '>=3.9,<3.10.0a0'
+    tomli: '>=1.1.0'
+  hash:
+    md5: 21053307d0cffe9d1b704be70339f0ca
+    sha256: ba734a04b997674aa967abe3096096ddf16d2dd2d4b88faf08055aeebc5956cf
+  manager: conda
+  name: pep517
+  optional: false
+  platform: linux-64
+  url: https://conda.anaconda.org/anaconda/linux-64/pep517-0.12.0-py39h06a4308_0.tar.bz2
+  version: 0.12.0
+- category: main
+  dependencies:
     ptyprocess: '>=0.5'
     python: ''
   hash:
@@ -3088,6 +3101,21 @@ package:
   platform: linux-64
   url: https://conda.anaconda.org/anaconda/linux-64/pytest-6.2.5-py39h06a4308_2.tar.bz2
   version: 6.2.5
+- category: main
+  dependencies:
+    packaging: '>=19.0'
+    pep517: '>=0.9.1'
+    python: '>3.6'
+    toml: ''
+  hash:
+    md5: e22834a2bbe60f75afdf2653ced203aa
+    sha256: c5ac49407c1b9c0df1332b23f40567873936cd32f2c5170e7f60a97ccd989171
+  manager: conda
+  name: python-build
+  optional: false
+  platform: linux-64
+  url: https://conda.anaconda.org/anaconda/noarch/python-build-0.7.0-pyhd3eb1b0_0.tar.bz2
+  version: 0.7.0
 - category: main
   dependencies:
     __glibc: '>=2.17,<3.0.a0'
@@ -6132,6 +6160,19 @@ package:
   version: '21.3'
 - category: main
   dependencies:
+    python: '>=3.9,<3.10.0a0'
+    tomli: '>=1.1.0'
+  hash:
+    md5: d239095f43ee6c53cc9fbd5a4503d4f7
+    sha256: 8c59d3221900e40607d650757a807d535c6be7080259cce8f5222bb801b229ac
+  manager: conda
+  name: pep517
+  optional: false
+  platform: osx-64
+  url: https://conda.anaconda.org/anaconda/osx-64/pep517-0.12.0-py39hecd8cb5_0.tar.bz2
+  version: 0.12.0
+- category: main
+  dependencies:
     ptyprocess: '>=0.5'
     python: ''
   hash:
@@ -6528,6 +6569,21 @@ package:
   platform: osx-64
   url: https://conda.anaconda.org/anaconda/osx-64/pytest-6.2.5-py39hecd8cb5_2.tar.bz2
   version: 6.2.5
+- category: main
+  dependencies:
+    packaging: '>=19.0'
+    pep517: '>=0.9.1'
+    python: '>3.6'
+    toml: ''
+  hash:
+    md5: e22834a2bbe60f75afdf2653ced203aa
+    sha256: c5ac49407c1b9c0df1332b23f40567873936cd32f2c5170e7f60a97ccd989171
+  manager: conda
+  name: python-build
+  optional: false
+  platform: osx-64
+  url: https://conda.anaconda.org/anaconda/noarch/python-build-0.7.0-pyhd3eb1b0_0.tar.bz2
+  version: 0.7.0
 - category: main
   dependencies:
     cffi: ''
@@ -9114,6 +9170,19 @@ package:
   version: '21.3'
 - category: main
   dependencies:
+    python: '>=3.9,<3.10.0a0'
+    tomli: '>=1.1.0'
+  hash:
+    md5: 61bf0f8883e8c01754d49d203a2dccf3
+    sha256: 6c996cf17c9b8dc39a358479098990f92dccf47bc717da4a3783d3235c9bcc36
+  manager: conda
+  name: pep517
+  optional: false
+  platform: win-64
+  url: https://conda.anaconda.org/anaconda/win-64/pep517-0.12.0-py39haa95532_0.tar.bz2
+  version: 0.12.0
+- category: main
+  dependencies:
     libcurl: '>=7.82.0,<8.0a0'
     libtiff: '>=4.3.0,<5.0a0'
     sqlite: '>=3.37.0,<4.0a0'
@@ -9611,6 +9680,21 @@ package:
   platform: win-64
   url: https://conda.anaconda.org/anaconda/win-64/pytest-6.2.5-py39haa95532_2.tar.bz2
   version: 6.2.5
+- category: main
+  dependencies:
+    packaging: '>=19.0'
+    pep517: '>=0.9.1'
+    python: '>3.6'
+    toml: ''
+  hash:
+    md5: e22834a2bbe60f75afdf2653ced203aa
+    sha256: c5ac49407c1b9c0df1332b23f40567873936cd32f2c5170e7f60a97ccd989171
+  manager: conda
+  name: python-build
+  optional: false
+  platform: win-64
+  url: https://conda.anaconda.org/anaconda/noarch/python-build-0.7.0-pyhd3eb1b0_0.tar.bz2
+  version: 0.7.0
 - category: main
   dependencies:
     python: '>=3.6'

@@ -16,6 +16,7 @@ dependencies:
   - ipykernel
   - jupyter
   - notebook
+  - python-build =0.7
   - pytest =6.2
   # Main libraries
   - cudatoolkit =11.2.2  # ["osx" not in get_env("PLATFORM")]
