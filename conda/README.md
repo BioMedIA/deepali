@@ -13,7 +13,7 @@ A conda environment for this project can be created using the `env` Makefile tar
 make env [NAME=deepali] [EDITABLE=1]
 ```
 
-This creates (or updates) a conda environment with the specified `NAME`, and subsequently installs the `deepali` libraries. When `EDITABLE=1|true`, an editable installation of the libraries is performed using `pip install --editable`.
+This creates a conda environment with the specified `NAME`, and subsequently installs the `deepali` libraries. When `EDITABLE=1|true`, an editable installation of the libraries is performed using `pip install --editable`.
 
 Alternatively, run the following `conda` commands intead of using `make`:
 
@@ -21,7 +21,7 @@ Alternatively, run the following `conda` commands intead of using `make`:
 NAME=deepali
 PLATFORM=linux-64
 
-conda create env --name $NAME --file environment.$PLATFORM.lock
+conda create --name $NAME --file environment.$PLATFORM.lock
 conda run --name $NAME pip install [--editable] ..
 ```
 

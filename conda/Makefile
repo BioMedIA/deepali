@@ -84,7 +84,7 @@ render:
 	fi
 
 
-env: update-env install
+env: create-env install
 
 create-env:
 	@$(CONDA) $(CONDA_OPTS) create --name $(NAME) --file environment.$(PLATFORM).lock
