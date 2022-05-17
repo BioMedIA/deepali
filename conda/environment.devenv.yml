@@ -3,14 +3,12 @@ channels:
   - conda-forge
   - pytorch
 dependencies:
-  # Python version
-  - pip =22.1
+  # Python
   - python =3.9
-  # PyTorch
-  - cudatoolkit =11.2.2  # ["osx" not in get_env("PLATFORM")]
-  - pytorch =1.9.1
-  - pytorch-gpu =1.9.1  # ["linux" in get_env("PLATFORM")]
-  - pytorch-ignite =0.4
+  # Installation tools
+  - pip =22.1
+  - setuptools >=61.0
+  - setuptools-scm >=6.2
   # Developer tools
   - black =22.3
   - flake8 =4.0
@@ -20,9 +18,13 @@ dependencies:
   - notebook
   - pytest =6.2
   # Main libraries
+  - cudatoolkit =11.2.2  # ["osx" not in get_env("PLATFORM")]
   - dacite =1.6
   - numpy =1.22
   - pandas =1.4
+  - pytorch =1.9.1
+  - pytorch-gpu =1.9.1  # ["linux" in get_env("PLATFORM")]
+  - pytorch-ignite =0.4
   - pyyaml =6.0
   - SimpleITK =2.0
   - typing-extensions =4.2

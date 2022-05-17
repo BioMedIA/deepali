@@ -19,9 +19,9 @@ metadata:
   - url: pytorch
     used_env_vars: []
   content_hash:
-    linux-64: 42dca9a50a7c5cd19123b14027fa52e54972629bf6dd5adf5a0bec14ad3da78a
-    osx-64: c5893200bca4c8c469f38a0b692c4711224a77de83d138760123737a678d2155
-    win-64: dd119839178335c5aee65c906d6b7b0e7d52b0d5bb751c30745e03bfd2cb74be
+    linux-64: 14a4dd26adace1a0c54c01bff400e68c8be93bfe804134845b071cbad00dbbaf
+    osx-64: c654f60a0d8cd27fe7c0aaa635cfaf4a9efa74b6b6babb83cab22dac2f701161
+    win-64: 6d4e81c587b87ef35e880af42ad6e812367ffb4a245b7e35ade76a64234c9fc8
   platforms:
   - linux-64
   - osx-64
@@ -3152,6 +3152,21 @@ package:
   platform: linux-64
   url: https://conda.anaconda.org/conda-forge/linux-64/scipy-1.8.0-py39hee8e79c_1.tar.bz2
   version: 1.8.0
+- category: main
+  dependencies:
+    packaging: '>=20.0'
+    python: '>=3.6'
+    setuptools: '>=45'
+    tomli: '>=1.0.0'
+  hash:
+    md5: 48597993761790e313f2a4c91092c17f
+    sha256: d77242077a6fe211422961194302fc0233f5f6527b9434dc3949f63a9f8e4741
+  manager: conda
+  name: setuptools-scm
+  optional: false
+  platform: linux-64
+  url: https://conda.anaconda.org/anaconda/noarch/setuptools-scm-6.3.2-pyhd3eb1b0_0.tar.bz2
+  version: 6.3.2
 - category: main
   dependencies:
     asttokens: ''
@@ -6572,6 +6587,21 @@ package:
   version: 1.8.0
 - category: main
   dependencies:
+    packaging: '>=20.0'
+    python: '>=3.6'
+    setuptools: '>=45'
+    tomli: '>=1.0.0'
+  hash:
+    md5: 48597993761790e313f2a4c91092c17f
+    sha256: d77242077a6fe211422961194302fc0233f5f6527b9434dc3949f63a9f8e4741
+  manager: conda
+  name: setuptools-scm
+  optional: false
+  platform: osx-64
+  url: https://conda.anaconda.org/anaconda/noarch/setuptools-scm-6.3.2-pyhd3eb1b0_0.tar.bz2
+  version: 6.3.2
+- category: main
+  dependencies:
     asttokens: ''
     executing: ''
     pure_eval: ''
@@ -9607,6 +9637,21 @@ package:
   platform: win-64
   url: https://conda.anaconda.org/anaconda/noarch/qtpy-2.0.1-pyhd3eb1b0_0.tar.bz2
   version: 2.0.1
+- category: main
+  dependencies:
+    packaging: '>=20.0'
+    python: '>=3.6'
+    setuptools: '>=45'
+    tomli: '>=1.0.0'
+  hash:
+    md5: 48597993761790e313f2a4c91092c17f
+    sha256: d77242077a6fe211422961194302fc0233f5f6527b9434dc3949f63a9f8e4741
+  manager: conda
+  name: setuptools-scm
+  optional: false
+  platform: win-64
+  url: https://conda.anaconda.org/anaconda/noarch/setuptools-scm-6.3.2-pyhd3eb1b0_0.tar.bz2
+  version: 6.3.2
 - category: main
   dependencies:
     asttokens: ''

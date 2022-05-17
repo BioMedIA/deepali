@@ -1,6 +1,6 @@
 # See also: https://setuptools.pypa.io/en/latest/userguide/pyproject_config.html
 [build-system]
-requires = ["setuptools>=61.0.0", "setuptools-scm[toml]", "wheel"]
+requires = ["setuptools>=61.0.0", "setuptools-scm[toml]>=6.2", "wheel"]
 build-backend = "setuptools.build_meta"
 
 
@@ -61,6 +61,9 @@ utils = [
 [tool.setuptools.packages.find]
 where = ["."]
 namespaces = true
+
+
+[tool.setuptools_scm]
 
 
 [tool.black]
