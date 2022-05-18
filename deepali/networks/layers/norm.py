@@ -87,9 +87,9 @@ def normalization(
     elif norm_name in ("layer", "layernorm"):
         if num_features is None:
             raise ValueError("normalization() 'num_features' required for 'layer' norm")
-        # This is equivalent to ("group", channels), not torch.nn.LayerNorm
-        # (see also https://arxiv.org/abs/1803.08494, Figure 2).
-        norm = nn.GroupNorm(num_features, num_features, *args, **norm_args)
+        # See examples at https://pytorch.org/docs/stable/generated/torch.nn.GroupNorm.html
+        # and Figure 2 of "Group Normalization" paper (https://arxiv.org/abs/1803.08494).
+        norm = nn.GroupNorm(1, num_features, *args, **norm_args)
     elif norm_name in ("instance", "instancenorm"):
         if spatial_dims is None:
             raise ValueError("normalization() 'spatial_dims' required for 'instance' norm")
