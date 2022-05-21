@@ -18,6 +18,7 @@ from ..core.cube import Cube
 from ..core.enum import PaddingMode, Sampling, SpatialDimArg
 from ..core.grid import ALIGN_CORNERS, Axes, Grid, grid_transform_points
 from ..core import image as U
+from ..core.itertools import zip_longest_repeat_last
 from ..core.path import unlink_or_mkdir
 from ..core.tensor import cat_scalars
 from ..core.types import Array, Device, DType, PathStr, Scalar, ScalarOrTuple, Size
@@ -734,25 +735,21 @@ class ImageBatch(DataTensor):
             raise TypeError(
                 f"{type(self).__name__}.sample() 'arg' must be Grid, Sequence[Grid], or Tensor"
             )
-        if len(arg) == 1:
-            grid = arg[0]
-            if all(grid == g for g in self._grid):
-                return self
-            coords = grid.coords(align_corners=align_corners, device=self.device).unsqueeze(0)
-        elif len(arg) == len(self):
-            if all(grid == g for grid, g in zip(arg, self._grid)):
-                return self
-            axes = Axes.from_align_corners(align_corners)
-            coords = [grid.coords(align_corners=align_corners, device=self.device) for grid in arg]
-            coords = [
-                grid_transform_points(p, grid, axes, to_grid)
-                for grid, to_grid, p in zip(arg, self._grid, coords)
-            ]
-            coords = torch.cat([tensor.unsqueeze(0) for tensor in coords], dim=0)
-        else:
+        if len(arg) not in (1, len(self)):
             raise ValueError(
                 f"{type(self).__name__}.sample() 'arg' must be one or {len(self)} grids"
             )
+        if all(grid == g for grid, g in zip_longest_repeat_last(arg, self._grid)):
+            return self
+        axes = Axes.from_align_corners(align_corners)
+        coords = [grid.coords(align_corners=align_corners, device=self.device) for grid in arg]
+        coords = torch.cat(
+            [
+                grid_transform_points(p, grid, axes, to_grid, axes).unsqueeze(0)
+                for p, grid, to_grid in zip_longest_repeat_last(coords, arg, self._grid)
+            ],
+            dim=0,
+        )
         data = U.grid_sample(
             data,
             coords,
@@ -760,7 +757,7 @@ class ImageBatch(DataTensor):
             padding=padding,
             align_corners=align_corners,
         )
-        return self._make_instance(data, grid)
+        return self._make_instance(data, arg)
 
     def __repr__(self) -> str:
         return type(self).__name__ + f"(data={self.tensor()!r}, grid={self.grids()!r})"
