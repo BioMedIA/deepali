@@ -59,6 +59,7 @@ def collate_samples(batch: Sequence[Sample]) -> Batch:
         if is_none:
             values.append(None)
         elif isinstance(elem0, FlowField):
+            FlowFieldsType = type(elem0.batch())
             flow_fields: List[FlowField] = samples
             if any(flow_field.axes() != elem0.axes() for flow_field in flow_fields):
                 raise ValueError(
@@ -66,8 +67,9 @@ def collate_samples(batch: Sequence[Sample]) -> Batch:
                 )
             data = default_collate([flow_field.tensor() for flow_field in flow_fields])
             grid = tuple(flow_field.grid() for flow_field in flow_fields)
-            values.append(FlowFields(data, grid, elem0.axes()))
+            values.append(FlowFieldsType(data, grid, elem0.axes()))
         elif isinstance(elem0, FlowFields):
+            FlowFieldsType = type(elem0)
             flow_fields: List[FlowFields] = samples
             if any(flow_field.axes() != elem0.axes() for flow_field in flow_fields):
                 raise ValueError(
@@ -75,17 +77,19 @@ def collate_samples(batch: Sequence[Sample]) -> Batch:
                 )
             data = torch.cat([flow_field.tensor() for flow_field in flow_fields], dim=0)
             grid = tuple(grid for flow_field in flow_fields for grid in flow_field.grids())
-            values.append(FlowFields(data, grid, elem0.axes()))
+            values.append(FlowFieldsType(data, grid, elem0.axes()))
         elif isinstance(elem0, Image):
+            ImageBatchType = type(elem0.batch())
             images: List[Image] = samples
             data = default_collate([image.tensor() for image in images])
             grid = tuple(image.grid() for image in images)
-            values.append(ImageBatch(data, grid))
+            values.append(ImageBatchType(data, grid))
         elif isinstance(elem0, ImageBatch):
+            ImageBatchType = type(elem0)
             images: List[ImageBatch] = samples
             data = torch.cat([image.tensor() for image in images], dim=0)
             grid = tuple(grid for image in images for grid in image.grids())
-            values.append(ImageBatch(data, grid))
+            values.append(ImageBatchType(data, grid))
         elif isinstance(elem0, (Path, str)):
             values.append(samples)
         elif isinstance(elem0, abc.Mapping) or is_dataclass(elem0) or is_namedtuple(elem0):
