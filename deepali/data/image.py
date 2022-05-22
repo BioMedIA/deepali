@@ -100,9 +100,14 @@ class ImageBatch(DataTensor):
         if kwargs is None:
             kwargs = {}
         result = func(*args, **kwargs)
-        if isinstance(result, Tensor) and result.shape == self.shape:
+        if (
+            isinstance(result, Tensor)
+            and result.ndim == self.ndim
+            and result.shape[2:] == self.shape[2:]
+        ):
             grids = self._grid
-            if func.__name__ == "clone":
+            # 'torch._C.ScriptMethod' object has no attribute '__name__'
+            if getattr(func, "__name__", "unknown") == "clone":
                 grids = tuple(grid.clone() for grid in grids)
             result = self._make_instance(result, grids)
         return result
@@ -829,9 +834,14 @@ class Image(DataTensor):
         if kwargs is None:
             kwargs = {}
         result = func(*args, **kwargs)
-        if isinstance(result, Tensor) and result.shape == self.shape:
+        if (
+            isinstance(result, Tensor)
+            and result.ndim == self.ndim
+            and result.shape[1:] == self.shape[1:]
+        ):
             grid = self._grid
-            if func.__name__ == "clone":
+            # 'torch._C.ScriptMethod' object has no attribute '__name__'
+            if getattr(func, "__name__", "unknown") == "clone":
                 grid = grid.clone()
             result = self._make_instance(result, grid)
         return result
