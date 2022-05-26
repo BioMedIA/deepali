@@ -7,7 +7,7 @@ dependencies:
   - python =3.9
   # Installation tools
   - pip =22.1
-  - setuptools >=61.0
+  - setuptools =59.5
   - setuptools-scm >=6.2
   # Developer tools
   - black =22.3
