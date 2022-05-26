@@ -80,7 +80,7 @@ class ImageBatch(DataTensor):
         **kwargs,
     ) -> TImageBatch:
         r"""Create a new instance while preserving subclass (meta-)data."""
-        kwargs["grid"] = grid or self._grid
+        kwargs["grid"] = self._grid if grid is None else grid
         return super()._make_instance(data, **kwargs)
 
     def __deepcopy__(self: TImageBatch, memo) -> TImageBatch:
@@ -814,7 +814,7 @@ class Image(DataTensor):
         **kwargs,
     ) -> TImage:
         r"""Create a new instance while preserving subclass meta-data."""
-        kwargs["grid"] = grid or self._grid
+        kwargs["grid"] = self._grid if grid is None else grid
         return super()._make_instance(data, **kwargs)
 
     def __deepcopy__(self: TImage, memo) -> TImage:
