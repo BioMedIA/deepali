@@ -1,5 +1,5 @@
 from collections import namedtuple
-from typing import Mapping, Optional, Sequence, Tuple, Union, overload
+from typing import Any, Iterable, Mapping, NamedTuple, Optional, Sequence, Tuple, Union, overload
 
 import torch
 from torch import Size, Tensor
@@ -7,9 +7,27 @@ from torch import Size, Tensor
 from .types import ScalarOrTuple
 
 
+def get_namedtuple_item(self: NamedTuple, arg: Union[int, str]) -> Any:
+    if isinstance(arg, str):
+        return getattr(self, arg)
+    return self[arg]
+
+
+def namedtuple_keys(self: NamedTuple) -> Iterable[str]:
+    return self._fields
+
+
+def namedtuple_values(self: NamedTuple) -> Iterable[Any]:
+    return self
+
+
+def namedtuple_items(self: NamedTuple) -> Iterable[Tuple[str, Any]]:
+    return zip(self._fields, self)
+
+
 def as_immutable_container(
     arg: Union[Tensor, Sequence, Mapping], recursive: bool = True
-) -> Union[Tensor, Sequence, Mapping]:
+) -> Union[Tensor, tuple]:
     r"""Convert mutable container such as dict or list to an immutable container type.
 
     For use with ``torch.utils.tensorboard.SummaryWriter.add_graph`` when model output is list or dict.
@@ -24,8 +42,12 @@ def as_immutable_container(
             arg = {key: as_immutable_container(value) for key, value in arg.items()}
         elif isinstance(arg, Sequence):
             arg = [as_immutable_container(value) for value in arg]
-    if isinstance(arg, dict):
+    if isinstance(arg, Mapping):
         output_type = namedtuple("Dict", sorted(arg.keys()))
+        output_type.__getitem__ = get_namedtuple_item
+        output_type.keys = namedtuple_keys
+        output_type.values = namedtuple_values
+        output_type.items = namedtuple_items
         return output_type(**arg)
     if isinstance(arg, list):
         return tuple(arg)

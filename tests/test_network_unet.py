@@ -5,6 +5,7 @@ import pytest
 import torch
 from torch import Tensor
 
+from deepali.core.types import is_namedtuple
 from deepali.networks.layers import convolution
 from deepali.networks.unet import UNet, UNetConfig, last_num_channels
 
@@ -101,7 +102,9 @@ def test_unet_with_multiple_output_layers(input_tensor: Tensor) -> None:
     assert model.output_is_tuple() is False
 
     output = model(input_tensor)
-    assert isinstance(output, dict)
+    assert is_namedtuple(output)
     assert len(output) == len(output_modules)
+    assert set(getattr(output, "_fields", [])) == set(output_modules.keys())
     assert set(output.keys()) == set(output_modules.keys())
-    assert all(isinstance(x, Tensor) for x in output.values())
+    assert output["output_1"] is output.output_1
+    assert all(isinstance(x, Tensor) for x in output)
