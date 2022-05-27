@@ -297,12 +297,12 @@ def test_norm_layer() -> None:
         norm_layer("layer", spatial_dims=1)
     norm = normalization("layer", num_features=32)
     assert isinstance(norm, nn.GroupNorm)
-    assert norm.num_groups == 32
+    assert norm.num_groups == 1
     assert norm.num_channels == 32
     assert norm.affine is True
     norm = norm_layer("LayerNorm", spatial_dims=1, num_features=64, affine=False)
     assert isinstance(norm, nn.GroupNorm)
-    assert norm.num_groups == 64
+    assert norm.num_groups == 1
     assert norm.num_channels == 64
     assert norm.affine is False
 
