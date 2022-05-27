@@ -92,6 +92,39 @@ class FlowFields(ImageBatch):
         kwargs["axes"] = axes or self._axes
         return super()._make_instance(data, grid, **kwargs)
 
+    @classmethod
+    def __torch_function__(cls, func, types, args=(), kwargs=None):
+        result = Tensor.__torch_function__(func, (Tensor,), args, kwargs)
+        if isinstance(result, Tensor):
+            grids: Sequence[Sequence[Grid]]
+            saxes: Sequence[Axes]
+            if isinstance(args[0], (tuple, list)):
+                args = args[0]
+            saxes = [ax for ax in (getattr(arg, "_axes", None) for arg in args) if ax is not None]
+            assert len(saxes) > 0
+            if any(ax != saxes[0] for ax in saxes[1:]):
+                raise ValueError(
+                    "Cannot apply __torch_function__ to flow fields with mismatching axes"
+                )
+            grids = [g for g in (getattr(arg, "_grid", None) for arg in args) if g is not None]
+            assert len(grids) > 0
+            grid = grids[0]
+            axes = saxes[0]
+            assert len(grid) > 0
+            if result.ndim == grid[0].ndim + 2 and result.shape[2:] == grid[0].shape:
+                # 'torch._C.ScriptMethod' object has no attribute '__name__'
+                if getattr(func, "__name__", "unknown") == "clone":
+                    grid = [g.clone() for g in grid]
+                if result.shape[1] != grid[0].ndim:
+                    result = ImageBatch(result, grid)
+                elif isinstance(result, cls):
+                    result.grid_(grid)
+                else:
+                    result = cls(result, grid, axes)
+            elif type(result) != Tensor:
+                result = result.as_subclass(Tensor)
+        return result
+
     def __getitem__(self: TFlowFields, index: int) -> FlowField:
         r"""Get flow field at specified batch index."""
         # Attention: Tensor.__getitem__ leads to endless recursion!
@@ -280,6 +313,38 @@ class FlowField(Image):
         r"""Create a new instance while preserving subclass meta-data."""
         kwargs["axes"] = axes or self._axes
         return super()._make_instance(data, grid, **kwargs)
+
+    @classmethod
+    def __torch_function__(cls, func, types, args=(), kwargs=None):
+        result = Tensor.__torch_function__(func, (Tensor,), args, kwargs)
+        if isinstance(result, Tensor):
+            grids: Sequence[Grid]
+            saxes: Sequence[Axes]
+            if isinstance(args[0], (tuple, list)):
+                args = args[0]
+            saxes = [ax for ax in (getattr(arg, "_axes", None) for arg in args) if ax is not None]
+            assert len(saxes) > 0
+            if any(ax != saxes[0] for ax in saxes[1:]):
+                raise ValueError(
+                    "Cannot apply __torch_function__ to flow fields with mismatching axes"
+                )
+            grids = [g for g in (getattr(arg, "_grid", None) for arg in args) if g is not None]
+            assert len(grids) > 0
+            grid = grids[0]
+            axes = saxes[0]
+            if result.ndim == grid.ndim + 1 and result.shape[1:] == grid.shape:
+                # 'torch._C.ScriptMethod' object has no attribute '__name__'
+                if getattr(func, "__name__", "unknown") == "clone":
+                    grid = grid.clone()
+                if result.shape[0] != grid.ndim:
+                    result = Image(result, grid)
+                elif isinstance(result, cls):
+                    result.grid_(grid)
+                else:
+                    result = cls(result, grid, axes)
+            elif type(result) != Tensor:
+                result = result.as_subclass(Tensor)
+        return result
 
     @classmethod
     def from_image(cls: Type[TFlowField], image: Image, axes: Optional[Axes] = None) -> TFlowField:

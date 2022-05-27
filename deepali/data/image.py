@@ -95,21 +95,30 @@ class ImageBatch(DataTensor):
         memo[id(self)] = result
         return result
 
-    def __torch_function__(self, func, types, args=(), kwargs=None):
-        args = [arg.as_subclass(Tensor) if isinstance(arg, Tensor) else arg for arg in args]
-        if kwargs is None:
-            kwargs = {}
-        result = func(*args, **kwargs)
-        if (
-            isinstance(result, Tensor)
-            and result.ndim == self.ndim
-            and result.shape[2:] == self.shape[2:]
-        ):
-            grids = self._grid
-            # 'torch._C.ScriptMethod' object has no attribute '__name__'
-            if getattr(func, "__name__", "unknown") == "clone":
-                grids = tuple(grid.clone() for grid in grids)
-            result = self._make_instance(result, grids)
+    @classmethod
+    def __torch_function__(cls, func, types, args=(), kwargs=None):
+        args = tuple(arg.batch() if isinstance(arg, Image) else arg for arg in args)
+        fargs = [arg.as_subclass(Tensor) if isinstance(arg, Tensor) else arg for arg in args]
+        result = Tensor.__torch_function__(func, (Tensor,), fargs, kwargs)
+        if isinstance(result, Tensor):
+            # e.g., torch.cat([a, b], dim=0)
+            if isinstance(args[0], (tuple, list)):
+                args = args[0]
+            grids: Sequence[Sequence[Grid]]
+            grids = [g for g in (getattr(arg, "_grid", None) for arg in args) if g is not None]
+            assert len(grids) > 0
+            grid = grids[0]
+            assert len(grid) > 0
+            if result.ndim == grid[0].ndim + 2 and result.shape[2:] == grid[0].shape:
+                # 'torch._C.ScriptMethod' object has no attribute '__name__'
+                if getattr(func, "__name__", "unknown") == "clone":
+                    grid = [g.clone() for g in grid]
+                if isinstance(result, cls):
+                    cls.grid_(grid)
+                else:
+                    result = cls(result, grid)
+            elif type(result) != Tensor:
+                result = result.as_subclass(Tensor)
         return result
 
     def cube(self: TImageBatch, n: int = 0) -> Cube:
@@ -829,21 +838,27 @@ class Image(DataTensor):
         memo[id(self)] = result
         return result
 
-    def __torch_function__(self, func, types, args=(), kwargs=None):
-        args = [arg.as_subclass(Tensor) if isinstance(arg, Tensor) else arg for arg in args]
-        if kwargs is None:
-            kwargs = {}
-        result = func(*args, **kwargs)
-        if (
-            isinstance(result, Tensor)
-            and result.ndim == self.ndim
-            and result.shape[1:] == self.shape[1:]
-        ):
-            grid = self._grid
-            # 'torch._C.ScriptMethod' object has no attribute '__name__'
-            if getattr(func, "__name__", "unknown") == "clone":
-                grid = grid.clone()
-            result = self._make_instance(result, grid)
+    @classmethod
+    def __torch_function__(cls, func, types, args=(), kwargs=None):
+        result = Tensor.__torch_function__(func, (Tensor,), args, kwargs)
+        if isinstance(result, Tensor):
+            # e.g., torch.cat([a, b], dim=0)
+            if isinstance(args[0], (tuple, list)):
+                args = args[0]
+            grids: Sequence[Grid]
+            grids = [g for g in (getattr(arg, "_grid", None) for arg in args) if g is not None]
+            assert len(grids) > 0
+            grid = grids[0]
+            if result.ndim == grid.ndim + 1 and result.shape[1:] == grid.shape:
+                # 'torch._C.ScriptMethod' object has no attribute '__name__'
+                if getattr(func, "__name__", "unknown") == "clone":
+                    grid = grid.clone()
+                if isinstance(result, cls):
+                    result.grid_(grid)
+                else:
+                    result = cls(result, grid)
+            elif type(result) != Tensor:
+                result = result.as_subclass(Tensor)
         return result
 
     def batch(self: TImage) -> ImageBatch:

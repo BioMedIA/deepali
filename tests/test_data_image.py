@@ -132,7 +132,11 @@ def test_image_torch_function(zeros: Tensor, grid: Grid) -> None:
     assert hasattr(image, "_grid")
     assert image.grid() is grid
 
+    result = image.type(image.dtype)
+    assert result is image
+
     result = image.type(torch.int16)
+    assert result is not image
     assert type(result) is Image
     assert hasattr(result, "_grid")
     assert result.grid() is image.grid()
@@ -157,6 +161,12 @@ def test_image_torch_function(zeros: Tensor, grid: Grid) -> None:
     assert hasattr(result, "_grid")
     assert result.grid() is image.grid()
     assert result.eq(2).all()
+
+    result = torch.add(4, image)
+    assert type(result) is Image
+    assert hasattr(result, "_grid")
+    assert result.grid() is image.grid()
+    assert result.eq(4).all()
 
     result = image.add(1)
     assert type(result) is Image
@@ -184,6 +194,14 @@ def test_image_torch_function(zeros: Tensor, grid: Grid) -> None:
         assert hasattr(result, "_grid")
         assert result.grid() is image.grid()
         assert result.is_cuda
+
+    image_1 = Image(data, grid)
+    image_2 = Image(data.clone(), grid)
+    assert image_1.shape[1:] == image_2.shape[1:]
+    image_3 = torch.cat([image_1, image_2], dim=0)
+    assert isinstance(image_3, Image)
+    assert image_3.shape[0] == image_1.shape[0] + image_2.shape[0]
+    assert image_3.shape[1:] == image_1.shape[1:]
 
 
 @pytest.mark.parametrize("zeros,grid", [(d, d) for d in (2, 3)], indirect=True)
