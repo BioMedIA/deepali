@@ -25,6 +25,8 @@ os.chdir(project_dir)
 
 namespace = "deepali"
 
+long_description = (project_dir / "README.md").read_text()
+
 packages = find_namespace_packages(
     where=project_dir,
     include=[namespace + ".*"],
@@ -68,7 +70,8 @@ setup(
     # package exists, use a package name that slightly differs from this project's name.
     name="deepali-hf",
     description="Image, point set, and surface registration library for PyTorch.",
-    readme="README.md",
+    long_description=long_description,
+    long_description_content_type="text/markdown",
     license="Apache License 2.0",
     license_files=["LICENSE"],
     author="HeartFlow-Imperial College London",
@@ -82,7 +85,6 @@ setup(
         "Topic :: Scientific/Engineering :: Image Processing",
         "Typing :: Typed",
     ],
-    namespace_packages=[namespace],
     packages=packages,
     python_requires=">=3.7",
     use_scm_version=True,
