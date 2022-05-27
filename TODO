@@ -2,7 +2,7 @@ Core:
 - [ ] Enable `Grid` to represent a batch of sampling grids, or add `GridBatch` (cf. `Image` <-> `ImageBatch`).
 
 Data:
-- [ ] Implement `Image.split`, `ImageBatch.split`, `FlowField.split`, and `FlowFields.split` such that return value is of same Tensor subclass type with adjusted spatial grid in case of a split along a spatial image dimension.
+- [x] Implement `Image.split`, `ImageBatch.split`, `FlowField.split`, and `FlowFields.split` such that return value is of same Tensor subclass type with adjusted spatial grid in case of a split along a spatial image dimension.
 
 Loss functions:
 - [ ] Normalized mutual information.

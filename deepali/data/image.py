@@ -2,10 +2,11 @@ r"""Image tensors."""
 
 from __future__ import annotations
 
-from typing import Dict, Optional, Sequence, Tuple, Type, TypeVar, Union, overload
+from typing import Any, Dict, Optional, Sequence, Tuple, Type, TypeVar, Union, overload
 
 import torch
 from torch import Tensor
+from torch.nn import functional as F
 
 try:
     import SimpleITK as sitk
@@ -95,31 +96,107 @@ class ImageBatch(DataTensor):
         memo[id(self)] = result
         return result
 
+    @staticmethod
+    def _torch_function_grid(
+        func, args, kwargs: Dict[str, Any]
+    ) -> Optional[Union[Sequence[Grid], Sequence[Sequence[Grid]]]]:
+        r"""Get spatial sampling grids from args passed to __torch_function__."""
+        if not args:
+            return None
+        if isinstance(args[0], (tuple, list)):
+            args = args[0]
+        grids: Sequence[Sequence[Grid]]
+        grids = [g for g in (getattr(arg, "_grid", None) for arg in args) if g is not None]
+        if not grids:
+            return None
+        if kwargs.get("dim", 0) == 0:
+            if func == torch.cat:
+                return [g for grid in grids for g in grid]
+            if func in (torch.split, Tensor.split):
+                grids = grids[0]
+                split_grids = []
+                split_size_or_sections = args[1]
+                if isinstance(split_size_or_sections, int):
+                    for start in range(0, len(grids), split_size_or_sections):
+                        split_grids.append(grids[start : start + split_size_or_sections])
+                elif isinstance(split_size_or_sections, Sequence):
+                    start = 0
+                    for num in split_size_or_sections:
+                        split_grids.append(grids[start : start + num])
+                return split_grids
+            if func in (torch.split_with_sizes, Tensor.split_with_sizes):
+                grids = grids[0]
+                split_grids = []
+                split_sizes = args[1]
+                start = 0
+                for num in split_sizes:
+                    split_grids.append(grids[start : start + num])
+                return split_grids
+            if func in (torch.tensor_split, Tensor.tensor_split):
+                grids = grids[0]
+                split_grids = []
+                tensor_indices_or_sections = args[1]
+                if isinstance(tensor_indices_or_sections, int):
+                    for start in range(0, len(grids), tensor_indices_or_sections):
+                        split_grids.append(grids[start : start + tensor_indices_or_sections])
+                elif isinstance(tensor_indices_or_sections, Sequence):
+                    indices = list(tensor_indices_or_sections)
+                    for start, end in zip([0] + indices, indices + [len(grids)]):
+                        split_grids.append(grids[start:end])
+                return split_grids
+        return grids[0]
+
+    @classmethod
+    def _torch_function_result(cls, func, data, grid: Optional[Sequence[Grid]]) -> Any:
+        if not isinstance(data, Tensor):
+            return data
+        if (
+            grid
+            and data.ndim == grid[0].ndim + 2
+            and data.shape[0] == len(grid)
+            and data.shape[2:] == grid[0].shape
+        ) or (grid is not None and len(grid) == 0 and data.ndim >= 4 and data.shape[0] == 0):
+            if func in (torch.clone, Tensor.clone):
+                grid = [g.clone() for g in grid]
+            if isinstance(data, cls):
+                data._grid = grid
+            else:
+                data = cls(data, grid)
+        elif type(data) != Tensor:
+            data = data.as_subclass(Tensor)
+        return data
+
     @classmethod
     def __torch_function__(cls, func, types, args=(), kwargs=None):
+        if kwargs is None:
+            kwargs = {}
         args = tuple(arg.batch() if isinstance(arg, Image) else arg for arg in args)
-        fargs = [arg.as_subclass(Tensor) if isinstance(arg, Tensor) else arg for arg in args]
-        result = Tensor.__torch_function__(func, (Tensor,), fargs, kwargs)
-        if isinstance(result, Tensor):
-            # e.g., torch.cat([a, b], dim=0)
-            if isinstance(args[0], (tuple, list)):
-                args = args[0]
-            grids: Sequence[Sequence[Grid]]
-            grids = [g for g in (getattr(arg, "_grid", None) for arg in args) if g is not None]
-            assert len(grids) > 0
-            grid = grids[0]
-            assert len(grid) > 0
-            if result.ndim == grid[0].ndim + 2 and result.shape[2:] == grid[0].shape:
-                # 'torch._C.ScriptMethod' object has no attribute '__name__'
-                if getattr(func, "__name__", "unknown") == "clone":
-                    grid = [g.clone() for g in grid]
-                if isinstance(result, cls):
-                    cls.grid_(grid)
-                else:
-                    result = cls(result, grid)
-            elif type(result) != Tensor:
-                result = result.as_subclass(Tensor)
-        return result
+        # fargs = [arg.as_subclass(Tensor) if isinstance(arg, Tensor) else arg for arg in args]
+        data = Tensor.__torch_function__(func, (Tensor,), args, kwargs)
+        grid = cls._torch_function_grid(func, args, kwargs)
+        if func in (F.grid_sample,):
+            grid = None
+        elif func in (
+            torch.split,
+            Tensor.split,
+            torch.split_with_sizes,
+            Tensor.split_with_sizes,
+            torch.tensor_split,
+            Tensor.tensor_split,
+        ):
+            if type(data) not in (tuple, list):
+                raise AssertionError(f"expected split 'data' to be tuple or list, got {type(data)}")
+            if type(grid) not in (tuple, list):
+                raise AssertionError(f"expected split 'grid' to be tuple or list, got {type(grid)}")
+            if len(grid) != len(data):
+                raise AssertionError(
+                    f"expected 'grid' tuple length to be equal batch size, but {len(grid)} != {len(data)}"
+                )
+            assert all(isinstance(d, Tensor) for d in data)
+            assert all(isinstance(g, (tuple, list)) for g in grid)
+            assert all(len(d) == len(g) for d, g in zip(data, grid))
+            return tuple(cls._torch_function_result(func, d, g) for d, g in zip(data, grid))
+        return cls._torch_function_result(func, data, grid)
 
     def cube(self: TImageBatch, n: int = 0) -> Cube:
         r"""Get cube of n-th image in batch defining its normalized coordinates space with respect to the world."""
@@ -838,28 +915,50 @@ class Image(DataTensor):
         memo[id(self)] = result
         return result
 
+    @staticmethod
+    def _torch_function_grid(args) -> Optional[Grid]:
+        r"""Get spatial sampling grid from args passed to __torch_function__."""
+        if not args:
+            return None
+        if isinstance(args[0], (tuple, list)):
+            args = args[0]
+        grids: Sequence[Grid]
+        grids = [g for g in (getattr(arg, "_grid", None) for arg in args) if g is not None]
+        if not grids:
+            return None
+        return grids[0]
+
+    @classmethod
+    def _torch_function_result(cls, func, data, grid: Optional[Grid]) -> Any:
+        if not isinstance(data, Tensor):
+            return data
+        if grid is not None and data.ndim == grid.ndim + 1 and data.shape[1:] == grid.shape:
+            if func in (torch.clone, Tensor.clone):
+                grid = grid.clone()
+            if isinstance(data, cls):
+                data._grid = grid
+            else:
+                data = cls(data, grid)
+        elif type(data) != Tensor:
+            data = data.as_subclass(Tensor)
+        return data
+
     @classmethod
     def __torch_function__(cls, func, types, args=(), kwargs=None):
-        result = Tensor.__torch_function__(func, (Tensor,), args, kwargs)
-        if isinstance(result, Tensor):
-            # e.g., torch.cat([a, b], dim=0)
-            if isinstance(args[0], (tuple, list)):
-                args = args[0]
-            grids: Sequence[Grid]
-            grids = [g for g in (getattr(arg, "_grid", None) for arg in args) if g is not None]
-            assert len(grids) > 0
-            grid = grids[0]
-            if result.ndim == grid.ndim + 1 and result.shape[1:] == grid.shape:
-                # 'torch._C.ScriptMethod' object has no attribute '__name__'
-                if getattr(func, "__name__", "unknown") == "clone":
-                    grid = grid.clone()
-                if isinstance(result, cls):
-                    result.grid_(grid)
-                else:
-                    result = cls(result, grid)
-            elif type(result) != Tensor:
-                result = result.as_subclass(Tensor)
-        return result
+        if func == F.grid_sample:
+            raise ValueError("Argument of F.grid_sample() must be a batch, not a single image")
+        data = Tensor.__torch_function__(func, (Tensor,), args, kwargs)
+        grid = cls._torch_function_grid(args)
+        if func in (
+            torch.split,
+            Tensor.split,
+            torch.split_with_sizes,
+            Tensor.split_with_sizes,
+            torch.tensor_split,
+            Tensor.tensor_split,
+        ):
+            return tuple(cls._torch_function_result(func, sub, grid) for sub in data)
+        return cls._torch_function_result(func, data, grid)
 
     def batch(self: TImage) -> ImageBatch:
         r"""Image batch consisting of this image only.

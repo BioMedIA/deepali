@@ -4,6 +4,7 @@ from typing import Tuple
 import pytest
 import torch
 from torch import Tensor
+from torch.nn import functional as F
 
 from deepali.core import ALIGN_CORNERS, Grid, functional as U
 from deepali.data import Image, ImageBatch
@@ -202,6 +203,81 @@ def test_image_torch_function(zeros: Tensor, grid: Grid) -> None:
     assert isinstance(image_3, Image)
     assert image_3.shape[0] == image_1.shape[0] + image_2.shape[0]
     assert image_3.shape[1:] == image_1.shape[1:]
+
+    # F.grid_sample() should always return a Tensor because the grid of the resampled image
+    # may only by chance have the same size as the one on which the data is being resampled,
+    # but the spatial positions of the new grid locations differ. See also Image.sample(grid).
+    coords = image.grid().coords()
+    with pytest.raises(ValueError):
+        F.grid_sample(image, coords, align_corners=True)
+
+    result = F.grid_sample(image.batch(), coords.unsqueeze(0), align_corners=True)
+    assert type(result) == Tensor
+    assert result.shape[1:] == image.shape
+
+    # Split image along channel dimension
+    result = image.split(1)
+    assert type(result) == tuple
+    assert len(result) == 1
+    assert type(result[0]) == Image
+    assert result[0].grid() is image.grid()
+
+    multi_channel_image = image.repeat((5,) + (1,) * image.grid().ndim)
+    assert type(multi_channel_image) == Image
+    assert multi_channel_image.shape[0] == 5
+    assert multi_channel_image.shape[1:] == image.grid().shape
+    assert multi_channel_image.grid() is image.grid()
+    result = multi_channel_image.split(2, dim=0)
+    assert type(result) == tuple
+    assert len(result) == 3
+    assert type(result[0]) == Image
+    assert type(result[1]) == Image
+    assert type(result[2]) == Image
+    assert result[0].shape == (2,) + image.shape[1:]
+    assert result[1].shape == (2,) + image.shape[1:]
+    assert result[2].shape == (1,) + image.shape[1:]
+
+    # Split batch of images along batch dimension
+    batch = image.batch()
+    assert type(batch) == ImageBatch
+    batch.grids() == (image.grid(),)
+    batch.grid(0) is image.grid()
+    result = batch.tensor_split([0])
+    assert type(result) == tuple
+    assert len(result) == 2
+    assert type(result[0]) == ImageBatch
+    assert len(result[0]) == 0
+    assert type(result[1]) == ImageBatch
+    assert len(result[1]) == 1
+    assert result[1].grid(0) is image.grid()
+
+    other: Image = image.clone()
+    assert other.grid() is not image.grid()
+    batch = torch.cat([image.batch(), other.batch()], dim=0)
+    assert type(batch) == ImageBatch
+    assert len(batch._grid) == 2
+    assert batch.grid(0) is image.grid()
+    assert batch.grid(1) is other.grid()
+
+    result = batch.split(1)
+    assert type(result) == tuple
+    assert len(result) == 2
+    assert type(result[0]) == ImageBatch
+    assert len(result[0]) == 1
+    assert type(result[1]) == ImageBatch
+    assert len(result[1]) == 1
+    assert result[0].grid(0) is image.grid()
+    assert result[1].grid(0) is other.grid()
+
+    result = torch.split(batch, 1)
+    assert type(result) == tuple
+    assert len(result) == 2
+    assert type(result[0]) == ImageBatch
+    assert len(result[0]) == 1
+    assert type(result[1]) == ImageBatch
+    assert len(result[1]) == 1
+    assert result[0].grid(0) is image.grid()
+    assert result[1].grid(0) is other.grid()
 
 
 @pytest.mark.parametrize("zeros,grid", [(d, d) for d in (2, 3)], indirect=True)

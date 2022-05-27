@@ -2,10 +2,11 @@ r"""Flow vector fields."""
 
 from __future__ import annotations
 
-from typing import Optional, Sequence, Type, TypeVar, Union, overload
+from typing import Any, Optional, Sequence, Type, TypeVar, Union, overload
 
 import torch
 from torch import Tensor
+from torch.nn import functional as F
 
 from ..core.enum import PaddingMode, Sampling
 from ..core import flow as U
@@ -92,38 +93,60 @@ class FlowFields(ImageBatch):
         kwargs["axes"] = axes or self._axes
         return super()._make_instance(data, grid, **kwargs)
 
+    @staticmethod
+    def _torch_function_axes(args) -> Optional[Axes]:
+        r"""Get flow field Axes from args passed to __torch_function__."""
+        if not args:
+            return None
+        if isinstance(args[0], (tuple, list)):
+            args = args[0]
+        axes: Sequence[Axes]
+        axes = [ax for ax in (getattr(arg, "_axes", None) for arg in args) if ax is not None]
+        if not axes:
+            return None
+        if any(ax != axes[0] for ax in axes[1:]):
+            raise ValueError("Cannot apply __torch_function__ to flow fields with mismatching axes")
+        return axes[0]
+
+    @classmethod
+    def _torch_function_result(
+        cls, func, data, grid: Optional[Sequence[Grid]], axes: Optional[Axes]
+    ) -> Any:
+        if not isinstance(data, Tensor):
+            return data
+        if (
+            grid
+            and axes is not None
+            and data.ndim == grid[0].ndim + 2
+            and data.shape[1] == grid[0].ndim
+            and data.shape[2:] == grid[0].shape
+        ) or (grid is not None and not grid and data.ndim >= 4 and data.shape[0] == 0):
+            if func in (torch.clone, Tensor.clone):
+                grid = [g.clone() for g in grid]
+            if isinstance(data, cls):
+                data._grid = grid
+                data._axes = axes
+            else:
+                data = cls(data, grid)
+        return ImageBatch._torch_function_result(func, data, grid)
+
     @classmethod
     def __torch_function__(cls, func, types, args=(), kwargs=None):
-        result = Tensor.__torch_function__(func, (Tensor,), args, kwargs)
-        if isinstance(result, Tensor):
-            grids: Sequence[Sequence[Grid]]
-            saxes: Sequence[Axes]
-            if isinstance(args[0], (tuple, list)):
-                args = args[0]
-            saxes = [ax for ax in (getattr(arg, "_axes", None) for arg in args) if ax is not None]
-            assert len(saxes) > 0
-            if any(ax != saxes[0] for ax in saxes[1:]):
-                raise ValueError(
-                    "Cannot apply __torch_function__ to flow fields with mismatching axes"
-                )
-            grids = [g for g in (getattr(arg, "_grid", None) for arg in args) if g is not None]
-            assert len(grids) > 0
-            grid = grids[0]
-            axes = saxes[0]
-            assert len(grid) > 0
-            if result.ndim == grid[0].ndim + 2 and result.shape[2:] == grid[0].shape:
-                # 'torch._C.ScriptMethod' object has no attribute '__name__'
-                if getattr(func, "__name__", "unknown") == "clone":
-                    grid = [g.clone() for g in grid]
-                if result.shape[1] != grid[0].ndim:
-                    result = ImageBatch(result, grid)
-                elif isinstance(result, cls):
-                    result.grid_(grid)
-                else:
-                    result = cls(result, grid, axes)
-            elif type(result) != Tensor:
-                result = result.as_subclass(Tensor)
-        return result
+        if func == F.grid_sample:
+            raise ValueError("Argument of F.grid_sample() must be a batch, not a single image")
+        data = Tensor.__torch_function__(func, (Tensor,), args, kwargs)
+        grid = cls._torch_function_grid(args)
+        axes = cls._torch_function_axes(args)
+        if func in (
+            torch.split,
+            Tensor.split,
+            torch.split_with_sizes,
+            Tensor.split_with_sizes,
+            torch.tensor_split,
+            Tensor.tensor_split,
+        ):
+            return tuple(cls._torch_function_result(func, res, grid, axes) for res in data)
+        return cls._torch_function_result(func, data, grid, axes)
 
     def __getitem__(self: TFlowFields, index: int) -> FlowField:
         r"""Get flow field at specified batch index."""
@@ -314,37 +337,58 @@ class FlowField(Image):
         kwargs["axes"] = axes or self._axes
         return super()._make_instance(data, grid, **kwargs)
 
+    @staticmethod
+    def _torch_function_axes(args) -> Optional[Axes]:
+        r"""Get flow field Axes from args passed to __torch_function__."""
+        if not args:
+            return None
+        if isinstance(args[0], (tuple, list)):
+            args = args[0]
+        axes: Sequence[Axes]
+        axes = [ax for ax in (getattr(arg, "_axes", None) for arg in args) if ax is not None]
+        if not axes:
+            return None
+        if any(ax != axes[0] for ax in axes[1:]):
+            raise ValueError("Cannot apply __torch_function__ to flow fields with mismatching axes")
+        return axes[0]
+
+    @classmethod
+    def _torch_function_result(cls, func, data, grid: Optional[Grid], axes: Optional[Axes]) -> Any:
+        if not isinstance(data, Tensor):
+            return data
+        if (
+            grid is not None
+            and axes is not None
+            and data.ndim == grid.ndim + 1
+            and data.shape[0] == grid.ndim
+            and data.shape[1:] == grid.shape
+        ):
+            if func in (torch.clone, Tensor.clone):
+                grid = grid.clone()
+            if isinstance(data, cls):
+                data._grid = grid
+                data._axes = axes
+            else:
+                data = cls(data, grid)
+        return Image._torch_function_result(func, data, grid)
+
     @classmethod
     def __torch_function__(cls, func, types, args=(), kwargs=None):
-        result = Tensor.__torch_function__(func, (Tensor,), args, kwargs)
-        if isinstance(result, Tensor):
-            grids: Sequence[Grid]
-            saxes: Sequence[Axes]
-            if isinstance(args[0], (tuple, list)):
-                args = args[0]
-            saxes = [ax for ax in (getattr(arg, "_axes", None) for arg in args) if ax is not None]
-            assert len(saxes) > 0
-            if any(ax != saxes[0] for ax in saxes[1:]):
-                raise ValueError(
-                    "Cannot apply __torch_function__ to flow fields with mismatching axes"
-                )
-            grids = [g for g in (getattr(arg, "_grid", None) for arg in args) if g is not None]
-            assert len(grids) > 0
-            grid = grids[0]
-            axes = saxes[0]
-            if result.ndim == grid.ndim + 1 and result.shape[1:] == grid.shape:
-                # 'torch._C.ScriptMethod' object has no attribute '__name__'
-                if getattr(func, "__name__", "unknown") == "clone":
-                    grid = grid.clone()
-                if result.shape[0] != grid.ndim:
-                    result = Image(result, grid)
-                elif isinstance(result, cls):
-                    result.grid_(grid)
-                else:
-                    result = cls(result, grid, axes)
-            elif type(result) != Tensor:
-                result = result.as_subclass(Tensor)
-        return result
+        if func == F.grid_sample:
+            raise ValueError("Argument of F.grid_sample() must be a batch, not a single image")
+        data = Tensor.__torch_function__(func, (Tensor,), args, kwargs)
+        grid = cls._torch_function_grid(args)
+        axes = cls._torch_function_axes(args)
+        if func in (
+            torch.split,
+            Tensor.split,
+            torch.split_with_sizes,
+            Tensor.split_with_sizes,
+            torch.tensor_split,
+            Tensor.tensor_split,
+        ):
+            return tuple(cls._torch_function_result(func, res, grid, axes) for res in data)
+        return cls._torch_function_result(func, data, grid, axes)
 
     @classmethod
     def from_image(cls: Type[TFlowField], image: Image, axes: Optional[Axes] = None) -> TFlowField:
