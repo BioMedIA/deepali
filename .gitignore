@@ -6,6 +6,7 @@
 ~$*
 *.swp
 /.idea/
+/.vscode/*.log
 
 # compilation
 __pycache__/
