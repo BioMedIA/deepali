@@ -3,6 +3,9 @@ r"""Loss functions, evaluation metrics, and related utilities."""
 import itertools
 from typing import Optional, Sequence, Union
 
+import math
+import numpy as np
+
 import torch
 from torch import Tensor
 from torch.nn.functional import binary_cross_entropy_with_logits, logsigmoid
@@ -633,6 +636,83 @@ def ssd_loss(
             raise ValueError("ssd_loss() 'norm' must be scalar")
         if norm > 0:
             loss = loss.div_(norm)
+    return loss
+
+
+def mi_loss(
+        input: Tensor,
+        target: Tensor,
+        mask: Optional[Tensor] = None,
+        vmin: Optional[float] = None,
+        vmax: Optional[float] = None,
+        num_bins: int = 64,
+        sample_ratio: Optional[float] = None,
+        nmi: bool = True
+) -> Tensor:
+    r"""
+    Calculate mutual information loss using Parzen window density and entropy estimations
+
+    References:
+    - Qiu, H., Qin, C., Schuh, A., Hammernik, K.: Learning Diffeomorphic and Modality-invariant Registration using B-splines. Medical Imaging with Deep Learning. (2021).
+    - Thévenaz, P., Unser, M.: Optimization of mutual information for multiresolution image registration. IEEE Trans. Image Process. 9, 2083–2099 (2000).
+
+    Args:
+        input: Source image sampled on ``target`` grid.
+        target: Target image with same shape as ``input``.
+        mask: Multiplicative mask with same shape as ``input``.
+        vmin: Minimal intensity value the joint and marginal density is estimated.
+        vmax: Maximal intensity value the joint and marginal density is estimated.
+        num_bins: Number of bin edges to discretize the density estimation.
+        sample_ratio: Ratio of the voxels to randomly sample from the images,
+            if `None` mutual information is calculated using all voxels .
+        nmi: Calculate Normalised Mutual Information instead of Mutual Information if True.
+    """
+    input = masked_loss(input, mask=mask)
+    target = masked_loss(target, mask=mask)
+
+    if sample_ratio is not None:
+        assert sample_ratio < 1., f"Subsampling ratio {sample_ratio} must be smaller than 1."
+        numel_ = np.prod(input.size()[2:])
+        idx_th = int(sample_ratio * numel_)
+        idx_choice = torch.randperm(int(numel_))[:idx_th]
+        input = input.view(input.size()[0], 1, -1)[:, :, idx_choice]
+        target = target.view(input.size()[0], 1, -1)[:, :, idx_choice]
+    input = input.flatten(start_dim=2, end_dim=-1)
+    target = target.flatten(start_dim=2, end_dim=-1)
+
+    # set the bin edges and Gaussian kernel std
+    if vmin is None:
+        vmin = torch.min(input.min(), target.min())
+    if vmax is None:
+        vmax = torch.max(input.max(), target.max())
+    bin_width = (vmax - vmin) / num_bins  # FWHM is one bin width
+    sigma = bin_width * (1 / (2 * math.sqrt(2 * math.log(2))))
+    bins = torch.linspace(vmin, vmax, num_bins, requires_grad=False).unsqueeze(1).type_as(input)
+
+    # calculate Parzen window function response
+    def parzen_window_fn(x):
+        return torch.exp(-(x - bins) ** 2 / (2 * sigma ** 2)) / (math.sqrt(2 * math.pi) * sigma)
+    pw_input = parzen_window_fn(input)  # (N, #bins, H*W*D)
+    pw_target = parzen_window_fn(target)
+
+    # calculate joint histogram
+    hist_joint = pw_input.bmm(pw_target.transpose(1, 2))  # (N, #bins, #bins)
+    hist_norm = hist_joint.flatten(start_dim=1, end_dim=-1).sum(dim=1) + 1e-5
+
+    # joint and marginal distributions
+    p_joint = hist_joint / hist_norm.view(-1, 1, 1)  # (N, #bins, #bins) / (N, 1, 1)
+    p_input = torch.sum(p_joint, dim=2)
+    p_target = torch.sum(p_joint, dim=1)
+
+    # calculate entropy
+    ent_input = - torch.sum(p_input * torch.log(p_input + 1e-5), dim=1)  # (N,1)
+    ent_target = - torch.sum(p_target * torch.log(p_target + 1e-5), dim=1)  # (N,1)
+    ent_joint = - torch.sum(p_joint * torch.log(p_joint + 1e-5), dim=(1, 2))  # (N,1)
+
+    if nmi:
+        loss = -torch.mean((ent_input + ent_target) / ent_joint)
+    else:
+        loss = -torch.mean(ent_input + ent_target - ent_joint)
     return loss
 
 
