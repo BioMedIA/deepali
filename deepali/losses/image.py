@@ -62,8 +62,7 @@ class MI(PairwiseImageLoss):
             vmax: Optional[float] = None,
             num_bins: int = 64,
             sample_ratio: Optional[float] = None,
-            nmi: bool = True
-
+            normalized: bool = True
     ):
         r"""Initialize loss term.
         See `deepali.losses.functional.mi_loss`
@@ -73,7 +72,7 @@ class MI(PairwiseImageLoss):
         self.vmax = vmax
         self.num_bins = num_bins
         self.sample_ratio = sample_ratio
-        self.nmi = nmi
+        self.normalized = normalized
 
     def forward(self, source: Tensor, target: Tensor, mask: Optional[Tensor] = None) -> Tensor:
         r"""Evaluate patch dissimilarity loss."""
@@ -85,14 +84,14 @@ class MI(PairwiseImageLoss):
             vmax=self.vmax,
             num_bins=self.num_bins,
             sample_ratio=self.sample_ratio,
-            nmi=self.nmi)
+            normalized=self.normalized)
 
     def extra_repr(self) -> str:
         return f"vmin={self.vmin}," \
                f"vmax={self.vmax}," \
                f"num_bins={self.num_bins}, " \
                f"sampling_ratio={self.sample_ratio}," \
-               f"nmi={self.nmi}"
+               f"normalized={self.normalized}"
 
 
 class PatchwiseImageLoss(PairwiseImageLoss):

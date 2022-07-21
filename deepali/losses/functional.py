@@ -4,7 +4,6 @@ import itertools
 from typing import Optional, Sequence, Union
 
 import math
-import numpy as np
 
 import torch
 from torch import Tensor
@@ -647,7 +646,7 @@ def mi_loss(
         vmax: Optional[float] = None,
         num_bins: int = 64,
         sample_ratio: Optional[float] = None,
-        nmi: bool = True
+        normalized: bool = True
 ) -> Tensor:
     r"""
     Calculate mutual information loss using Parzen window density and entropy estimations
@@ -665,14 +664,14 @@ def mi_loss(
         num_bins: Number of bin edges to discretize the density estimation.
         sample_ratio: Ratio of the voxels to randomly sample from the images,
             if `None` mutual information is calculated using all voxels .
-        nmi: Calculate Normalised Mutual Information instead of Mutual Information if True.
+        normalized: Calculate Normalised Mutual Information instead of Mutual Information if True.
     """
     input = masked_loss(input, mask=mask)
     target = masked_loss(target, mask=mask)
 
     if sample_ratio is not None:
         assert sample_ratio < 1., f"Subsampling ratio {sample_ratio} must be smaller than 1."
-        numel_ = np.prod(input.size()[2:])
+        numel_ = input.size()[2:].numel()
         idx_th = int(sample_ratio * numel_)
         idx_choice = torch.randperm(int(numel_))[:idx_th]
         input = input.view(input.size()[0], 1, -1)[:, :, idx_choice]
@@ -709,7 +708,7 @@ def mi_loss(
     ent_target = - torch.sum(p_target * torch.log(p_target + 1e-5), dim=1)  # (N,1)
     ent_joint = - torch.sum(p_joint * torch.log(p_joint + 1e-5), dim=(1, 2))  # (N,1)
 
-    if nmi:
+    if normalized:
         loss = -torch.mean((ent_input + ent_target) / ent_joint)
     else:
         loss = -torch.mean(ent_input + ent_target - ent_joint)
