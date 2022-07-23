@@ -6,6 +6,7 @@ from operator import mul
 from typing import Optional, Sequence, Tuple, Union
 
 import torch
+import torch.nn.functional as F
 from torch import Tensor
 
 from .tensor import as_tensor
@@ -33,6 +34,7 @@ __all__ = (
     "homogeneous_transform",
     "tensordot",
     "vectordot",
+    "vector_rotation",
     # adapted from kornia.geometry
     "angle_axis_to_rotation_matrix",
     "angle_axis_to_quaternion",
@@ -455,3 +457,18 @@ def vectordot(a: Tensor, b: Tensor, w: Optional[Tensor] = None, dim: int = -1) -
     if w is not None:
         c.mul(w)
     return c.sum(dim)
+
+
+def vector_rotation(a: Tensor, b: Tensor) -> Tensor:
+    r"""Calculate rotation matrix which aligns two 3D vectors."""
+    if not isinstance(a, Tensor) or not isinstance(b, Tensor):
+        raise TypeError("vector_rotation() 'a' and 'b' must be of type Tensor")
+    if a.shape != b.shape:
+        raise ValueError("vector_rotation() 'a' and 'b' must have identical shape")
+    a = F.normalize(a, p=2, dim=-1)
+    b = F.normalize(b, p=2, dim=-1)
+    axis = a.cross(b, dim=-1)
+    norm: Tensor = axis.norm(p=2, dim=-1, keepdim=True)
+    angle_axis = axis.div(norm).mul(norm.asin())
+    rotation_matrix = angle_axis_to_rotation_matrix(angle_axis)
+    return rotation_matrix
