@@ -27,6 +27,7 @@ from .tensor import unravel_coords
 from .tensor import unravel_index
 
 # Linear algebra/geometry
+from .affine import affine_rotation_matrix
 from .affine import apply_transform as apply_affine_transform
 from .affine import euler_rotation_matrix
 from .affine import euler_rotation_angles
@@ -135,6 +136,7 @@ __all__ = (
     "unravel_index",
     # Linear algebra/geometry
     "affine_flow",
+    "affine_rotation_matrix",
     "affine_transform_points",
     "affine_transform_vectors",
     "angle_axis_to_rotation_matrix",

@@ -12,6 +12,7 @@ from .types import Array, Device, Scalar, Shape
 
 
 __all__ = (
+    "affine_rotation_matrix",
     "apply_transform",
     "euler_rotation_matrix",
     "euler_rotation_angles",
@@ -24,6 +25,58 @@ __all__ = (
     "transform_points",
     "transform_vectors",
 )
+
+
+def affine_rotation_matrix(matrix: Tensor) -> Tensor:
+    r"""Get orthonormal rotation matrix from (homogeneous) affine transformation.
+
+    This function assumes the following order of elementary transformations:
+    1) Scaling, 2) Shearing, 3) Rotation, and 4) Translation.
+
+    See also FullAffineTransform, AffineTransform, RigidTransform, etc.
+
+    Args:
+        matrix: Affine transformation as tensor of shape (..., 3, 3) or (..., 3, 4).
+
+    Returns:
+        Orthonormal rotation matrices with determinant 1 as tensor of shape (..., 3, 3).
+
+    """
+    # Translated from the C++ MIRTK code which is based on the book Graphics Gems:
+    # https://github.com/BioMedIA/MIRTK/blob/6461e43d0ad0e0dcea2a65aeea213a78b420eae5/Modules/Numerics/src/Matrix.cc#L1446-L1548
+    if not isinstance(matrix, Tensor):
+        raise TypeError("affine_rotation_matrix() 'matrix' must be Tensor")
+    if matrix.ndim < 2 or matrix.shape[-2] != 3 or matrix.shape[-1] not in (3, 4):
+        raise ValueError("affine_rotation_matrix() 'matrix' must have shape (..., 3, 3|4)")
+    matrix = matrix[..., :3].clone()
+    # Compute X scale factor and normalize 1st column.
+    sx: Tensor = torch.linalg.norm(matrix[..., 0], ord=2, dim=-1)
+    matrix[..., 0] = matrix[..., 0].div(sx.unsqueeze(-1))
+    # Compute XY shear factor and make 2nd column orthogonal to 1st.
+    tansxy = matrix[..., 0].mul(matrix[..., 1]).sum(dim=-1)
+    matrix[..., 1] = matrix[..., 1].sub(matrix[..., 0].mul(tansxy.unsqueeze(-1)))
+    # Actually, tansxy and 2nd column are still to large by a factor of sy.
+    # Now, compute Y scale and normalize 2nd column and rescale tansxy.
+    sy: Tensor = torch.linalg.norm(matrix[..., 1], ord=2, dim=-1)
+    matrix[..., 1] = matrix[..., 1].div(sy.unsqueeze(-1))
+    tansxy = tansxy.div(sy)
+    # Compute XZ and YZ shears, orthogonalize 3rd column.
+    tansxz = matrix[..., 0].mul(matrix[..., 2]).sum(dim=-1)
+    matrix[..., 2] = matrix[..., 2].sub(matrix[..., 0].mul(tansxz.unsqueeze(-1)))
+    tansyz = matrix[..., 1].mul(matrix[..., 2]).sum(dim=-1)
+    matrix[..., 2] = matrix[..., 2].sub(matrix[..., 1].mul(tansyz.unsqueeze(-1)))
+    # Actually, tansxz, tansyz and 2nd column are still too large by a factor of sz.
+    # Next, get Z scale, normalize 3rd column and scale tansxz and tansyz.
+    sz: Tensor = torch.linalg.norm(matrix[..., 2], ord=2, dim=-1)
+    matrix[..., 2] = matrix[..., 2].div(sz.unsqueeze(-1))
+    tansxz = tansxz.div(sz)
+    tansyz = tansyz.div(sz)
+    # At this point, the columns are orthonormal. Check for a coordinate system flip.
+    # If the determinant is -1, then negate the matrix (and the scaling factors).
+    mask = matrix[..., 0].mul(matrix[..., 1].cross(matrix[..., 2], dim=-1)).sum(dim=-1).ge(0)
+    mask = mask.unsqueeze(-1).unsqueeze(-1).expand_as(matrix)
+    matrix = matrix.where(mask, -matrix)
+    return matrix
 
 
 def identity_transform(
