@@ -56,6 +56,7 @@ from .linalg import rotation_matrix_to_angle_axis
 from .linalg import rotation_matrix_to_quaternion
 from .linalg import tensordot
 from .linalg import vectordot
+from .linalg import vector_rotation
 
 # Data operations
 from .bspline import bspline_interpolation_weights
@@ -162,6 +163,7 @@ __all__ = (
     "tensordot",
     "translation",
     "vectordot",
+    "vector_rotation",
     # Data operations
     "avg_pool",
     "bounding_box",
