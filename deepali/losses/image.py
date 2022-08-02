@@ -53,6 +53,47 @@ class MSE(NormalizedPairwiseImageLoss):
         return L.mse_loss(source, target, mask=mask, norm=self.norm)
 
 
+class MI(PairwiseImageLoss):
+    r""" Mutual information loss using Parzen window estimate with Gaussian kernel. """
+
+    def __init__(
+            self,
+            vmin: Optional[float] = None,
+            vmax: Optional[float] = None,
+            num_bins: int = 64,
+            sample_ratio: Optional[float] = None,
+            normalized: bool = True
+    ):
+        r"""Initialize loss term.
+        See `deepali.losses.functional.mi_loss`
+        """
+        super().__init__()
+        self.vmin = vmin
+        self.vmax = vmax
+        self.num_bins = num_bins
+        self.sample_ratio = sample_ratio
+        self.normalized = normalized
+
+    def forward(self, source: Tensor, target: Tensor, mask: Optional[Tensor] = None) -> Tensor:
+        r"""Evaluate patch dissimilarity loss."""
+        return L.mi_loss(
+            source,
+            target,
+            mask=mask,
+            vmin=self.vmin,
+            vmax=self.vmax,
+            num_bins=self.num_bins,
+            sample_ratio=self.sample_ratio,
+            normalized=self.normalized)
+
+    def extra_repr(self) -> str:
+        return f"vmin={self.vmin}," \
+               f"vmax={self.vmax}," \
+               f"num_bins={self.num_bins}, " \
+               f"sampling_ratio={self.sample_ratio}," \
+               f"normalized={self.normalized}"
+
+
 class PatchwiseImageLoss(PairwiseImageLoss):
     r"""Pairwise similarity of 2D image patches defined within a 3D volume."""
 
