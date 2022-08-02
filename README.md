@@ -94,6 +94,7 @@ Below we list a few projects which are either similar to *deepali* or complement
 - **[Mermaid]**: This [PyTorch] based toolkit facilitates both traditional and learning based registration with a particular focus on diffeomorphic transformation models based on either static or time-dependent velocity fields, including scalar and vector momentum fields. It should be especially of interested to those familiar with the mathematical framework of [Large Deformation Metric Mapping] for [Computational Anatomy].
 - **[MONAI]**: This excellent framework for deep learning in healthcare imaging is well maintained and part of the [PyTorch Ecosystem]. It is not specific to medical image registration. In particular, MONAI omits spatial transformation models for use in a registration method, whether optimized directly or integrated in a deep learning model, but contains advanced modules for sampling an image at deformed spatial locations. Common spatial transformations used for data augmentation and general neural network architectures for various tasks are also available in this framework.
 - **[Neurite]**: A neural networks toolbox with a focus on medical image analysis in [TensorFlow]. Parts of it have been used in [VoxelMorph], for example.
+- **[NITorch]**: A library written by post-docs in John Ashburner's group which is conceptually related to SPM and has a great overlap with *deepali*. Some low-level functionality for applying spatial transformations has more recently been contributed to MONAI as well.
 - **[TorchIO]**: A library in the [PyTorch Ecosystem] for efficient loading, preprocessing, augmentation, and patch-based sampling of 3D medical images.
 
 
@@ -102,6 +103,7 @@ Below we list a few projects which are either similar to *deepali* or complement
 [Mermaid]: https://github.com/uncbiag/mermaid
 [MONAI]: https://github.com/Project-MONAI/MONAI
 [Neurite]: https://github.com/adalca/neurite
+[NITorch]: https://github.com/balbasty/nitorch
 [NumPy]: https://numpy.org/
 [PyTorch]: https://pytorch.org/
 [PyTorch Ecosystem]: https://pytorch.org/ecosystem/
