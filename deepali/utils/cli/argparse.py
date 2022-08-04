@@ -20,7 +20,7 @@ UnknownArguments = List[str]
 STANDARD_ARGUMENTS_GROUP_TITLE = "Standard arguments"
 
 
-class HelpFormatter(argparse.HelpFormatter):
+class HelpFormatter(argparse.ArgumentDefaultsHelpFormatter):
     # See: https://stackoverflow.com/a/35848313
 
     def add_usage(self, usage, actions, groups, prefix=None):
@@ -311,7 +311,14 @@ def main_func(
 
         """
         argv = None if argv is None else [str(arg) for arg in argv]
-        return func(parser(add_help=True).parse_args(argv))
+        try:
+            p = parser(add_help=True)
+            args = p.parse_args(argv)
+            exit_code = func(args)
+        except KeyboardInterrupt:
+            sys.stderr.write("Interrupted by user\n")
+            exit_code = 1
+        return exit_code
 
     # Return closure
     return main

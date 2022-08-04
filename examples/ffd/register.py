@@ -114,9 +114,4 @@ def load_config(path: PathStr) -> Dict[str, Any]:
 
 
 if __name__ == "__main__":
-    try:
-        exit_code = main()
-    except KeyboardInterrupt:
-        sys.stderr.write("Execution interrupted by user\n")
-        exit_code = 1
-    sys.exit(exit_code)
+    sys.exit(main())
