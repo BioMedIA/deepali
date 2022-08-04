@@ -1098,7 +1098,8 @@ def grid_sample(
 
     """
     grid = check_sample_grid("grid_sample", data, grid)
-    assert data.device == grid.device
+    if data.device != grid.device:
+        raise ValueError("grid_sample() 'data' and 'grid' tensors must be on same device")
     N = grid.shape[0]
     D = grid.shape[-1]
     if data.shape[0] != N:
