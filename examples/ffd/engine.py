@@ -14,8 +14,8 @@ from torch import Tensor
 from torch.optim import Optimizer
 from torch.utils.hooks import RemovableHandle
 
-from utilities import slope_of_least_squares_fit
-from losses import RegistrationLoss, RegistrationResult
+from .optim import slope_of_least_squares_fit
+from .losses import RegistrationLoss, RegistrationResult
 
 
 PROFILING = False

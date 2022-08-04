@@ -1,15 +1,11 @@
-# Using linearly interpolated dense displacement vector field
-# model:
-#   name: DDF
-#   downsample: 2
-# Using cubic B-spline interpolation / free-form deformation
+# Using free-form deformation model
 model:
   name: FFD
   stride: [8, 8, 5]
 # Loss terms of objective function to minimize
 energy:
   seg: [1, MSE]
-  be: [0.001, BendingEnergy]
+  be: [0.005, BSplineBending]
 # Optimization scheme and parameters
 optim:
   name: Adam

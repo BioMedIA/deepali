@@ -23,11 +23,11 @@ from deepali.spatial import SpatialTransform
 from deepali.spatial import Translation
 from deepali.spatial import new_spatial_transform
 
-from engine import RegistrationEngine
-from hooks import RegistrationEvalHook, RegistrationStepHook
-from hooks import normalize_grad_hook, smooth_grad_hook
-from losses import PairwiseImageRegistrationLoss, weight_channel_names
-from optim import new_optimizer
+from .engine import RegistrationEngine
+from .hooks import RegistrationEvalHook, RegistrationStepHook
+from .hooks import normalize_grad_hook, smooth_grad_hook
+from .losses import PairwiseImageRegistrationLoss, weight_channel_names
+from .optim import new_optimizer
 
 
 def register_pairwise(
