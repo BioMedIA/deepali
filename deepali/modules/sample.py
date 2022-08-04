@@ -148,13 +148,19 @@ class SampleImage(Module):
                 f"{type(self).__name__}() 'input' must be Tensor or Mapping[str, Tensor]"
             )
         for name, data in source.items():
-            output[name] = U.grid_sample(
+            is_unbatched = data.ndim == grid.shape[-1] + 1
+            if is_unbatched:
+                data = data.unsqueeze(0)
+            data = U.grid_sample(
                 data,
                 grid,
                 mode=self._sampling,
                 padding=self._padding,
                 align_corners=align_corners,
             )
+            if is_unbatched:
+                data = data.squeeze(0)
+            output[name] = data
         if mask is not None:
             if not isinstance(mask, Tensor):
                 raise TypeError(f"{type(self).__name__}() 'mask' must be Tensor")
