@@ -4,6 +4,26 @@ from itertools import repeat
 from typing import Any, Iterable, Sequence, Union
 
 
+def is_even_permutation(permutation: Sequence[int]) -> bool:
+    r"""Checks if given permutation is even.
+
+    Example:
+        >>> is_even_permutation(range(10))
+        True
+        >>> is_even_permutation(range(10)[::-1])
+        False
+
+    """
+    if len(permutation) == 1:
+        return True
+    transitions_count = 0
+    for index, element in enumerate(permutation):
+        for next_element in permutation[index + 1 :]:
+            if element > next_element:
+                transitions_count += 1
+    return not (transitions_count % 2)
+
+
 def repeat_last(arg: Union[Any, Sequence[Any]], length: int) -> Sequence[Any]:
     r"""Repeat last element in sequence to extend it to the specified length."""
     if not isinstance(arg, str) and not isinstance(arg, Sequence):
