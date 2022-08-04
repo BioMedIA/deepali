@@ -7,6 +7,7 @@ import torch
 from torch import Tensor
 from torch.nn.functional import binary_cross_entropy_with_logits, logsigmoid
 
+from ..core.bspline import evaluate_cubic_bspline
 from ..core.enum import SpatialDerivativeKeys
 from ..core.grid import Grid
 from ..core.image import avg_pool, dot_channels, spatial_derivatives
@@ -29,8 +30,11 @@ __all__ = (
     "ssd_loss",
     "grad_loss",
     "bending_loss",
-    "bending_energy_loss",
+    "bending_energy",
     "be_loss",
+    "bspline_bending_loss",
+    "bspline_bending_energy",
+    "bspline_be_loss",
     "curvature_loss",
     "diffusion_loss",
     "divergence_loss",
@@ -744,7 +748,66 @@ def bending_loss(
 
 
 be_loss = bending_loss
-bending_energy_loss = bending_loss
+bending_energy = bending_loss
+
+
+def bspline_bending_loss(
+    data: Tensor, stride: ScalarOrTuple[int] = 1, reduction: str = "mean"
+) -> Tensor:
+    r"""Evaluate bending energy of cubic B-spline function, e.g., spatial free-form deformation.
+
+    Args:
+        data: Cubic B-spline interpolation coefficients as tensor of shape ``(N, C, ..., X)``.
+        stride: Number of points between control points at which to evaluate bending energy, plus one.
+            If a sequence of values is given, these must be the strides for the different spatial
+            dimensions in the order ``(sx, ...)``. A stride of 1 is equivalent to evaluating bending
+            energy only at the usually coarser resolution of the control point grid. It should be noted
+            that the stride need not match the stride used to densely sample the spline deformation field
+            at a given fixed target image resolution.
+        reduction: Specifies the reduction to apply to the output: 'none' | 'mean' | 'sum'.
+
+    Returns:
+        Bending energy of cubic B-spline.
+
+    """
+    if not isinstance(data, Tensor):
+        raise TypeError("bspline_bending_loss() 'data' must be torch.Tensor")
+    if not torch.is_floating_point(data):
+        raise TypeError("bspline_bending_loss() 'data' must have floating point dtype")
+    if data.ndim < 3:
+        raise ValueError("bspline_bending_loss() 'data' must have shape (N, C, ..., X)")
+    D = data.ndim - 2
+    C = data.shape[1]
+    if C != D:
+        raise ValueError(
+            f"bspline_bending_loss() 'data' number of channels ({C})"
+            f" does not match number of spatial dimensions ({D})"
+        )
+    energy: Optional[Tensor] = None
+    derivs = SpatialDerivativeKeys.all(D, order=2)
+    derivs = SpatialDerivativeKeys.unique(derivs)
+    npoints = 0
+    for deriv in derivs:
+        derivative = [0] * D
+        for sdim in SpatialDerivativeKeys.split(deriv):
+            derivative[sdim] += 1
+        assert sum(derivative) == 2
+        values = evaluate_cubic_bspline(data, stride=stride, derivative=derivative).square()
+        if reduction != "none":
+            npoints = values.shape[2:].numel()
+            values = values.sum()
+        if not SpatialDerivativeKeys.is_mixed(deriv):
+            values = values.mul_(2)
+        energy = values if energy is None else energy.add_(values)
+    assert energy is not None
+    assert npoints > 0
+    if reduction == "mean" and npoints > 1:
+        energy = energy.div_(npoints)
+    return energy
+
+
+bspline_be_loss = bspline_bending_loss
+bspline_bending_energy = bspline_bending_loss
 
 
 def curvature_loss(

@@ -130,10 +130,30 @@ class DisplacementLoss(Module, metaclass=ABCMeta):
 class BSplineLoss(Module, metaclass=ABCMeta):
     r"""Base class of loss terms based on cubic B-spline deformation coefficients."""
 
+    def __init__(self, stride: ScalarOrTuple[int] = 1, reduction: str = "mean"):
+        r"""Initialize regularization term.
+
+        Args:
+            stride: Number of points between control points at which to evaluate bending energy, plus one.
+                If a sequence of values is given, these must be the strides for the different spatial
+                dimensions in the order ``(sx, ...)``. A stride of 1 is equivalent to evaluating bending
+                energy only at the usually coarser resolution of the control point grid. It should be noted
+                that the stride need not match the stride used to densely sample the spline deformation field
+                at a given fixed target image resolution.
+            reduction: Specifies the reduction to apply to the output: 'none' | 'mean' | 'sum'.
+
+        """
+        super().__init__()
+        self.stride = stride
+        self.reduction = reduction
+
     @abstractmethod
-    def forward(self, params: Tensor, stride: ScalarOrTuple[int]) -> Tensor:
+    def forward(self, params: Tensor, stride: ScalarOrTuple[int] = 1) -> Tensor:
         r"""Evaluate loss term for given free-form deformation parameters."""
         raise NotImplementedError(f"{type(self).__name__}.forward()")
+
+    def extra_repr(self) -> str:
+        return f"stride={self.stride!r}, reduction={self.reduction!r}"
 
 
 class PointSetDistance(Module, metaclass=ABCMeta):

@@ -7,7 +7,7 @@ import torch
 from torch import Size, Tensor
 from torch.nn import functional as F
 
-from .enum import PaddingMode, SpatialDim, SpatialDimArg, SpatialDerivativeKeys
+from .enum import PaddingMode, SpatialDim, SpatialDimArg
 from .image import conv, conv1d
 from .itertools import is_even_permutation
 from .kernels import cubic_bspline1d
@@ -341,40 +341,6 @@ def evaluate_cubic_bspline(
         if shape is not None:
             output = output[(slice(0, N), slice(0, C)) + tuple(slice(0, n) for n in shape)]
     return output
-
-
-def cubic_bspline_bending_energy(
-    data: Tensor, stride: ScalarOrTuple[int], reduction: str = "mean"
-) -> Tensor:
-    r"""Evaluate bending energy of cubic B-spline free-form deformation."""
-    if not isinstance(data, Tensor):
-        raise TypeError("cubic_bspline_bending_energy() 'data' must be torch.Tensor")
-    if not torch.is_floating_point(data):
-        raise TypeError("cubic_bspline_bending_energy() 'data' must have floating point dtype")
-    if data.ndim < 3:
-        raise ValueError("cubic_bspline_bending_energy() 'data' must have shape (N, C, ..., X)")
-    D = data.ndim - 2
-    C = data.shape[1]
-    if C != D:
-        raise ValueError(
-            f"cubic_bspline_bending_energy() 'data' mismatch between number of channels ({C}) and spatial dimensions ({D})"
-        )
-    if reduction == "none":
-        raise NotImplementedError(f"cubic_bspline_bending_energy() reduction={reduction!r}")
-    energy = torch.tensor(0, dtype=data.dtype, device=data.device)
-    derivs = SpatialDerivativeKeys.all(D, order=2)
-    derivs = SpatialDerivativeKeys.unique(derivs)
-    for deriv in derivs:
-        derivative = [0] * D
-        for sdim in SpatialDerivativeKeys.split(deriv):
-            derivative[sdim] += 1
-        assert sum(derivative) == 2
-        values = evaluate_cubic_bspline(data, stride=stride, derivative=derivative)
-        factor = 1 if SpatialDerivativeKeys.is_mixed(deriv) else 2
-        energy = energy.add_(values.square().sum().mul_(factor))
-    if reduction == "mean":
-        energy = energy.div_(data.shape[2:].numel())
-    return energy
 
 
 def cubic_bspline_jacobian_det(data: Tensor, stride: ScalarOrTuple[int]) -> Tensor:

@@ -316,7 +316,7 @@ class PairwiseImageRegistrationLoss(RegistrationLoss):
         for name, term in bspline_terms.items():
             value = torch.tensor(0, dtype=torch.float, device=self.device)
             for bspline_transform in bspline_transforms:
-                value += term(bspline_transform.data(), bspline_transform.stride)
+                value += term(bspline_transform.data())
             losses[name] = value
         # Sum of parameters loss terms
         params_terms = self.loss_terms_of_type(ParamsLoss)
