@@ -17,6 +17,7 @@ from typing import Any
 
 from torch.nn import Module
 
+from .base import BSplineLoss
 from .base import DisplacementLoss
 from .base import NormalizedPairwiseImageLoss
 from .base import PairwiseImageLoss
@@ -25,6 +26,8 @@ from .base import PointSetDistance
 from .base import RegistrationLoss
 from .base import RegistrationLosses
 from .base import RegistrationResult
+
+from .bspline import BSplineBending, BSplineBendingEnergy
 
 from .flow import Bending, BendingEnergy, BE
 from .flow import Curvature
@@ -47,6 +50,7 @@ from .pointset import LandmarkPointDistance, LPD
 
 __all__ = (
     # Base types
+    "BSplineLoss",
     "DisplacementLoss",
     "NormalizedPairwiseImageLoss",
     "PairwiseImageLoss",
@@ -64,6 +68,8 @@ __all__ = (
     "BE",
     "Bending",
     "BendingEnergy",
+    "BSplineBending",
+    "BSplineBendingEnergy",
     "ClosestPointDistance",
     "CPD",
     "Curvature",

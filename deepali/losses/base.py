@@ -8,6 +8,7 @@ from torch import Tensor
 from torch.nn import Module, ModuleDict, ModuleList
 
 from ..core.math import max_difference
+from ..core.types import ScalarOrTuple
 
 
 RegistrationResult = Dict[str, Any]
@@ -123,6 +124,15 @@ class DisplacementLoss(Module, metaclass=ABCMeta):
     @abstractmethod
     def forward(self, u: Tensor) -> Tensor:
         r"""Evaluate regularization loss for given transformation."""
+        raise NotImplementedError(f"{type(self).__name__}.forward()")
+
+
+class BSplineLoss(Module, metaclass=ABCMeta):
+    r"""Base class of loss terms based on cubic B-spline deformation coefficients."""
+
+    @abstractmethod
+    def forward(self, params: Tensor, stride: ScalarOrTuple[int]) -> Tensor:
+        r"""Evaluate loss term for given free-form deformation parameters."""
         raise NotImplementedError(f"{type(self).__name__}.forward()")
 
 

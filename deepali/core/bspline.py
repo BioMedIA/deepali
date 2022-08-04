@@ -6,7 +6,7 @@ import torch
 from torch import Size, Tensor
 from torch.nn import functional as F
 
-from .enum import PaddingMode, SpatialDim, SpatialDimArg
+from .enum import PaddingMode, SpatialDim, SpatialDimArg, SpatialDerivativeKeys
 from .image import conv, conv1d
 from .kernels import cubic_bspline1d
 from .tensor import move_dim
@@ -166,8 +166,18 @@ def cubic_bspline_interpolation_weights(
 
 @overload
 def cubic_bspline_interpolation_weights(
+    stride: int,
+    derivative: Sequence[int],
+    dtype: Optional[torch.dtype] = None,
+    device: Optional[torch.device] = None,
+) -> Tuple[Tensor, ...]:
+    ...
+
+
+@overload
+def cubic_bspline_interpolation_weights(
     stride: Sequence[int],
-    derivative: int = 0,
+    derivative: ScalarOrTuple[int] = 0,
     dtype: Optional[torch.dtype] = None,
     device: Optional[torch.device] = None,
 ) -> Tuple[Tensor, ...]:
@@ -176,45 +186,54 @@ def cubic_bspline_interpolation_weights(
 
 def cubic_bspline_interpolation_weights(
     stride: ScalarOrTuple[int],
-    derivative: int = 0,
+    derivative: ScalarOrTuple[int] = 0,
     dtype: Optional[torch.dtype] = None,
     device: Optional[torch.device] = None,
 ) -> Union[Tensor, Tuple[Tensor, ...]]:
     r"""Compute cubic B-spline interpolation weights."""
     kernels = {}
-    return_single_tensor = False
+    return_single_tensor = isinstance(stride, int) and isinstance(derivative, int)
     if isinstance(stride, int):
-        stride = [stride]
-        return_single_tensor = True
-    for s in stride:
-        if s in kernels:
+        stride = [stride] * (len(derivative) if isinstance(derivative, Sequence) else 1)
+    if isinstance(derivative, int):
+        derivative = [derivative] * len(stride)
+    elif not isinstance(derivative, Sequence):
+        raise TypeError(
+            "cubic_bspline_interpolation_weights() 'derivative' must be int or Sequence[int]"
+        )
+    elif len(derivative) != len(stride):
+        raise ValueError(
+            "cubic_bspline_interpolation_weights() length of 'derivative' sequence does not match 'stride'"
+        )
+    for s, d in zip(stride, derivative):
+        if (s, d) in kernels:
             continue
         kernel = torch.empty((s, 4), dtype=dtype, device=device)
         offset = torch.arange(0, 1, 1 / s, dtype=kernel.dtype, device=kernel.device)
-        if derivative == 0:
+        if d == 0:
             kernel[:, 3] = offset.pow(3).mul_(1 / 6)
             kernel[:, 0] = offset.mul(offset.sub(1)).mul_(0.5).add_(1 / 6).sub_(kernel[:, 3])
             kernel[:, 2] = offset.add(kernel[:, 0]).sub_(kernel[:, 3].mul(2))
             kernel[:, 1] = -kernel[:, [0, 2, 3]].sum(1).sub(1)
-        elif derivative == 1:
+        elif d == 1:
             kernel[:, 3] = offset.pow(2).mul_(0.5)
             kernel[:, 0] = offset.sub(kernel[:, 3]).sub_(0.5)
             kernel[:, 2] = kernel[:, 0].sub(kernel[:, 3].mul(2)).add_(1)
             kernel[:, 1] = -kernel[:, [0, 2, 3]].sum(1)
-        elif derivative == 2:
+        elif d == 2:
             kernel[:, 3] = offset
             kernel[:, 0] = -offset.sub(1)
             kernel[:, 2] = -offset.mul(3).sub_(1)
             kernel[:, 1] = offset.mul(3).sub_(2)
-        elif derivative == 3:
+        elif d == 3:
             kernel[:, 3] = 1
             kernel[:, 0] = -1
             kernel[:, 2] = -3
             kernel[:, 1] = 3
         else:
             kernel.fill_(0)
-        kernels[s] = kernel
-    kernels = tuple(kernels[s] for s in stride)
+        kernels[(s, d)] = kernel
+    kernels = tuple(kernels[(s, d)] for s, d in zip(stride, derivative))
     if return_single_tensor:
         assert len(kernels) == 1
         return kernels[0]
@@ -227,6 +246,7 @@ def evaluate_cubic_bspline(
     size: Optional[Size] = None,
     shape: Optional[Size] = None,
     kernel: Optional[Union[Tensor, Sequence[Tensor]]] = None,
+    derivative: ScalarOrTuple[int] = 0,
     transpose: bool = False,
 ) -> Tensor:
     r"""Evaluate cubic B-spline function.
@@ -270,6 +290,10 @@ def evaluate_cubic_bspline(
     # Implementation inspired by AIRLab
     if transpose:
         if kernel is None:
+            if derivative != 0:
+                raise NotImplementedError(
+                    "evaluate_cubic_bspline() 'derivative' must be 0 when kernel=None and transpose=True"
+                )
             kernels = {}
             for s in stride:
                 if s not in kernels:
@@ -293,7 +317,7 @@ def evaluate_cubic_bspline(
     else:
         if kernel is None:
             kernel = cubic_bspline_interpolation_weights(
-                stride=stride, dtype=data.dtype, device=data.device
+                stride=stride, derivative=derivative, dtype=data.dtype, device=data.device
             )
         elif isinstance(kernel, Tensor):
             kernel = [kernel] * D
@@ -315,6 +339,40 @@ def evaluate_cubic_bspline(
         if shape is not None:
             output = output[(slice(0, N), slice(0, C)) + tuple(slice(0, n) for n in shape)]
     return output
+
+
+def cubic_bspline_bending_energy(
+    data: Tensor, stride: ScalarOrTuple[int], reduction: str = "mean"
+) -> Tensor:
+    r"""Evaluate bending energy of cubic B-spline free-form deformation."""
+    if not isinstance(data, Tensor):
+        raise TypeError("cubic_bspline_bending_energy() 'data' must be torch.Tensor")
+    if not torch.is_floating_point(data):
+        raise TypeError("cubic_bspline_bending_energy() 'data' must have floating point dtype")
+    if data.ndim < 3:
+        raise ValueError("cubic_bspline_bending_energy() 'data' must have shape (N, C, ..., X)")
+    D = data.ndim - 2
+    C = data.shape[1]
+    if C != D:
+        raise ValueError(
+            f"cubic_bspline_bending_energy() 'data' mismatch between number of channels ({C}) and spatial dimensions ({D})"
+        )
+    if reduction == "none":
+        raise NotImplementedError(f"cubic_bspline_bending_energy() reduction={reduction!r}")
+    energy = torch.tensor(0, dtype=data.dtype, device=data.device)
+    derivs = SpatialDerivativeKeys.all(D, order=2)
+    derivs = SpatialDerivativeKeys.unique(derivs)
+    for deriv in derivs:
+        derivative = [0] * D
+        for sdim in SpatialDerivativeKeys.split(deriv):
+            derivative[sdim] += 1
+        assert sum(derivative) == 2
+        values = evaluate_cubic_bspline(data, stride=stride, derivative=derivative)
+        factor = 1 if SpatialDerivativeKeys.is_mixed(deriv) else 2
+        energy = energy.add_(values.square().sum().mul_(factor))
+    if reduction == "mean":
+        energy = energy.div_(data.shape[2:].numel())
+    return energy
 
 
 def subdivide_cubic_bspline(
