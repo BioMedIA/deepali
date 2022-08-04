@@ -547,7 +547,9 @@ def get_levels_config(config: Dict[str, Any]) -> Tuple[int, int, int]:
     return levels, coarsest_level, finest_level
 
 
-def get_pyramid_config(config: Dict[str, Any]) -> Tuple[Optional[Union[float, Sequence[float]]], int, Optional[Union[str, int]]]:
+def get_pyramid_config(
+    config: Dict[str, Any]
+) -> Tuple[Optional[Union[float, Sequence[float]]], int, Optional[Union[str, int]]]:
     r"""Get settings of Gaussian resolution pyramid from configuration."""
     cfg = config.get("pyramid", {})
     min_size = cfg.get("min_size", 16)
@@ -586,27 +588,36 @@ def get_loss_config(config: Dict[str, Any]) -> Tuple[Dict[str, Dict[str, Any]], 
             cfg[f"loss_{i}"] = str(name)
     if isinstance(cfg, dict):
         for key, value in cfg.items():
+            name = None
             weight = 1
             kwargs = {}
             if isinstance(value, str):
                 name = value
             elif isinstance(value, Sequence):
-                if len(value) == 1:
-                    name = value[0]
-                elif len(value) == 2:
-                    weight, name = value
-                elif len(value) > 2:
-                    weight = value[0]
-                    value = join_kwargs_in_sequence(value[1:])
-                    if isinstance(value, dict):
-                        kwargs = dict(value)
-                        name = kwargs.pop("name", None)
-                    else:
-                        assert len(value) == 2
-                        name = value[0]
-                        kwargs = dict(value[1])
-                else:
+                if not value:
                     raise ValueError(f"get_loss_config() '{key}' loss entry is empty")
+                if len(value) == 1:
+                    if isinstance(value[0], str):
+                        value = {"name": value[0]}
+                elif len(value) > 1:
+                    if isinstance(value[0], (int, float)):
+                        value[0] = {"weight": value[0]}
+                    if isinstance(value[1], str):
+                        value[1] = {"name": value[1]}
+                value = join_kwargs_in_sequence(value)
+                if isinstance(value, dict):
+                    kwargs = dict(value)
+                    name = kwargs.pop("name", None)
+                    weight = kwargs.pop("weight", 1)
+                elif len(value) == 2:
+                    name = value[0]
+                    kwargs = dict(value[1])
+                elif len(value) == 3:
+                    weight = float(value[0])
+                    name = value[1]
+                    kwargs = dict(value[2])
+                else:
+                    raise ValueError(f"get_loss_config() '{key}' invalid loss configuration")
             elif isinstance(value, dict):
                 kwargs = dict(value)
                 name = kwargs.pop("name", None)

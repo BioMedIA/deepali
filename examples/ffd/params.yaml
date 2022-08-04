@@ -1,11 +1,13 @@
 # Using free-form deformation model
 model:
   name: FFD
-  stride: [8, 8, 5]
+  stride: &stride [8, 8, 5]
 # Loss terms of objective function to minimize
 energy:
   seg: [1, MSE]
-  be: [0.005, BSplineBending]
+  be: [0.005, BSplineBending, stride: *stride]
+  # To approximate bending energy on coarser grid, use smaller stride, e.g.:
+  # be: [0.005, BSplineBending, stride: 1]
 # Optimization scheme and parameters
 optim:
   name: Adam

@@ -141,7 +141,6 @@ def func(args: Args) -> int:
         warped_image = Image(data, target_grid)
         warped_image.write(unlink_or_mkdir(args.warped_seg))
     if args.output_transform:
-        transform = transform.to("cpu")
         path = unlink_or_mkdir(args.output_transform)
         if path.suffix == ".pt":
             torch.save(transform, path)
