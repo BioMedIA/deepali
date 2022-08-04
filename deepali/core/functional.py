@@ -63,6 +63,7 @@ from .linalg import vector_rotation
 from .bspline import bspline_interpolation_weights
 from .bspline import cubic_bspline_bending_energy
 from .bspline import cubic_bspline_control_point_grid_size
+from .bspline import cubic_bspline_jacobian_det
 from .bspline import evaluate_cubic_bspline
 from .bspline import subdivide_cubic_bspline
 
@@ -183,6 +184,7 @@ __all__ = (
     "cshape_image",
     "cubic_bspline_bending_energy",
     "cubic_bspline_control_point_grid_size",
+    "cubic_bspline_jacobian_det",
     "denormalize_flow",
     "denormalize_grid",
     "distance_matrix",

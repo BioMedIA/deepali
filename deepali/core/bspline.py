@@ -1,5 +1,6 @@
 r"""Functions for B-spline interpolation."""
 
+from itertools import permutations
 from typing import Callable, Optional, Sequence, Tuple, Union, overload
 
 import torch
@@ -8,6 +9,7 @@ from torch.nn import functional as F
 
 from .enum import PaddingMode, SpatialDim, SpatialDimArg, SpatialDerivativeKeys
 from .image import conv, conv1d
+from .itertools import is_even_permutation
 from .kernels import cubic_bspline1d
 from .tensor import move_dim
 from .types import ScalarOrTuple
@@ -373,6 +375,40 @@ def cubic_bspline_bending_energy(
     if reduction == "mean":
         energy = energy.div_(data.shape[2:].numel())
     return energy
+
+
+def cubic_bspline_jacobian_det(data: Tensor, stride: ScalarOrTuple[int]) -> Tensor:
+    r"""Evaluate Jacobian determinant of cubic B-spline free-form deformation."""
+    if not isinstance(data, Tensor):
+        raise TypeError("cubic_bspline_jacobian_det() 'data' must be torch.Tensor")
+    if not torch.is_floating_point(data):
+        raise TypeError("cubic_bspline_jacobian_det() 'data' must have floating point dtype")
+    if data.ndim < 3:
+        raise ValueError("cubic_bspline_jacobian_det() 'data' must have shape (N, C, ..., X)")
+    D = data.ndim - 2
+    C = data.shape[1]
+    if C != D:
+        raise ValueError(
+            f"cubic_bspline_jacobian_det() 'data' mismatch between number of channels ({C}) and spatial dimensions ({D})"
+        )
+    jac: Optional[Tensor] = None
+    for perm in permutations(range(D)):
+        term: Optional[Tensor] = None
+        for i, j in zip(range(D), perm):
+            derivative = [1 if dim == j else 0 for dim in range(D)]
+            du = evaluate_cubic_bspline(data.narrow(1, i, 1), stride=stride, derivative=derivative)
+            if i == j:
+                du = du.add_(1)  # T(x) = x + u(x)
+            term = du if term is None else term.mul_(du)
+        assert term is not None
+        if jac is None:
+            jac = term
+        elif is_even_permutation(perm):
+            jac = jac.add_(term)
+        else:
+            jac = jac.sub_(term)
+    assert jac is not None
+    return jac
 
 
 def subdivide_cubic_bspline(
