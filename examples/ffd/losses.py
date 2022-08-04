@@ -2,24 +2,29 @@ r"""Registration loss for pairwise image registration."""
 
 from collections import defaultdict
 import re
-from typing import Dict, Mapping, Optional, Sequence, Tuple, Type, Union
+from typing import Dict, Generator, List, Mapping, Optional, Sequence, Tuple, Type, TypeVar, Union
 
 import torch
 from torch import Tensor
 from torch.nn import Module
 
 from deepali.core import Grid, PaddingMode, Sampling, functional as U
-from deepali.losses import DisplacementLoss, PairwiseImageLoss, ParamsLoss, PointSetDistance
+from deepali.losses import PairwiseImageLoss, PointSetDistance, LandmarkPointDistance
+from deepali.losses import BSplineLoss, DisplacementLoss, ParamsLoss
 from deepali.losses import RegistrationLoss, RegistrationLosses, RegistrationResult
-from deepali.losses import LandmarkPointDistance
 from deepali.modules import SampleImage
-from deepali.spatial import CompositeTransform, SequentialTransform, SpatialTransform
+from deepali.spatial import BSplineTransform, SpatialTransform
+from deepali.spatial import CompositeTransform, SequentialTransform
 
 
 RE_WEIGHT = re.compile(
     r"^((?P<mul>[0-9]+(\.[0-9]+)?)\s*[\* ])?\s*(?P<chn>[a-zA-Z0-9_-]+)\s*(\+\s*(?P<add>[0-9]+(\.[0-9]+)?))?$"
 )
 RE_TERM_VAR = re.compile(r"^[a-zA-Z0-9_-]+\((?P<var>[a-zA-Z0-9_]+)\)$")
+
+
+TModule = TypeVar("TModule", bound=Module)
+TSpatialTransform = TypeVar("TSpatialTransform", bound=SpatialTransform)
 
 
 class PairwiseImageRegistrationLoss(RegistrationLoss):
@@ -108,13 +113,30 @@ class PairwiseImageRegistrationLoss(RegistrationLoss):
         assert isinstance(device, torch.device)
         return device
 
-    def loss_terms_of_type(self, loss_type: Type[Module]) -> Dict[str, Module]:
+    def loss_terms_of_type(self, loss_type: Type[TModule]) -> Dict[str, TModule]:
         r"""Get dictionary of loss terms of a specifictype."""
         return {
             name: module
             for name, module in self.loss_terms.items()
             if isinstance(module, loss_type)
         }
+
+    def transforms_of_type(
+        self, transform_type: Type[TSpatialTransform]
+    ) -> List[TSpatialTransform]:
+        r"""Get list of spatial transformations of a specific type."""
+
+        def _iter_transforms(
+            transform,
+        ) -> Generator[SpatialTransform, None, None]:
+            if isinstance(transform, transform_type):
+                yield transform
+            elif isinstance(transform, CompositeTransform):
+                for t in transform.transforms():
+                    yield from _iter_transforms(t)
+
+        transforms = list(_iter_transforms(self.transform))
+        return transforms
 
     @property
     def has_transform(self) -> bool:
@@ -286,6 +308,15 @@ class PairwiseImageRegistrationLoss(RegistrationLoss):
             value = torch.tensor(0, dtype=torch.float, device=self.device)
             for buf in bufs:
                 value += term(buf)
+            losses[name] = value
+        # Sum of free-form deformation loss terms
+        bspline_transforms = self.transforms_of_type(BSplineTransform)
+        bspline_terms = self.loss_terms_of_type(BSplineLoss)
+        misc_excl |= set(bspline_terms.keys())
+        for name, term in bspline_terms.items():
+            value = torch.tensor(0, dtype=torch.float, device=self.device)
+            for bspline_transform in bspline_transforms:
+                value += term(bspline_transform.data(), bspline_transform.stride)
             losses[name] = value
         # Sum of parameters loss terms
         params_terms = self.loss_terms_of_type(ParamsLoss)

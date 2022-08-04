@@ -11,13 +11,16 @@ import yaml
 
 import torch
 import torch.cuda
+from torch import Tensor
 
-from deepali.core import PathStr
+from deepali.core import Grid, PathStr, unlink_or_mkdir
+from deepali.data import Image
+from deepali.modules import TransformImage
 from deepali.utils.cli import ArgumentParser, Args, main_func
 from deepali.utils.cli import configure_logging, cuda_visible_devices
 from deepali.utils.cli import filter_warning_of_experimental_named_tensors_feature
 
-from pairwise import register_pairwise
+from .pairwise import register_pairwise
 
 log = logging.getLogger()
 
@@ -27,7 +30,9 @@ def parser(**kwargs) -> ArgumentParser:
     if "description" not in kwargs:
         kwargs["description"] = globals()["__doc__"]
     parser = ArgumentParser(**kwargs)
-    parser.add_argument("-c", "--config", help="Configuration file")
+    parser.add_argument(
+        "-c", "--config", help="Configuration file", default=Path(__file__).parent / "params.yaml"
+    )
     parser.add_argument(
         "-t", "--target", "--target-img", dest="target_img", help="Fixed target image"
     )
@@ -36,7 +41,6 @@ def parser(**kwargs) -> ArgumentParser:
     )
     parser.add_argument("--target-seg", help="Fixed target segmentation label image")
     parser.add_argument("--source-seg", help="Moving source segmentation label image")
-    parser.add_argument("--debug-dir", help="Output directory for intermediate files")
     parser.add_argument(
         "-o",
         "--output",
@@ -45,12 +49,33 @@ def parser(**kwargs) -> ArgumentParser:
         help="Output transformation parameters",
     )
     parser.add_argument(
+        "-w",
+        "--warped",
+        "--warped-img",
+        "--output-img",
+        dest="warped_img",
+        help="Deformed source image",
+    )
+    parser.add_argument(
+        "--warped-seg",
+        "--output-seg",
+        dest="warped_seg",
+        help="Deformed source segmentation label image",
+    )
+    parser.add_argument(
         "--device",
         help="Device on which to execute registration",
         choices=("cpu", "cuda"),
         default="cpu",
     )
-    parser.add_argument("--debug", help="Debug level", type=int, default=0)
+    parser.add_argument("--debug-dir", help="Output directory for intermediate files")
+    parser.add_argument(
+        "--debug",
+        "--debug-level",
+        help="Debug level",
+        type=int,
+        default=0,
+    )
     parser.add_argument("-v", "--verbose", help="Verbosity of output messages", type=int, default=0)
     parser.add_argument(
         "--log-level",
@@ -79,6 +104,7 @@ def init(args: Args) -> int:
 def func(args: Args) -> int:
     r"""Execute registration given parsed arguments."""
     config = load_config(args.config)
+    device = torch.device("cuda:0" if args.device == "cuda" else "cpu")
     start = timer()
     transform = register_pairwise(
         target={"img": args.target_img, "seg": args.target_seg},
@@ -90,13 +116,37 @@ def func(args: Args) -> int:
         debug=args.debug,
     )
     log.info(f"Elapsed time: {timer() - start:.3f}s")
+    if args.warped_img:
+        target_grid = Grid.from_file(args.target_img)
+        source_image = Image.read(args.source_img, device=device)
+        warp_image = TransformImage(
+            target=target_grid,
+            source=source_image.grid(),
+            sampling="linear",
+            padding=source_image.min(),
+        ).to(device)
+        data: Tensor = warp_image(transform.tensor(), source_image)
+        warped_image = Image(data, target_grid)
+        warped_image.write(unlink_or_mkdir(args.warped_img))
+    if args.warped_seg:
+        target_grid = Grid.from_file(args.target_seg)
+        source_image = Image.read(args.source_seg, device=device)
+        warp_labels = TransformImage(
+            target=target_grid,
+            source=source_image.grid(),
+            sampling="nearest",
+            padding=0,
+        ).to(device)
+        data: Tensor = warp_labels(transform.tensor(), source_image)
+        warped_image = Image(data, target_grid)
+        warped_image.write(unlink_or_mkdir(args.warped_seg))
     if args.output_transform:
-        path = Path(args.output_transform).absolute()
+        transform = transform.to("cpu")
+        path = unlink_or_mkdir(args.output_transform)
         if path.suffix == ".pt":
-            torch.save(transform.to("cpu"), path)
+            torch.save(transform, path)
         else:
-            flow = transform.flow(device="cpu")
-            flow[0].write(path)
+            transform.flow()[0].write(path)
     return 0
 
 

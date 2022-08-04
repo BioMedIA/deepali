@@ -8,7 +8,7 @@ from deepali.core import functional as U
 from deepali.core.kernels import gaussian1d
 from deepali.spatial import is_linear_transform
 
-from engine import RegistrationEngine, RegistrationResult
+from .engine import RegistrationEngine, RegistrationResult
 
 
 RegistrationEvalHook = Callable[[RegistrationEngine, int, int, RegistrationResult], None]
