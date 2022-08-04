@@ -167,7 +167,9 @@ def join_kwargs_in_sequence(arg):
                 "join_kwargs_in_sequence() 'arg' must be str, dict,"
                 " or sequence of dicts with the first item being either a str or dict"
             )
-        if len(arg) > 2:
+        if len(arg) == 1 and isinstance(arg[0], dict):
+            arg = arg[0]
+        elif len(arg) > 1:
             start = 0 if isinstance(arg[0], dict) else 1
             kwargs = dict(arg[start])
             for i in range(start + 1, len(arg)):
