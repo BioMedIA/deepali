@@ -61,8 +61,12 @@ from .linalg import vector_rotation
 
 # Data operations
 from .bspline import bspline_interpolation_weights
+from .bspline import cubic_bspline_control_point_grid
 from .bspline import cubic_bspline_control_point_grid_size
 from .bspline import cubic_bspline_jacobian_det
+from .bspline import cubic_bspline_jacobian_dict
+from .bspline import cubic_bspline_jacobian_matrix
+from .bspline import cubic_bspline_jacobian_triu
 from .bspline import evaluate_cubic_bspline
 from .bspline import subdivide_cubic_bspline
 
@@ -181,8 +185,12 @@ __all__ = (
     "conv1d",
     "crop",
     "cshape_image",
+    "cubic_bspline_control_point_grid",
     "cubic_bspline_control_point_grid_size",
     "cubic_bspline_jacobian_det",
+    "cubic_bspline_jacobian_dict",
+    "cubic_bspline_jacobian_matrix",
+    "cubic_bspline_jacobian_triu",
     "denormalize_flow",
     "denormalize_grid",
     "distance_matrix",
