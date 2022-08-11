@@ -480,6 +480,7 @@ class Cube(object):
                 assert isinstance(other_value, Tensor)
                 if value.shape != other_value.shape:
                     return False
+                other_value = other_value.to(device=value.device)
                 if not torch.allclose(value, other_value, rtol=1e-5, atol=1e-8):
                     return False
             elif value != other_value:
