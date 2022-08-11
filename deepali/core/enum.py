@@ -24,6 +24,8 @@ class Sampling(Enum):
             arg = arg.lower()
         if arg is None or arg in ("default", "bilinear", "trilinear"):
             return cls.LINEAR
+        if arg == "nn":
+            return cls.NEAREST
         return cls(arg)
 
     def grid_sample_mode(self, num_spatial_dim: int) -> str:
