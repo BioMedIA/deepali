@@ -210,6 +210,8 @@ class SampleImage(Module):
         mask: Optional[Tensor] = None,
     ) -> Union[Tensor, Tuple[Tensor, Tensor], Dict[str, Tensor]]:
         r"""Sample images at target grid points after mapping these to the source grid cube."""
+        if grid.ndim == grid.shape[-1] + 1:
+            grid = grid.unsqueeze(0)
         grid = self._transform_target_to_source(grid)
         return self._sample_source_image(grid, input=input, data=data, mask=mask)
 
@@ -279,6 +281,8 @@ class TransformImage(SampleImage):
         r"""Sample images at transformed target grid points after mapping these to the source grid cube."""
         grid: Tensor = self.grid
         if isinstance(transform, Tensor):
+            if transform.ndim == grid.shape[-1] + 1:
+                transform = transform.unsqueeze(0)
             grid = U.transform_grid(transform, grid, align_corners=self.align_corners())
         elif transform is not None:
             raise TypeError("TransformImage() 'transform' must be Tensor")
