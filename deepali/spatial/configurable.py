@@ -115,7 +115,7 @@ class TransformConfig(DataclassConfig):
     r"""Configuration of spatial transformation model."""
 
     # Spatial transformation model to use
-    transform: Union[str] = "Affine o SVF"
+    transform: str = "Affine o SVF"
     # Composition of affine transformation.
     #
     # The string value of this configuration entry can be in one of two forms:

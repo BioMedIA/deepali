@@ -185,6 +185,13 @@ class CompositeTransform(SpatialTransform):
             transform.update()
         return self
 
+    def clear_buffers(self: TCompositeTransform) -> TCompositeTransform:
+        r"""Clear any buffers that are registered by ``self.update()``."""
+        super().clear_buffers()
+        for transform in self.transforms():
+            transform.clear_buffers()
+        return self
+
 
 class MultiLevelTransform(CompositeTransform):
     r"""Sum of spatial transformations applied to any set of points."""

@@ -7,7 +7,6 @@ from typing import Callable, Optional, TypeVar, Union, cast
 
 import torch
 from torch import Tensor
-from torch.nn import init
 
 from ..core.grid import Axes, Grid
 from ..data.flow import FlowFields
@@ -25,47 +24,11 @@ TDenseVectorFieldTransform = TypeVar(
 class DenseVectorFieldTransform(ParametricTransform, NonRigidTransform):
     r"""Dense vector field transformation with linear interpolation at non-grid point locations."""
 
-    def __init__(
-        self,
-        grid: Grid,
-        groups: Optional[int] = None,
-        params: Optional[Union[bool, Tensor, Callable]] = True,
-    ) -> None:
-        r"""Initialize transformation parameters.
-
-        Args:
-            grid: Grid domain on which transformation is defined.
-            groups: Number of transformations. A given image batch can either be deformed by a
-                single transformation, or a separate transformation for each image in the batch, e.g.,
-                for group-wise or batched registration. The default is one transformation for all images
-                in the batch, or the batch length of the ``params`` tensor if provided.
-            params: Initial parameters. If a tensor is given, it is only registered as optimizable module
-                parameters when of type ``torch.nn.Parameter``. When a callable is given instead, it will be
-                called by ``self.update()`` with ``SpatialTransform.condition()`` arguments. When a boolean
-                argument is given, a new zero-initialized tensor is created. If ``True``, this tensor is
-                registered as optimizable module parameter. If ``None``, parameters must be set using
-                ``self.data()`` or ``self.data_()`` before this transformation is evaluated.
-
-        """
-        if groups is None:
-            groups = params.shape[0] if isinstance(params, Tensor) else 1
-        super().__init__(grid, groups=groups, params=params)
-        shape = (groups,) + self.data_shape
-        self.register_buffer("u", torch.zeros(shape), persistent=False)
-
     @property
     def data_shape(self) -> torch.Size:
         r"""Get shape of transformation parameters tensor."""
         grid = self.grid()
         return (grid.ndim,) + grid.shape
-
-    @torch.no_grad()
-    def reset_parameters(self) -> None:
-        r"""Reset transformation parameters."""
-        super().reset_parameters()
-        u = getattr(self, "u", None)
-        if u is not None:
-            init.constant_(u, 0)
 
     @torch.no_grad()
     def grid_(self: TDenseVectorFieldTransform, grid: Grid) -> TDenseVectorFieldTransform:
@@ -132,8 +95,6 @@ class DisplacementFieldTransform(DenseVectorFieldTransform):
         r"""Update buffered displacement vector field."""
         super().update()
         u = self.data()
-        # Attention: Tensor may be of type torch.nn.Parameter and in this case "self.u = u"
-        # would remove the previously registered buffer and add it as parameter instead.
         self.register_buffer("u", u, persistent=False)
         return self
 
@@ -169,16 +130,7 @@ class StationaryVelocityFieldTransform(DenseVectorFieldTransform):
 
         """
         super().__init__(grid, groups=groups, params=params)
-        self.register_buffer("v", torch.zeros_like(self.u), persistent=False)
         self.exp = ExpFlow(scale=scale, steps=steps, align_corners=grid.align_corners())
-
-    @torch.no_grad()
-    def reset_parameters(self) -> None:
-        r"""Reset transformation parameters."""
-        super().reset_parameters()
-        v = getattr(self, "v", None)
-        if v is not None:
-            init.constant_(v, 0)
 
     def grid_(self, grid: Grid) -> StationaryVelocityFieldTransform:
         r"""Set sampling grid of transformation domain and codomain."""
@@ -213,7 +165,10 @@ class StationaryVelocityFieldTransform(DenseVectorFieldTransform):
             inv.link_(self)
         inv.exp = cast(ExpFlow, self.exp).inverse()
         if update_buffers:
-            inv.u = inv.exp(inv.v)
+            v = getattr(inv, "v", None)
+            if v is not None:
+                u = inv.exp(v)
+                inv.register_buffer("u", u, persistent=False)
         return inv
 
     def update(self) -> StationaryVelocityFieldTransform:
@@ -221,8 +176,6 @@ class StationaryVelocityFieldTransform(DenseVectorFieldTransform):
         super().update()
         v = self.data()
         u = self.exp(v)
-        # Attention: Tensor may be of type torch.nn.Parameter and in this case "self.v = v"
-        # would remove the previously registered buffer and add it as parameter instead.
         self.register_buffer("v", v, persistent=False)
         self.register_buffer("u", u, persistent=False)
         return self

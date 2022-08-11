@@ -1,5 +1,7 @@
 r"""Mix-ins for spatial transformations that have (optimizable) parameters."""
 
+from __future__ import annotations
+
 from copy import copy as shallow_copy
 from typing import Callable, Optional, Union, cast, overload
 
@@ -33,7 +35,7 @@ class ParametricTransform:
     """
 
     def __init__(
-        self,
+        self: Union[TSpatialTransform, ParametricTransform],
         grid: Grid,
         groups: Optional[int] = None,
         params: Optional[Union[bool, Tensor, Callable]] = True,
@@ -94,7 +96,7 @@ class ParametricTransform:
         return isinstance(self.params, Parameter)
 
     @torch.no_grad()
-    def reset_parameters(self) -> None:
+    def reset_parameters(self: Union[TSpatialTransform, ParametricTransform]) -> None:
         r"""Reset transformation parameters."""
         params = self.params  # Note: May be None!
         if params is None:
@@ -102,6 +104,7 @@ class ParametricTransform:
         if callable(params):
             params = self.p
         init.constant_(params, 0.0)
+        self.clear_buffers()
 
     @property
     def data_shape(self) -> torch.Size:
@@ -118,16 +121,14 @@ class ParametricTransform:
         r"""Get shallow copy with specified parameters."""
         ...
 
-    def data(
-        self: TSpatialTransform, arg: Optional[Tensor] = None
-    ) -> Union[TSpatialTransform, Tensor]:
+    def data(self: Union[TSpatialTransform, ParametricTransform], arg: Optional[Tensor] = None) -> Union[TSpatialTransform, Tensor]:
         r"""Get transformation parameters or shallow copy with specified parameters, respectively."""
         params = self.params  # Note: May be None!
         if arg is None:
             if params is None:
                 raise AssertionError(f"{type(self).__name__}.data() 'params' must be set first")
             if callable(params):
-                params = self.p
+                params = getattr(self, "p")
             return params
         if not isinstance(arg, Tensor):
             raise TypeError(f"{type(self).__name__}.data() 'arg' must be tensor")
@@ -146,9 +147,12 @@ class ParametricTransform:
             copy.params = Parameter(arg, params.requires_grad)
         else:
             copy.params = arg
+        copy.clear_buffers()
         return copy
 
-    def data_(self: TSpatialTransform, arg: Tensor) -> TSpatialTransform:
+    def data_(
+        self: Union[TSpatialTransform, ParametricTransform], arg: Tensor
+    ) -> TSpatialTransform:
         r"""Replace transformation parameters.
 
         Args:
@@ -184,9 +188,10 @@ class ParametricTransform:
             self.params = Parameter(arg, params.requires_grad)
         else:
             self.params = arg
+        self.clear_buffers()
         return self
 
-    def _data(self) -> Tensor:
+    def _data(self: Union[TSpatialTransform, ParametricTransform]) -> Tensor:
         r"""Get most recent transformation parameters.
 
         When transformation parameters are obtained from a callable, this function invokes
@@ -221,11 +226,16 @@ class ParametricTransform:
         assert isinstance(params, Tensor)
         return params
 
-    def link(self: TSpatialTransform, other: TSpatialTransform) -> TSpatialTransform:
+    def link(
+        self: Union[TSpatialTransform, ParametricTransform], other: TSpatialTransform
+    ) -> TSpatialTransform:
         r"""Make shallow copy of this transformation which is linked to another instance."""
         return shallow_copy(self).link_(other)
 
-    def link_(self: TSpatialTransform, other: TSpatialTransform) -> TSpatialTransform:
+    def link_(
+        self: Union[TSpatialTransform, ParametricTransform],
+        other: Union[TSpatialTransform, ParametricTransform]
+    ) -> TSpatialTransform:
         r"""Link this transformation to another of the same type.
 
         This transformation is modified to use a reference to the given transformation. After linking,
@@ -257,21 +267,22 @@ class ParametricTransform:
                 self.reset_parameters()
         return self
 
-    def unlink(self: TSpatialTransform) -> TSpatialTransform:
+    def unlink(self: Union[TSpatialTransform, ParametricTransform]) -> TSpatialTransform:
         r"""Make a shallow copy of this transformation with parameters set to ``None``."""
         return shallow_copy(self).unlink_()
 
-    def unlink_(self: TSpatialTransform) -> TSpatialTransform:
+    def unlink_(self: Union[TSpatialTransform, ParametricTransform]) -> TSpatialTransform:
         r"""Resets transformation parameters to ``None``."""
         self.params = None
         if hasattr(self, "p"):
             delattr(self, "p")
         return self
 
-    def update(self: TSpatialTransform) -> TSpatialTransform:
+    def update(self: Union[TSpatialTransform, ParametricTransform]) -> TSpatialTransform:
         r"""Update buffered data such as predicted parameters, velocities, and/or displacements."""
         if hasattr(self, "p"):
-            self.p = self._data()
+            p = self._data()
+            self.register_buffer("p", p, persistent=False)
         super().update()
         return self
 
@@ -311,7 +322,9 @@ class InvertibleParametricTransform(ParametricTransform):
         self.invert = bool(invert)
 
     def inverse(
-        self: TSpatialTransform, link: bool = False, update_buffers: bool = False
+        self: Union[TSpatialTransform, InvertibleParametricTransform],
+        link: bool = False,
+        update_buffers: bool = False
     ) -> TSpatialTransform:
         r"""Get inverse of this transformation.
 
@@ -338,6 +351,6 @@ class InvertibleParametricTransform(ParametricTransform):
         inv.invert = not self.invert
         return inv
 
-    def extra_repr(self) -> str:
+    def extra_repr(self: Union[TSpatialTransform, InvertibleParametricTransform]) -> str:
         r"""Print current transformation."""
         return super().extra_repr() + f", invert={self.invert}"

@@ -143,6 +143,7 @@ def func(args: Args) -> int:
     if args.output_transform:
         path = unlink_or_mkdir(args.output_transform)
         if path.suffix == ".pt":
+            transform.clear_buffers()
             torch.save(transform, path)
         else:
             transform.flow()[0].write(path)

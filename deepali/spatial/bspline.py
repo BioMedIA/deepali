@@ -8,7 +8,6 @@ from typing import Callable, List, Optional, Sequence, Tuple, TypeVar, Union
 
 import torch
 from torch import Tensor
-from torch.nn import init
 
 from ..core import kernels as K
 from ..core import functional as U
@@ -70,11 +69,7 @@ class BSplineTransform(ParametricTransform, NonRigidTransform):
             raise ValueError(f"BSplineTransform() 'stride' must be single int or {grid.ndim} ints")
         self.stride = tuple(int(s) for s in stride)
         self._transpose = transpose  # MUST be set before register_kernels() is called
-        if groups is None:
-            groups = params.shape[0] if isinstance(params, Tensor) else 1
         super().__init__(grid, groups=groups, params=params)
-        shape = (groups,) + self.data_shape
-        self.register_buffer("u", torch.zeros(shape), persistent=False)
         self.register_kernels(stride)
 
     @property
@@ -87,14 +82,6 @@ class BSplineTransform(ParametricTransform, NonRigidTransform):
     @property
     def data_stride(self) -> Tuple[int, ...]:
         return tuple(reversed([int(s) for s in self.stride]))
-
-    @torch.no_grad()
-    def reset_parameters(self) -> None:
-        r"""Reset transformation parameters."""
-        super().reset_parameters()
-        u = getattr(self, "u", None)
-        if u is not None:
-            init.constant_(u, 0)
 
     @torch.no_grad()
     def grid_(self: TBSplineTransform, grid: Grid) -> TBSplineTransform:
@@ -192,7 +179,7 @@ class BSplineTransform(ParametricTransform, NonRigidTransform):
                     kernel = K.cubic_bspline1d(s)
                 else:
                     kernel = U.bspline_interpolation_weights(degree=3, stride=s)
-                self.register_buffer(name, kernel)
+                self.register_buffer(name, kernel, persistent=False)
 
     def deregister_kernels(self, stride: Union[int, Sequence[int]]) -> None:
         r"""Remove precomputed cubic B-spline kernels."""
@@ -229,7 +216,8 @@ class FreeFormDeformation(BSplineTransform):
     def update(self) -> FreeFormDeformation:
         r"""Update buffered displacement vector field."""
         super().update()
-        self.u = self.evaluate_spline()
+        u = self.evaluate_spline()
+        self.register_buffer("u", u, persistent=False)
         return self
 
 
@@ -263,16 +251,7 @@ class StationaryVelocityFreeFormDeformation(BSplineTransform):
         """
         align_corners = grid.align_corners()
         super().__init__(grid, groups=groups, params=params, stride=stride, transpose=transpose)
-        self.register_buffer("v", torch.zeros_like(self.u), persistent=False)
         self.exp = ExpFlow(scale=scale, steps=steps, align_corners=align_corners)
-
-    @torch.no_grad()
-    def reset_parameters(self) -> None:
-        r"""Reset transformation parameters."""
-        super().reset_parameters()
-        v = getattr(self, "v", None)
-        if v is not None:
-            init.constant_(v, 0)
 
     def inverse(
         self, link: bool = False, update_buffers: bool = False
@@ -301,12 +280,17 @@ class StationaryVelocityFreeFormDeformation(BSplineTransform):
             inv.link_(self)
         inv.exp = cast(ExpFlow, self.exp).inverse()
         if update_buffers:
-            inv.u = inv.exp(inv.v)
+            v = getattr(inv, "v", None)
+            if v is not None:
+                u = inv.exp(v)
+                inv.register_buffer("u", u, persistent=False)
         return inv
 
     def update(self) -> StationaryVelocityFreeFormDeformation:
         r"""Update buffered velocity and displacement vector fields."""
         super().update()
-        self.v = self.evaluate_spline()
-        self.u = self.exp(self.v)
+        v = self.evaluate_spline()
+        u = self.exp(v)
+        self.register_buffer("v", v, persistent=False)
+        self.register_buffer("u", u, persistent=False)
         return self
