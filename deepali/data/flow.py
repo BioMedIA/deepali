@@ -10,9 +10,9 @@ from torch.nn import functional as F
 
 from ..core.enum import PaddingMode, Sampling
 from ..core import flow as U
-from ..core.grid import Axes, Grid
+from ..core.grid import Axes, Grid, grid_transform_vectors
 from ..core.tensor import move_dim
-from ..core.types import Array, Device, DType, PathStr
+from ..core.types import Array, Device, DType, PathStr, Scalar
 
 from .image import Image, ImageBatch
 
@@ -210,6 +210,50 @@ class FlowFields(ImageBatch):
         )
         flow = self._make_instance(data, flow._grid, flow._axes)
         flow = flow.axes(axes)  # restore original axes
+        return flow
+
+    def sample(
+        self: TFlowFields,
+        arg: Union[Grid, Sequence[Grid], Tensor],
+        mode: Optional[Union[Sampling, str]] = None,
+        padding: Optional[Union[PaddingMode, str, Scalar]] = None,
+    ) -> Union[TFlowFields, Tensor]:
+        r"""Sample flow fields at optionally deformed unit grid points.
+
+        Args:
+            arg: Either a single grid which defines the sampling points for all images in the batch,
+                a different grid for each image in the batch, or a tensor of normalized coordinates
+                with shape ``(N, ..., D)`` or ``(1, ..., D)``. In the latter case, note that the
+                shape ``...`` need not correspond to a (deformed) grid as required by ``grid_sample()``.
+                It can be an arbitrary shape, e.g., ``M`` to sample at ``M`` given points.
+            mode: Image interpolation mode.
+            padding: Image extrapolation mode or scalar padding value.
+
+        Returns:
+            If ``arg`` is of type ``Grid`` or ``Sequence[Grid]``, a ``FlowFields`` batch is returned.
+            When these grids match the grids of this batch of flow fields, ``self`` is returned.
+            Otherwise, a ``Tensor`` of shape (N, C, ...) of sampled flow values is returned.
+            Note that when ``arg`` is of type ``Grid`` or ``Sequence[Grid]``, flow vectors that are
+            not expressed with respect to the world coordinate system will be implicitly converted to
+            flow vectors with respect to the new sampling grids. If this is not desired, use a ``Tensor``
+            type with sampling coordinates instead of ``Grid`` instances.
+
+        """
+        flow = super().sample(arg, mode=mode, padding=padding)
+        if isinstance(flow, FlowFields):
+            axes = flow.axes()
+            if axes != Axes.WORLD:
+                data = flow.tensor()
+                data = U.move_dim(data, 1, -1)
+                data = torch.cat(
+                    [
+                        grid_transform_vectors(v, grid, axes, to_grid, axes).unsqueeze_(0)
+                        for v, grid, to_grid in zip(data, self._grid, flow.grids())
+                    ],
+                    dim=0,
+                )
+                data = U.move_dim(data, -1, 1)
+                flow = self._make_instance(data, flow.grids())
         return flow
 
     def warp_image(
