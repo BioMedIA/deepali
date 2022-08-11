@@ -119,6 +119,7 @@ class SpatialTransform(DeviceProperty, Module, metaclass=ABCMeta):
 
     def condition_(self: TSpatialTransform, *args, **kwargs) -> TSpatialTransform:
         r"""Set data tensor on which this transformation is conditioned."""
+        self.clear_buffers()
         self._args = args
         self._kwargs = kwargs
         return self
@@ -152,8 +153,11 @@ class SpatialTransform(DeviceProperty, Module, metaclass=ABCMeta):
 
     def grid_(self: TSpatialTransform, grid: Grid) -> TSpatialTransform:
         r"""Set sampling grid which defines domain and codomain of this transformation."""
+        if self._grid == grid:
+            return self
         if grid.ndim != self.ndim:
             raise ValueError(f"{type(self).__name__}.grid_() must be {self.ndim}-dimensional")
+        self.clear_buffers()
         self._grid = grid
         return self
 
@@ -193,6 +197,7 @@ class SpatialTransform(DeviceProperty, Module, metaclass=ABCMeta):
             RuntimeError: When this transformation has no optimizable parameters.
 
         """
+        self.clear_buffers()
         grid = self.grid()
         flow = flow.to(self.device)
         flow = flow.sample(grid)
@@ -402,6 +407,10 @@ class SpatialTransform(DeviceProperty, Module, metaclass=ABCMeta):
         """
         raise NotImplementedError(f"{type(self).__name__}.inverse()")
 
+    def clear_buffers(self: TSpatialTransform) -> TSpatialTransform:
+        r"""Clear any buffers that are registered by ``self.update()``."""
+        ...
+
     def extra_repr(self) -> str:
         return f"grid={repr(self.grid())}"
 
@@ -455,11 +464,12 @@ class NonRigidTransform(SpatialTransform):
             Batch of displacement vector fields as tensor of shape ``(N, D, ..., X)``.
 
         """
-        try:
-            u = self.u
-        except AttributeError:
+        u = getattr(self, "u", None)
+        if u is None:
+            u = getattr(self.update(), "u", None)
+        if u is None or "u" not in {name for name, _, in self.named_buffers()}:
             raise AssertionError(
-                f"{type(self).__name__}.__init__() required to register"
+                f"{type(self).__name__}.update() required to register"
                 " displacement vector field tensor as buffer named 'u'."
                 " See also NonRigidTransform.update() docstring."
             )
@@ -487,5 +497,18 @@ class NonRigidTransform(SpatialTransform):
             or other desired properties on the (stationary) velocity field. Alternatively, a
             regularization term may be based directly on the optimizable parameters.
 
+        Returns:
+            Self reference to this updated transformation.
+
         """
+        return self
+
+    def clear_buffers(self: TNonRigidTransform) -> TNonRigidTransform:
+        r"""Clear any buffers that are registered by ``self.update()``."""
+        super().clear_buffers()
+        for name in ("u", "v"):
+            try:
+                delattr(self, name)
+            except AttributeError:
+                pass
         return self
