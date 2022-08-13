@@ -2,6 +2,10 @@ r"""Loss functions, evaluation metrics, and related utilities."""
 
 import itertools
 from typing import Optional, Sequence, Union
+import warnings
+from contextlib import nullcontext
+
+import math
 
 import torch
 from torch import Tensor
@@ -28,6 +32,7 @@ __all__ = (
     "lcc_loss",
     "mse_loss",
     "ssd_loss",
+    "mi_loss",
     "grad_loss",
     "bending_loss",
     "bending_energy",
@@ -637,6 +642,146 @@ def ssd_loss(
             raise ValueError("ssd_loss() 'norm' must be scalar")
         if norm > 0:
             loss = loss.div_(norm)
+    return loss
+
+
+def multinomial(mask: Tensor, num_samples: int) -> Tensor:
+    r"""Randomly sample locations within a region of interest mask, using the mask as multinomial distribution"""
+    with torch.no_grad() if mask.requires_grad else nullcontext():
+        num_locations = mask.size(2)
+        assert (
+            mask.size(1) == 1
+        ), f"Mask has more than 1 channel ({mask.size(1)}) which is not supported."
+        mask = mask.squeeze(1)
+        if num_locations > 2**24:
+            # As torch.multinomial() works only for at most 2^24 categories, use inverse transform sampling
+            # if the number of candidate voxels is very large.
+            mask_cdf = mask
+            mask_cdf = torch.cumsum(
+                mask_cdf / mask_cdf.sum(dim=1, keepdim=True), dim=1, out=mask_cdf
+            )
+            mask_cdf = torch.divide(mask_cdf, mask_cdf[:, -1].unsqueeze(-1), out=mask_cdf)
+            cdf_values = torch.rand(mask.size(0), num_samples).to(mask)
+            sample_index = torch.searchsorted(mask_cdf, cdf_values)
+            sample_index = torch.clip(sample_index, 0, num_locations - 1, out=sample_index)
+        else:
+            # sampling with replacement to ensure the correct sampling distribution due to Pytorch issue #50034
+            sample_index = torch.multinomial(mask, num_samples, replacement=True)
+    return sample_index
+
+
+def random_sample(
+    inputs: Union[Tensor, Sequence[Tensor]],
+    mask: Optional[Tensor] = None,
+    sample_ratio: float = None,
+    num_samples: int = None,
+) -> Union[Tensor, Sequence[Tensor]]:
+    r"""Random sampling of voxels within an image or within masked area"""
+    # input with spatial structures, output spatially flat tensors
+    inputs = [x.flatten(start_dim=2, end_dim=-1) for x in inputs]
+    if mask is not None:
+        mask = mask.flatten(start_dim=2, end_dim=-1)
+
+    sampling = sample_ratio is not None or num_samples is not None
+    if sampling:
+        numel = inputs[0].size(2)
+        if sample_ratio is not None:
+            # prioritize sample_ratio
+            assert sample_ratio < 1.0, f"Subsampling ratio {sample_ratio} must be smaller than 1."
+            if num_samples is not None:
+                warnings.warn(
+                    "`num_samples` in loss.functional.sampling_fn() is ignored because `sample_ratio` is set"
+                )
+            num_samples = int(sample_ratio * numel)
+        assert num_samples <= numel
+        # sampling
+        if mask is None:
+            # sample globally the same random index along the batch dimension
+            sample_index = torch.randperm(int(numel))[:num_samples]
+            outputs = [x[:, :, sample_index] for x in inputs]
+        else:
+            # sample within the mask with different random index for each sample in the batch
+            sample_index = multinomial(mask, num_samples)
+            sample_index = sample_index.unsqueeze(1).repeat(1, inputs[0].size(1), 1)
+            outputs = [torch.gather(x, dim=2, index=sample_index) for x in inputs]
+        return outputs
+    else:
+        return inputs
+
+
+def mi_loss(
+    input: Tensor,
+    target: Tensor,
+    mask: Optional[Tensor] = None,
+    vmin: Optional[float] = None,
+    vmax: Optional[float] = None,
+    num_bins: int = 64,
+    sample_ratio: Optional[float] = None,
+    num_samples: Optional[int] = None,
+    normalized: bool = True,
+) -> Tensor:
+    r"""
+    Calculate mutual information loss using Parzen window density and entropy estimations
+
+    References:
+    - Qiu, H., Qin, C., Schuh, A., Hammernik, K.: Learning Diffeomorphic and Modality-invariant Registration using B-splines. Medical Imaging with Deep Learning. (2021).
+    - Thévenaz, P., Unser, M.: Optimization of mutual information for multiresolution image registration. IEEE Trans. Image Process. 9, 2083–2099 (2000).
+
+    Args:
+        input: Source image sampled on ``target`` grid.
+        target: Target image with same shape as ``input``.
+        mask: Region of interest mask with same shape as ``input``.
+        vmin: Minimal intensity value the joint and marginal density is estimated.
+        vmax: Maximal intensity value the joint and marginal density is estimated.
+        num_bins: Number of bin edges to discretize the density estimation.
+        sample_ratio: Ratio of voxels in the image domain randomly sampled to compute the loss.
+        num_samples: Number of voxels in the image domain randomly sampled to compute the loss,
+            ignored if `sample_ratio` is also set.
+        normalized: Calculate Normalized Mutual Information instead of Mutual Information if True.
+    """
+    sampling = sample_ratio is not None or num_samples is not None
+    if sampling:
+        input_sample, target_sample = random_sample(
+            (input, target), mask, sample_ratio, num_samples
+        )
+    else:
+        input_sample = masked_loss(input, mask=mask).flatten(start_dim=2, end_dim=-1)
+        target_sample = masked_loss(target, mask=mask).flatten(start_dim=2, end_dim=-1)
+
+    # set the bin edges and Gaussian kernel std
+    if vmin is None:
+        vmin = torch.min(input.min(), target.min())
+    if vmax is None:
+        vmax = torch.max(input.max(), target.max())
+    bin_width = (vmax - vmin) / num_bins  # FWHM is one bin width
+    sigma = bin_width * (1 / (2 * math.sqrt(2 * math.log(2))))
+    bins = torch.linspace(vmin, vmax, num_bins, requires_grad=False).unsqueeze(1).type_as(input)
+
+    # calculate Parzen window function response
+    def parzen_window_fn(x):
+        return torch.exp(-((x - bins) ** 2) / (2 * sigma**2)) / (math.sqrt(2 * math.pi) * sigma)
+
+    pw_input = parzen_window_fn(input_sample)  # (N, #bins, H*W*D)
+    pw_target = parzen_window_fn(target_sample)
+
+    # calculate joint histogram
+    hist_joint = pw_input.bmm(pw_target.transpose(1, 2))  # (N, #bins, #bins)
+    hist_norm = hist_joint.flatten(start_dim=1, end_dim=-1).sum(dim=1) + 1e-5
+
+    # joint and marginal distributions
+    p_joint = hist_joint / hist_norm.view(-1, 1, 1)  # (N, #bins, #bins) / (N, 1, 1)
+    p_input = torch.sum(p_joint, dim=2)
+    p_target = torch.sum(p_joint, dim=1)
+
+    # calculate entropy
+    ent_input = -torch.sum(p_input * torch.log(p_input + 1e-5), dim=1)  # (N,1)
+    ent_target = -torch.sum(p_target * torch.log(p_target + 1e-5), dim=1)  # (N,1)
+    ent_joint = -torch.sum(p_joint * torch.log(p_joint + 1e-5), dim=(1, 2))  # (N,1)
+
+    if normalized:
+        loss = -torch.mean((ent_input + ent_target) / ent_joint)
+    else:
+        loss = -torch.mean(ent_input + ent_target - ent_joint)
     return loss
 
 
