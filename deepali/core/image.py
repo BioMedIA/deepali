@@ -5,7 +5,7 @@ from typing import Dict, Optional, Sequence, Union
 
 import torch
 import torch.nn.functional as F
-from torch import Tensor
+from torch import Generator, Tensor
 
 from .enum import PaddingMode, Sampling
 from .enum import SpatialDim, SpatialDimArg, SpatialDerivativeKeys
@@ -13,6 +13,7 @@ from .grid import ALIGN_CORNERS, Axes, Grid, grid_transform_points
 from .kernels import gaussian1d, gaussian1d_I
 from .names import image_batch_tensor_names
 from .nnutils import same_padding, stride_minus_kernel_padding
+from .random import multinomial
 from .tensor import as_tensor, cat_scalars, move_dim
 from .types import Array, Device, Scalar, ScalarOrTuple, Size, Shape, is_float_dtype
 
@@ -1161,6 +1162,74 @@ def grid_sample_mask(
         padding=PaddingMode.ZEROS,
         align_corners=align_corners,
     )
+
+
+def rand_sample(
+    data: Union[Tensor, Sequence[Tensor]],
+    num_samples: int,
+    mask: Optional[Tensor] = None,
+    replacement: bool = False,
+    generator: Optional[Generator] = None,
+) -> Union[Tensor, Sequence[Tensor]]:
+    r"""Random sampling of voxels within an image.
+
+    Args:
+        data: One or more image batch tensors with shape ``(N, C, ... X)`` to sample
+            from at the same random image grid positions, i.e., voxel indices. Note that
+            all input tensors must have the same number and size of spatial dimensions.
+        num_samples: Number of spatial samples to draw.
+        mask: Optional mask to use for spatially weighted sampling.
+        replacement: Whether to sample with or without replacement.
+        generator: Random number generator to use.
+
+    Returns:
+        Tensor of shape ``(N, C, num_samples)`` with input ``data`` values at randomly
+        sampled spatial grid points. When ``data`` is a sequence of tensors, a list
+        of tensors with order matching the input data is returned.
+
+    """
+    input: Sequence[Tensor]
+    if isinstance(data, Tensor):
+        input = [data]
+    elif isinstance(data, Sequence) and all(isinstance(x, Tensor) for x in data):
+        input = data
+    else:
+        raise TypeError("rand_sample() 'data' must be Tensor or Sequence[Tensor]")
+    if not input:
+        return []
+    if any(x.ndim < 3 for x in input):
+        raise ValueError("rand_sample() 'data' must be one or more tensors of shape (N, C, ..., X)")
+    shape = input[0].shape
+    device = input[0].device
+    if any(x.shape[2:] != shape[2:] for x in input):
+        raise ValueError("rand_sample() 'data' tensors must have identical spatial shape")
+    numel = shape[2:].numel()
+    if not replacement and num_samples > numel:
+        raise ValueError("rand_sample() 'num_samples' is greater than number of spatial points")
+    input = [x.flatten(2) for x in input]
+    if not replacement and mask is None:
+        perm = torch.empty(numel, dtype=torch.int64, device=device)
+        index = torch.empty((shape[0], num_samples), dtype=torch.int64, device=device)
+        for row in index:
+            torch.randperm(numel, generator=generator, out=perm, device=device)
+            row.copy_(perm.narrow(0, 0, num_samples), non_blocking=True)
+    else:
+        if mask is None:
+            mask = torch.ones((1, 1, numel), dtype=torch.float32, device=device)
+        else:
+            if mask.ndim < 3:
+                raise ValueError("rand_sample() 'mask' must be tensor of shape (N, C, ..., X)")
+            if mask.shape[2:] != shape[2:]:
+                raise ValueError("rand_sample() 'mask' has different spatial shape than 'data'")
+            if mask.shape[1] != 1:
+                raise ValueError("rand_sample() 'mask' must be scalar image tensor")
+            mask = mask.flatten(2).squeeze(1)
+        index = multinomial(mask, num_samples, replacement=replacement, generator=generator)
+    index = index.unsqueeze(1).repeat(1, shape[1], 1)
+    out = [torch.gather(x, dim=2, index=index) for x in input]
+    if len(out) == 1 and isinstance(data, Tensor):
+        return out[0]
+    return out
 
 
 def image_slice(data: Tensor, offset: Optional[int] = None) -> Tensor:

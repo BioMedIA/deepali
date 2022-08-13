@@ -87,6 +87,7 @@ from .image import grid_sample
 from .image import grid_sample_mask
 from .image import image_slice
 from .image import normalize_image
+from .image import rand_sample
 from .image import rescale
 from .image import sample_image
 from .image import spatial_derivatives
@@ -220,6 +221,7 @@ __all__ = (
     "ones_image",
     "polyline_directions",
     "polyline_tangents",
+    "rand_sample",
     "rescale",
     "sample_flow",
     "sample_image",
