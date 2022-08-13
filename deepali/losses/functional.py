@@ -1,7 +1,7 @@
 r"""Loss functions, evaluation metrics, and related utilities."""
 
 import itertools
-from typing import Optional, Sequence, Union, Tuple
+from typing import Optional, Sequence, Union
 import warnings
 from contextlib import nullcontext
 
@@ -641,7 +641,7 @@ def ssd_loss(
     return loss
 
 
-def sample_index_in_mask(mask: Tensor, num_samples: int) -> Tensor:
+def multinomial(mask: Tensor, num_samples: int) -> Tensor:
     r""" Randomly sample locations within a region of interest mask, using the mask as multinomial distribution"""
     with torch.no_grad() if mask.requires_grad else nullcontext():
         num_locations = mask.size(2)
@@ -662,23 +662,21 @@ def sample_index_in_mask(mask: Tensor, num_samples: int) -> Tensor:
     return sample_index
 
 
-def sample_in_mask(
-        input: Tensor,
-        target: Tensor,
-        mask: Tensor = None,
+def random_sample(
+        inputs: Union[Tensor, Sequence[Tensor]],
+        mask: Optional[Tensor] = None,
         sample_ratio: float = None,
         num_samples: int = None
-) -> Tuple[Tensor, Tensor]:
+) -> Union[Tensor, Sequence[Tensor]]:
     r""" Random sampling of voxels within an image or within masked area """
     # input with spatial structures, output spatially flat tensors
-    input = input.flatten(start_dim=2, end_dim=-1)
-    target = target.flatten(start_dim=2, end_dim=-1)
+    inputs = [x.flatten(start_dim=2, end_dim=-1) for x in inputs]
     if mask is not None:
         mask = mask.flatten(start_dim=2, end_dim=-1)
 
     sampling = sample_ratio is not None or num_samples is not None
     if sampling:
-        numel = input.size(2)
+        numel = inputs[0].size(2)
         if sample_ratio is not None:
             # prioritize sample_ratio
             assert sample_ratio < 1., f"Subsampling ratio {sample_ratio} must be smaller than 1."
@@ -690,17 +688,15 @@ def sample_in_mask(
         if mask is None:
             # sample globally the same random index along the batch dimension
             sample_index = torch.randperm(int(numel))[:num_samples]
-            input_sample = input[:, :, sample_index]
-            target_sample = target[:, :, sample_index]
+            outputs = [x[:, :, sample_index] for x in inputs]
         else:
             # sample within the mask with different random index for each sample in the batch
-            sample_index = sample_index_in_mask(mask, num_samples)
-            sample_index = sample_index.unsqueeze(1).repeat(1, input.size()[1], 1)
-            input_sample = torch.gather(input, dim=2, index=sample_index)
-            target_sample = torch.gather(target, dim=2, index=sample_index)
-        return input_sample, target_sample
+            sample_index = multinomial(mask, num_samples)
+            sample_index = sample_index.unsqueeze(1).repeat(1, inputs[0].size(1), 1)
+            outputs = [torch.gather(x, dim=2, index=sample_index) for x in inputs]
+        return outputs
     else:
-        return input, target
+        return inputs
 
 
 def mi_loss(
@@ -735,7 +731,7 @@ def mi_loss(
     """
     sampling = sample_ratio is not None or num_samples is not None
     if sampling:
-        input_sample, target_sample = sample_in_mask(input, target, mask, sample_ratio, num_samples)
+        input_sample, target_sample = random_sample((input, target), mask, sample_ratio, num_samples)
     else:
         input_sample = masked_loss(input, mask=mask).flatten(start_dim=2, end_dim=-1)
         target_sample = masked_loss(target, mask=mask).flatten(start_dim=2, end_dim=-1)
