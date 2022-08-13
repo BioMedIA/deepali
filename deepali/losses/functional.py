@@ -3,6 +3,7 @@ r"""Loss functions, evaluation metrics, and related utilities."""
 import itertools
 from typing import Optional, Sequence, Union, Tuple
 import warnings
+from contextlib import nullcontext
 
 import math
 
@@ -640,20 +641,24 @@ def ssd_loss(
     return loss
 
 
-def sample_index_from_mask(mask: Tensor, num_samples: int):
+def sample_index_in_mask(mask: Tensor, num_samples: int) -> Tensor:
     r""" Randomly sample locations within a region of interest mask, using the mask as multinomial distribution"""
-    num_locations = mask.size()[2]
-    if num_locations > 2 ** 24:
-        # As torch.multinomial() works only for at most 2^24 categories, use inverse transform sampling
-        # if the number of candidate voxels is very large.
-        mask_cdf = mask.squeeze(1)
-        mask_cdf = torch.cumsum(mask_cdf / mask_cdf.sum(dim=1, keepdim=True), dim=1, out=mask_cdf)
-        mask_cdf = torch.divide(mask_cdf, mask_cdf[:, -1].unsqueeze(-1), out=mask_cdf)
-        cdf_values = torch.rand(mask.size()[0], num_samples).type_as(mask)
-        sample_index = torch.searchsorted(mask_cdf, cdf_values)
-        sample_index = torch.clip(sample_index, 0, num_locations - 1, out=sample_index)
-    else:
-        sample_index = torch.multinomial(mask.squeeze(1), num_samples, replacement=False)
+    with torch.no_grad() if mask.requires_grad else nullcontext():
+        num_locations = mask.size(2)
+        assert mask.size(1) == 1, f"Mask has more than 1 channel ({mask.size(1)}) which is not supported."
+        mask = mask.squeeze(1)
+        if num_locations > 2 ** 24:
+            # As torch.multinomial() works only for at most 2^24 categories, use inverse transform sampling
+            # if the number of candidate voxels is very large.
+            mask_cdf = mask
+            mask_cdf = torch.cumsum(mask_cdf / mask_cdf.sum(dim=1, keepdim=True), dim=1, out=mask_cdf)
+            mask_cdf = torch.divide(mask_cdf, mask_cdf[:, -1].unsqueeze(-1), out=mask_cdf)
+            cdf_values = torch.rand(mask.size(0), num_samples).to(mask)
+            sample_index = torch.searchsorted(mask_cdf, cdf_values)
+            sample_index = torch.clip(sample_index, 0, num_locations - 1, out=sample_index)
+        else:
+            # sampling with replacement to ensure the correct sampling distribution due to Pytorch issue #50034
+            sample_index = torch.multinomial(mask, num_samples, replacement=True)
     return sample_index
 
 
@@ -670,28 +675,32 @@ def sample_in_mask(
     target = target.flatten(start_dim=2, end_dim=-1)
     if mask is not None:
         mask = mask.flatten(start_dim=2, end_dim=-1)
-    if sample_ratio is not None or num_samples is not None:
-        numel_ = input.size()[2]
-        if sample_ratio is not None:  # prioritize sample_ratio
+
+    sampling = sample_ratio is not None or num_samples is not None
+    if sampling:
+        numel = input.size(2)
+        if sample_ratio is not None:
+            # prioritize sample_ratio
             assert sample_ratio < 1., f"Subsampling ratio {sample_ratio} must be smaller than 1."
             if num_samples is not None:
                 warnings.warn("`num_samples` in loss.functional.sampling_fn() is ignored because `sample_ratio` is set")
-            num_samples = int(sample_ratio * numel_)
+            num_samples = int(sample_ratio * numel)
+        assert num_samples <= numel
+        # sampling
         if mask is None:
-            # todo: this logic can be simplified if we use sampling within an all-one mask
-            sample_index = torch.randperm(int(numel_))[:num_samples]
+            # sample globally the same random index along the batch dimension
+            sample_index = torch.randperm(int(numel))[:num_samples]
             input_sample = input[:, :, sample_index]
             target_sample = target[:, :, sample_index]
         else:
-            # sample within the mask
-            sample_index = sample_index_from_mask(mask, num_samples)
+            # sample within the mask with different random index for each sample in the batch
+            sample_index = sample_index_in_mask(mask, num_samples)
             sample_index = sample_index.unsqueeze(1).repeat(1, input.size()[1], 1)
             input_sample = torch.gather(input, dim=2, index=sample_index)
             target_sample = torch.gather(target, dim=2, index=sample_index)
+        return input_sample, target_sample
     else:
-        input_sample = masked_loss(input, mask=mask)
-        target_sample = masked_loss(target, mask=mask)
-    return input_sample, target_sample
+        return input, target
 
 
 def mi_loss(
@@ -724,7 +733,12 @@ def mi_loss(
             ignored if `sample_ratio` is also set.
         normalized: Calculate Normalized Mutual Information instead of Mutual Information if True.
     """
-    input_sample, target_sample = sample_in_mask(input, target, mask, sample_ratio, num_samples)
+    sampling = sample_ratio is not None or num_samples is not None
+    if sampling:
+        input_sample, target_sample = sample_in_mask(input, target, mask, sample_ratio, num_samples)
+    else:
+        input_sample = masked_loss(input, mask=mask).flatten(start_dim=2, end_dim=-1)
+        target_sample = masked_loss(target, mask=mask).flatten(start_dim=2, end_dim=-1)
 
     # set the bin edges and Gaussian kernel std
     if vmin is None:
