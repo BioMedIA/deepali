@@ -4,6 +4,7 @@ from typing import Optional
 
 import torch
 from torch import Generator, LongTensor, Tensor
+from torch.distributions import Gumbel
 
 
 def multinomial(
@@ -31,6 +32,8 @@ def multinomial(
     if input.ndim == 0 or input.ndim > 2:
         raise ValueError("multinomial() 'input' must be vector or matrix")
     num_candidates = input.size(-1)
+    if not replacement and num_candidates < num_samples:
+        raise ValueError("multinomial() 'num_samples' cannot be greater than number of categories")
     # torch.multinomial() works only for at most 2^24 categories.
     if num_candidates <= 2**24:
         out = torch.multinomial(
@@ -45,7 +48,7 @@ def multinomial(
         out = torch.clip(out, 0, num_candidates - 1, out=out)
     # In case of replacement=False, use Gumbel-max trick instead of inverse transform sampling.
     else:
-        raise NotImplementedError(
-            f"multinomial() 'replacement=False' for an input with more than {2**24} elements"
-        )
+        gumbels: Tensor = Gumbel(0, 1).sample(input.shape[:-1] + (num_candidates,))
+        out = torch.argsort(gumbels.add_(input), dim=-1, descending=True)
+        out = out.narrow(-1, 0, num_samples)
     return out
