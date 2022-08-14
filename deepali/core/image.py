@@ -1207,23 +1207,30 @@ def rand_sample(
     if not replacement and num_samples > numel:
         raise ValueError("rand_sample() 'num_samples' is greater than number of spatial points")
     input = [x.flatten(2) for x in input]
-    if not replacement and mask is None:
-        perm = torch.empty(numel, dtype=torch.int64, device=device)
-        index = torch.empty((shape[0], num_samples), dtype=torch.int64, device=device)
-        for row in index:
-            torch.randperm(numel, generator=generator, out=perm, device=device)
-            row.copy_(perm.narrow(0, 0, num_samples), non_blocking=True)
-    else:
-        if mask is None:
-            mask = torch.ones((1, 1, numel), dtype=torch.float32, device=device)
+    if mask is None:
+        if replacement:
+            index = torch.randint(
+                0,
+                numel,
+                (shape[0], num_samples),
+                generator=generator,
+                device=device,
+                dtype=torch.int64,
+            )
         else:
-            if mask.ndim < 3:
-                raise ValueError("rand_sample() 'mask' must be tensor of shape (N, C, ..., X)")
-            if mask.shape[2:] != shape[2:]:
-                raise ValueError("rand_sample() 'mask' has different spatial shape than 'data'")
-            if mask.shape[1] != 1:
-                raise ValueError("rand_sample() 'mask' must be scalar image tensor")
-            mask = mask.flatten(2).squeeze(1)
+            perm = torch.empty(numel, dtype=torch.int64, device=device)
+            index = torch.empty((shape[0], num_samples), dtype=torch.int64, device=device)
+            for row in index:
+                torch.randperm(numel, generator=generator, out=perm, device=device)
+                row.copy_(perm.narrow(0, 0, num_samples), non_blocking=True)
+    else:
+        if mask.ndim < 3:
+            raise ValueError("rand_sample() 'mask' must be tensor of shape (N, C, ..., X)")
+        if mask.shape[2:] != shape[2:]:
+            raise ValueError("rand_sample() 'mask' has different spatial shape than 'data'")
+        if mask.shape[1] != 1:
+            raise ValueError("rand_sample() 'mask' must be scalar image tensor")
+        mask = mask.flatten(2).squeeze(1)
         index = multinomial(mask, num_samples, replacement=replacement, generator=generator)
     index = index.unsqueeze(1).repeat(1, shape[1], 1)
     out = [torch.gather(x, dim=2, index=index) for x in input]
