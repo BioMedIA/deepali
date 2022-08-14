@@ -1233,7 +1233,7 @@ def rand_sample(
         mask = mask.flatten(2).squeeze(1)
         index = multinomial(mask, num_samples, replacement=replacement, generator=generator)
     index = index.unsqueeze(1).repeat(1, shape[1], 1)
-    out = [torch.gather(x, dim=2, index=index) for x in input]
+    out = [x.gather(2, index) for x in input]
     if len(out) == 1 and isinstance(data, Tensor):
         return out[0]
     return out
