@@ -1230,7 +1230,7 @@ def rand_sample(
             raise ValueError("rand_sample() 'mask' has different spatial shape than 'data'")
         if mask.shape[1] != 1:
             raise ValueError("rand_sample() 'mask' must be scalar image tensor")
-        mask = mask.flatten(2).squeeze(1)
+        mask = mask.flatten(2).squeeze(1).expand(shape[0], numel)
         index = multinomial(mask, num_samples, replacement=replacement, generator=generator)
     index = index.unsqueeze(1).repeat(1, shape[1], 1)
     out = [x.gather(2, index) for x in input]
