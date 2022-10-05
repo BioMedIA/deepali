@@ -1392,8 +1392,10 @@ def rescale(
     if norm < 1e-15:
         result = data.new_empty(data.shape).fill_(min)
     else:
-        scale = (max - min) / (data_max - data_min)
+        scale = (max - min) / norm
         result = min + scale * (data - data_min)
+    if not dtype.is_floating_point:
+        result = result.round_()
     result = result.clamp_(min=min, max=max)
     result = result.type(dtype)
     return result
