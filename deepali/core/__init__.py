@@ -40,6 +40,8 @@ from .grid import grid_vectors_transform
 from .grid import grid_transform_points
 from .grid import grid_transform_vectors
 
+from .random import multinomial
+
 from .types import Array
 from .types import Batch
 from .types import Dataclass
@@ -105,6 +107,7 @@ __all__ = (
     "join_kwargs_in_sequence",
     "make_parent_dir",
     "make_temp_file",
+    "multinomial",
     "is_bool_dtype",
     "is_float_dtype",
     "is_int_dtype",

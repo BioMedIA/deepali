@@ -1,3 +1,5 @@
+import os
+
 import torch
 from torch import Tensor
 
@@ -40,6 +42,74 @@ def test_fill_border():
     assert result[:, :, :, :, 8:].eq(1).all()
     assert result[:, :, 2:5, 1:4, 3:8].eq(0).all()
     assert result.sum() == 680
+
+
+def test_rand_sample_cuda() -> None:
+
+    if "CUDA_VISIBLE_DEVICES" not in os.environ:
+        os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+
+    device = torch.device("cuda:0")
+    generator = torch.Generator(device=device).manual_seed(123456789)
+
+    start = torch.cuda.Event(enable_timing=True)
+    end = torch.cuda.Event(enable_timing=True)
+
+    shape = torch.Size((5, 1, 32, 64, 128))
+    data = torch.arange(shape[2:].numel()).reshape((1, 1) + shape[2:]).expand(shape).to(device)
+    num_samples = 10
+
+    # Draw unweighted samples with and without replacement
+    t_elapsed_1 = 0
+    for i in range(5):
+        start.record()
+        values = U.rand_sample(data, num_samples, mask=None, replacement=False, generator=generator)
+        end.record()
+        torch.cuda.synchronize()
+        if i > 0:
+            t_elapsed_1 += start.elapsed_time(end)
+    t_elapsed_1 /= 4
+
+    assert not torch.allclose(values[0], values[1])
+
+    t_elapsed_2 = 0
+    for i in range(5):
+        start.record()
+        values = U.rand_sample(data, num_samples, mask=None, replacement=True, generator=generator)
+        end.record()
+        torch.cuda.synchronize()
+        if i > 0:
+            t_elapsed_2 += start.elapsed_time(end)
+    t_elapsed_2 /= 4
+
+    assert not torch.allclose(values[0], values[1])
+
+    # Compare with using multinomial with an all-one mask
+    t_elapsed_3 = 0
+    for i in range(5):
+        start.record()
+        mask = torch.ones((1, 1) + data.shape[2:], device=device)
+        values = U.rand_sample(data, num_samples, mask=mask, replacement=False, generator=generator)
+        end.record()
+        torch.cuda.synchronize()
+        if i > 0:
+            t_elapsed_3 += start.elapsed_time(end)
+    t_elapsed_3 /= 4
+
+    assert not torch.allclose(values[0], values[1])
+
+    t_elapsed_4 = 0
+    for i in range(5):
+        start.record()
+        mask = torch.ones((1, 1) + data.shape[2:], device=device)
+        values = U.rand_sample(data, num_samples, mask=mask, replacement=True, generator=generator)
+        end.record()
+        torch.cuda.synchronize()
+        if i > 0:
+            t_elapsed_4 += start.elapsed_time(end)
+    t_elapsed_4 /= 4
+
+    assert not torch.allclose(values[0], values[1])
 
 
 def test_sample_image() -> None:
