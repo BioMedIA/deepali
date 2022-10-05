@@ -25,13 +25,10 @@ os.chdir(project_dir)
 
 namespace = "deepali"
 
-long_description = (project_dir / "README.md").read_text()
+long_description = Path("README.md").read_text()
 
-packages = find_namespace_packages(
-    where=project_dir,
-    include=[namespace + ".*"],
-    exclude=["examples", "tests"]
-)
+packages = find_namespace_packages(where="src")
+package_dir={"": "src"}
 
 install_requires = [
     "dacite",
@@ -86,6 +83,7 @@ setup(
         "Typing :: Typed",
     ],
     packages=packages,
+    package_dir=package_dir,
     python_requires=">=3.7",
     use_scm_version=True,
     setup_requires=["setuptools-scm"],
