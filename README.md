@@ -23,13 +23,13 @@ At a granular level, *deepali* is a library that consists of the following compo
 | [deepali.utils] | Optional auxiliaries for interfacing with external libraries and tools. |
 
 
-[deepali.core]: deepali/core/
-[deepali.data]: deepali/data/
-[deepali.losses]: deepali/losses/
-[deepali.modules]: deepali/modules/
-[deepali.networks]: deepali/networks/
-[deepali.spatial]: deepali/spatial/
-[deepali.utils]: deepali/utils/
+[deepali.core]: src/deepali/core/
+[deepali.data]: src/deepali/data/
+[deepali.losses]: src/deepali/losses/
+[deepali.modules]: src/deepali/modules/
+[deepali.networks]: src/deepali/networks/
+[deepali.spatial]: src/deepali/spatial/
+[deepali.utils]: src/deepali/utils/
 
 
 ## Dependencies
