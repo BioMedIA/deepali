@@ -1,11 +1,11 @@
 r"""Auxiliary functions for random sampling."""
 
 from typing import Optional
-import warnings
+
+from pkg_resources import parse_version
 
 import torch
 from torch import Generator, LongTensor, Tensor
-from torch.distributions import Gumbel
 
 
 def multinomial(
@@ -67,16 +67,19 @@ def _multinomial(
     if input.ndim == 0 or input.ndim > 2:
         raise ValueError("_multinomial() 'input' must be vector or matrix")
     num_candidates = input.size(-1)
+    out_shape = input.shape[:-1] + (num_samples,)
+    if out is not None:
+        if not isinstance(out, Tensor):
+            raise TypeError("_multinomial() 'out' must be Tensor")
+        if out.dtype != torch.int64:
+            raise TypeError("_multinomial() 'out' must be int64 tensor")
+        if out.shape != out_shape:
+            raise ValueError(f"_multinomial() 'out' must have shape {out_shape}")
     # Use inverse transform sampling if the number of candidates is large and replacement=True
     if replacement:
         cdf = input.type(torch.float64).cumsum(dim=-1)
         cdf = cdf.div_(cdf[..., -1:].clone())
-        val = torch.rand(
-            cdf.shape[:-1] + (num_samples,),
-            generator=generator,
-            dtype=cdf.dtype,
-            device=cdf.device,
-        )
+        val = torch.rand(out_shape, generator=generator, dtype=cdf.dtype, device=cdf.device)
         out = torch.searchsorted(cdf, val, out=out).clip_(0, num_candidates - 1)
     # In case of replacement=False, use Gumbel-max trick instead of inverse transform sampling.
     else:
@@ -84,12 +87,20 @@ def _multinomial(
             raise ValueError(
                 "_multinomial() 'num_samples' cannot be greater than number of categories"
             )
-        if generator is not None:
-            warnings.warn(
-                "_multinomial() with 'replacement=False' currently ignores 'generator' argument"
-            )
-        gumbels: Tensor = Gumbel(0, 1).sample(input.shape[:-1] + (num_candidates,))
-        indices = torch.argsort(gumbels.to(input).add_(input), dim=-1, descending=True)
-        indices = indices.narrow(-1, 0, num_samples)
-        out = indices if out is None else out.copy_(indices)
+        logit = input.log()
+        value = torch.rand(
+            input.shape[:-1] + (num_candidates,),
+            generator=generator,
+            dtype=logit.dtype,
+            device=input.device,
+        )
+        value = value.log_().neg_().log_().neg_().add_(logit)
+        if parse_version(torch.__version__) < parse_version("1.12"):
+            _, index = value.topk(num_samples, dim=-1, sorted=False)
+            out = index if out is None else out.copy_(index)
+        else:
+            if out is None:
+                out = torch.empty(out_shape, dtype=torch.int64, device=value.device)
+            _ = torch.empty(out_shape, dtype=value.dtype, device=value.device)
+            _, out = value.topk(num_samples, dim=-1, sorted=False, out=(_, out))
     return out
