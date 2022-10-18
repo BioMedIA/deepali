@@ -6,6 +6,8 @@ from copy import copy as shallow_copy
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Dict, Optional, Sequence, Union, overload
 
+from pkg_resources import parse_version
+
 try:
     import SimpleITK as sitk
 except ImportError:
@@ -939,7 +941,10 @@ class Grid(object):
             else:
                 coord = torch.arange(n, dtype=dtype, device=device)
             coords.append(coord)
-        coords = torch.stack(torch.meshgrid(*coords), dim=-1)
+        if parse_version(torch.__version__) < parse_version("1.10"):
+            coords = torch.stack(torch.meshgrid(*coords), dim=-1)
+        else:
+            coords = torch.stack(torch.meshgrid(*coords, indexing="ij"), dim=-1)
         if not flip:  # default order (x, ...) requires flipping stacked meshgrid coords
             coords = torch.flip(coords, dims=(-1,))
         return coords
