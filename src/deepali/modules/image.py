@@ -4,6 +4,8 @@ import math
 from numbers import Number
 from typing import Optional, Union
 
+from pkg_resources import parse_version
+
 import torch
 from torch import Tensor
 from torch.nn import Module, functional as F
@@ -88,7 +90,11 @@ class GaussianConv(Module):
             sigma = (sigma,) * dim
         # The gaussian kernel is the product of the gaussian function of each dimension.
         kernel = torch.tensor(1, dtype=torch.float32, device="cpu")
-        mgrids = torch.meshgrid([torch.arange(n, dtype=torch.float32) for n in kernel_size])
+        mgrids = [torch.arange(n, dtype=torch.float32) for n in kernel_size]
+        if parse_version(torch.__version__) < parse_version("1.10"):
+            mgrids = torch.meshgrid(mgrids)
+        else:
+            mgrids = torch.meshgrid(mgrids, indexing="ij")
         norm = math.sqrt(2 * math.pi)
         for size, std, mgrid in zip(kernel_size, sigma, mgrids):
             mean = (size - 1) / 2

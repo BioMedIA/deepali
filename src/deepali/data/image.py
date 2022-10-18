@@ -723,7 +723,9 @@ class ImageBatch(DataTensor):
         return self._make_instance(data, grid)
 
     def conv(
-        self: TImageBatch, kernel: Tensor, padding: Union[PaddingMode, str, int] = None
+        self: TImageBatch,
+        kernel: Union[Tensor, Sequence[Optional[Tensor]]],
+        padding: Union[PaddingMode, str, int] = None,
     ) -> TImageBatch:
         r"""Filter images in batch with a given convolutional kernel.
 
@@ -1287,7 +1289,11 @@ class Image(DataTensor):
         batch = batch.region_of_interest(*args, **kwargs)
         return batch[0]
 
-    def conv(self: TImage, kernel: Tensor, padding: Union[PaddingMode, str, int] = None) -> TImage:
+    def conv(
+        self: TImage,
+        kernel: Union[Tensor, Sequence[Optional[Tensor]]],
+        padding: Union[PaddingMode, str, int] = None,
+    ) -> TImage:
         r"""Filter image with a given (separable) kernel."""
         batch = self.batch()
         batch = batch.conv(kernel, padding=padding)
