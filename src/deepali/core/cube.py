@@ -3,7 +3,9 @@ r"""Bounding box oriented in world space which defines a normalized domain."""
 from __future__ import annotations
 
 from copy import copy as shallow_copy
-from typing import Any, Optional, Union, overload
+from typing import Any, Optional, Sequence, Union, overload
+
+import numpy as np
 
 import torch
 from torch import Tensor
@@ -72,6 +74,57 @@ class Cube(object):
             self.center_(center)
             if not torch.allclose(origin, self.origin()):
                 raise ValueError("Cube() 'center' and 'origin' are inconsistent")
+
+    def numpy(self) -> np.ndarray:
+        r"""Get cube attributes as 1-dimensional NumPy array."""
+        return np.concatenate(
+            [
+                self._extent.numpy(),
+                self._center.numpy(),
+                self._direction.flatten().numpy(),
+            ],
+            axis=0,
+        )
+
+    @classmethod
+    def from_numpy(cls, attrs: Sequence[float], origin: bool = False) -> Cube:
+        r"""Create Cube from 1-dimensional NumPy array."""
+        return cls.from_seq(attrs, origin=origin)
+
+    @classmethod
+    def from_seq(cls, attrs: Sequence[float], origin: bool = False) -> Cube:
+        r"""Create Cube from sequence of attribute values.
+
+        Args:
+            attrs: Array of length (D + 2) * D, where ``D=2`` or ``D=3`` is the number
+                of spatial cube dimensions and array items are given as
+                ``(sx, ..., cx, ..., d11, ..., d21, ....)``, where ``(sx, ...)`` is the
+                cube extent, ``(cx, ...)`` the cube center coordinates, and ``(d11, ...)``
+                are the cube direction cosines. The argument can be a Python list or tuple,
+                NumPy array, or PyTorch tensor.
+            origin: Whether ``(cx, ...)`` specifies Cube origin rather than center.
+
+        Returns:
+            Cube instance.
+
+        """
+        if len(attrs) == 8:
+            d = 2
+        elif len(attrs) == 15:
+            d = 3
+        else:
+            raise ValueError(
+                f"{cls.__name__}.from_seq() expected array of length 8 (D=2) or 15 (D=3)"
+            )
+        kwargs = dict(
+            extent=attrs[0:d],
+            direction=attrs[2 * d :],
+        )
+        if origin:
+            kwargs["origin"] = attrs[d : 2 * d]
+        else:
+            kwargs["center"] = attrs[d : 2 * d]
+        return Cube(**kwargs)
 
     @classmethod
     def from_grid(cls, grid: Grid, align_corners: Optional[bool] = None) -> Cube:
