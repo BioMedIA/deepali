@@ -1,6 +1,88 @@
+import pytest
+
+import numpy as np
 import torch
+from torch import Tensor
 
 from deepali.core.grid import Grid
+from deepali.core import affine as A
+
+
+@pytest.fixture
+def default_angle() -> Tensor:
+    return torch.deg2rad(torch.tensor(33.0))
+
+
+@pytest.fixture
+def default_grid(default_angle: Tensor) -> Grid:
+    direction = A.euler_rotation_matrix(default_angle)
+    grid = Grid(size=(34, 42), spacing=(0.7, 1.2), center=(7, 4), direction=direction)
+    return grid
+
+
+def test_grid_to_from_numpy(default_grid: Grid) -> None:
+    r"""Test converting a Grid to a 1-dimensional NumPy array and constructing a new one from such array."""
+    dim = default_grid.ndim
+    arr = default_grid.numpy()
+    assert isinstance(arr, np.ndarray)
+    assert arr.ndim == 1
+    assert arr.dtype == (np.float32 if default_grid.dtype == torch.float32 else np.float64)
+    assert arr.shape == ((dim + 3) * dim,)
+    grid = Grid.from_numpy(arr)
+    assert grid == default_grid
+
+
+def test_grid_eq(default_grid: Grid, default_angle: Tensor) -> None:
+    r"""Test comparison of different Grid instances for equality."""
+    # Same instance
+    assert default_grid == default_grid
+
+    # Different instance, same attributes
+    other_grid = Grid(
+        size=default_grid.size(),
+        spacing=default_grid.spacing(),
+        center=default_grid.center(),
+        direction=default_grid.direction(),
+    )
+    assert default_grid == other_grid
+
+    # Different size
+    other_grid = Grid(
+        size=default_grid.size_tensor().add(1),
+        spacing=default_grid.spacing(),
+        center=default_grid.center(),
+        direction=default_grid.direction(),
+    )
+    assert default_grid != other_grid
+
+    # Different spacing
+    other_grid = Grid(
+        size=default_grid.size(),
+        spacing=default_grid.spacing().add(0.001),
+        center=default_grid.center(),
+        direction=default_grid.direction(),
+    )
+    assert default_grid != other_grid
+
+    # Different center
+    other_grid = Grid(
+        size=default_grid.size(),
+        spacing=default_grid.spacing(),
+        center=default_grid.center().add(0.001),
+        direction=default_grid.direction(),
+    )
+    assert default_grid != other_grid
+
+    # Different direction
+    other_direction = A.euler_rotation_matrix(default_angle.add(0.001))
+
+    other_grid = Grid(
+        size=default_grid.size(),
+        spacing=default_grid.spacing(),
+        center=default_grid.center(),
+        direction=other_direction,
+    )
+    assert default_grid != other_grid
 
 
 def test_grid_crop():

@@ -6,6 +6,7 @@ from copy import copy as shallow_copy
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Dict, Optional, Sequence, Union, overload
 
+import numpy as np
 from pkg_resources import parse_version
 
 try:
@@ -189,6 +190,65 @@ class Grid(object):
                     raise ValueError("Grid() 'center' and 'origin' are inconsistent")
         # Default align_corners option argument for grid resizing operations
         self._align_corners = bool(align_corners)
+
+    def numpy(self) -> np.ndarray:
+        r"""Get grid attributes as 1-dimensional NumPy array."""
+        return np.concatenate(
+            [
+                self._size.numpy(),
+                self._spacing.numpy(),
+                self._center.numpy(),
+                self._direction.flatten().numpy(),
+            ],
+            axis=0,
+        )
+
+    @classmethod
+    def from_numpy(
+        cls, attrs: Sequence[float], origin: bool = False, align_corners: bool = ALIGN_CORNERS
+    ) -> Grid:
+        r"""Create Grid from 1-dimensional NumPy array."""
+        return cls.from_seq(attrs, origin=origin, align_corners=align_corners)
+
+    @classmethod
+    def from_seq(
+        cls, attrs: Sequence[float], origin: bool = False, align_corners: bool = ALIGN_CORNERS
+    ) -> Grid:
+        r"""Create Grid from sequence of attribute values.
+
+        Args:
+            attrs: Array of length (D + 3) * D, where ``D=2`` or ``D=3`` is the number
+                of spatial grid dimensions and array items are given as
+                ``(nx, ..., sx, ..., cx, ..., d11, ..., d21, ....)``,
+                where ``(nx, ...)`` is the grid size, ``(sx, ...)`` the grid spacing,
+                ``(cx, ...)`` the grid center coordinates, and ``(d11, ...)``
+                are the grid direction cosines. The argument can be a Python
+                list or tuple, NumPy array, or PyTorch tensor.
+            origin: Whether ``(cx, ...)`` specifies Grid origin rather than center.
+
+        Returns:
+            Grid instance.
+
+        """
+        if len(attrs) == 10:
+            d = 2
+        elif len(attrs) == 18:
+            d = 3
+        else:
+            raise ValueError(
+                f"{cls.__name__}.from_seq() expected array of length 10 (D=2) or 18 (D=3)"
+            )
+        kwargs = dict(
+            size=attrs[0:d],
+            spacing=attrs[d : 2 * d],
+            direction=attrs[3 * d :],
+            align_corners=align_corners,
+        )
+        if origin:
+            kwargs["origin"] = attrs[2 * d : 3 * d]
+        else:
+            kwargs["center"] = attrs[2 * d : 3 * d]
+        return Grid(**kwargs)
 
     @classmethod
     def from_batch(cls, tensor: Tensor) -> Grid:
