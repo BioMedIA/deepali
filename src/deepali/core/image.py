@@ -11,7 +11,6 @@ from .enum import PaddingMode, Sampling
 from .enum import SpatialDim, SpatialDimArg, SpatialDerivativeKeys
 from .grid import ALIGN_CORNERS, Axes, Grid, grid_transform_points
 from .kernels import gaussian1d, gaussian1d_I
-from .names import image_batch_tensor_names
 from .nnutils import same_padding, stride_minus_kernel_padding
 from .random import multinomial
 from .tensor import as_tensor, cat_scalars, move_dim
@@ -1055,7 +1054,6 @@ def check_sample_grid(func: str, data: Tensor, grid: Tensor) -> Tensor:
         raise ValueError(
             f"Last {func}() 'grid' dimension size must match number of spatial image dimensions"
         )
-    grid = grid.rename(None)
     if grid.ndim == data.ndim - 1:
         grid = grid.unsqueeze(0)
     elif grid.ndim != data.ndim:
@@ -1803,7 +1801,6 @@ def empty_image(
     shape: Optional[Shape] = None,
     num: Optional[int] = None,
     channels: Optional[int] = None,
-    named: bool = False,
     dtype: Optional[torch.dtype] = None,
     device: Optional[Device] = None,
 ) -> Tensor:
@@ -1814,7 +1811,6 @@ def empty_image(
         shape: Spatial size in the order ``(..., X)``.
         num: Number of images in batch.
         channels: Number of channels per image.
-        named: Whether to create named tensor (experimental).
         dtype: Data type of image tensor.
         device: Device on which to store image data.
 
@@ -1824,8 +1820,7 @@ def empty_image(
     """
     size = _image_size("empty_image", size, shape)
     shape = (num or 1, channels or 1) + tuple(reversed(size))
-    names = image_batch_tensor_names(len(shape)) if named else None
-    return torch.empty(shape, names=names, dtype=dtype, device=device)
+    return torch.empty(shape, dtype=dtype, device=device)
 
 
 def grid_image(
@@ -1834,7 +1829,6 @@ def grid_image(
     num: Optional[int] = None,
     stride: Optional[Union[int, Sequence[int]]] = None,
     inverted: bool = False,
-    named: bool = False,
     dtype: Optional[torch.dtype] = None,
     device: Optional[Device] = None,
 ) -> Tensor:
@@ -1850,7 +1844,6 @@ def grid_image(
             values, where the first stride applies to the last tensor dimension,
             which corresponds to the first spatial grid dimension.
         inverted: Whether to draw grid lines in black (0) over white (1) background.
-        named: Whether to create named tensor (experimental).
         dtype: Data type of image tensor.
         device: Device on which to store image data.
 
@@ -1859,7 +1852,7 @@ def grid_image(
 
     """
     size = _image_size("grid_image", size, shape)
-    data = empty_image(size, num=1, channels=1, named=named, dtype=dtype, device=device)
+    data = empty_image(size, num=1, channels=1, dtype=dtype, device=device)
     data.fill_(1 if inverted else 0)
     if stride is None:
         stride = 4
@@ -1882,7 +1875,6 @@ def ones_image(
     shape: Optional[Shape] = None,
     num: Optional[int] = None,
     channels: Optional[int] = None,
-    named: bool = False,
     dtype: Optional[torch.dtype] = None,
     device: Optional[Device] = None,
 ) -> Tensor:
@@ -1893,7 +1885,6 @@ def ones_image(
         shape: Spatial size in the order ``(..., X)``.
         num: Number of images in batch.
         channels: Number of channels per image.
-        named: Whether to create named tensor (experimental).
         dtype: Data type of image tensor.
         device: Device on which to store image data.
 
@@ -1902,7 +1893,7 @@ def ones_image(
 
     """
     size = _image_size("ones_image", size, shape)
-    data = empty_image(size, num=num, channels=channels, named=named, dtype=dtype, device=device)
+    data = empty_image(size, num=num, channels=channels, dtype=dtype, device=device)
     return data.fill_(1)
 
 
@@ -1911,7 +1902,6 @@ def zeros_image(
     shape: Optional[Shape] = None,
     num: Optional[int] = None,
     channels: Optional[int] = None,
-    named: bool = False,
     dtype: Optional[torch.dtype] = None,
     device: Optional[Device] = None,
 ) -> Tensor:
@@ -1922,7 +1912,6 @@ def zeros_image(
         shape: Spatial size in the order ``(..., X)``.
         num: Number of images in batch.
         channels: Number of channels per image.
-        named: Whether to create named tensor (experimental).
         dtype: Data type of image tensor.
         device: Device on which to store image data.
 
@@ -1931,5 +1920,5 @@ def zeros_image(
 
     """
     size = _image_size("zeros_image", size, shape)
-    data = empty_image(size, num=num, channels=channels, named=named, dtype=dtype, device=device)
+    data = empty_image(size, num=num, channels=channels, dtype=dtype, device=device)
     return data.fill_(0)
