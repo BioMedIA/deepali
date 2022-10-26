@@ -158,11 +158,8 @@ def batched_index_select(input: Tensor, dim: int, index: Tensor) -> Tensor:
     return torch.gather(input, dim, index)
 
 
-def move_dim(tensor: Tensor, dim: Union[int, str], pos: int) -> Tensor:
+def move_dim(tensor: Tensor, dim: int, pos: int) -> Tensor:
     r"""Move the specified tensor dimension to another position."""
-    names = list(tensor.names)
-    if isinstance(dim, str):
-        dim = names.index(dim)
     if dim < 0:
         dim = tensor.ndim + dim
     if pos < 0:
@@ -171,31 +168,11 @@ def move_dim(tensor: Tensor, dim: Union[int, str], pos: int) -> Tensor:
         return tensor
     if dim < pos:
         pos += 1
-    tensor = tensor.rename(None)
     tensor = tensor.unsqueeze(pos)
-    names.insert(pos, names[dim])
     if pos <= dim:
         dim += 1
-    del names[dim]
     tensor = tensor.transpose(dim, pos).squeeze(dim)
-    tensor = tensor.refine_names(*names)
     return tensor
-
-
-def named_dims(tensor: Tensor, *names: str) -> Tuple[int, ...]:
-    r"""Get indices of named tensor dimensions."""
-    if names:
-        indices = []
-        for name in names:
-            if not name:
-                raise ValueError("named_dims() 'names' cannot be None or empty string")
-            try:
-                indices.append(tensor.names.index(name))
-            except ValueError:
-                raise KeyError("named_dims() 'tensor' has no dimension named 'name'")
-    else:
-        indices = range(tensor.ndim)
-    return tuple(indices)
 
 
 def unravel_coords(indices: Tensor, size: Tuple[int, ...]) -> Tensor:

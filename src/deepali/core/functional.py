@@ -13,16 +13,12 @@ from .math import max_difference
 from .math import round_decimals
 from .math import threshold
 
-from .names import image_batch_tensor_names
-from .names import image_tensor_names
-
 from .tensor import as_tensor
 from .tensor import as_float_tensor
 from .tensor import as_one_hot_tensor
 from .tensor import atleast_1d
 from .tensor import batched_index_select
 from .tensor import move_dim
-from .tensor import named_dims
 from .tensor import unravel_coords
 from .tensor import unravel_index
 
@@ -131,11 +127,8 @@ __all__ = (
     "atanh",
     "atleast_1d",
     "batched_index_select",
-    "image_batch_tensor_names",
-    "image_tensor_names",
     "max_difference",
     "move_dim",
-    "named_dims",
     "round_decimals",
     "threshold",
     "unravel_coords",
