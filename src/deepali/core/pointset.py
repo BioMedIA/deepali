@@ -125,11 +125,18 @@ def normalize_grid(
     if not grid.is_floating_point():
         grid = grid.float()
     if size is None:
-        if grid.ndim < 4 or grid.shape[-1] != grid.ndim - 2:
-            raise ValueError(
-                "normalize_grid() 'grid' must have shape (N, ..., X, D) when 'size' not given"
-            )
-        size = torch.Size(reversed(grid.shape[1:-1]))  # X,...
+        if channels_last:
+            if grid.ndim < 4 or grid.shape[-1] != grid.ndim - 2:
+                raise ValueError(
+                    "normalize_grid() 'grid' must have shape (N, ..., X, D) when 'size' not given"
+                )
+            size = torch.Size(reversed(grid.shape[1:-1]))  # X,...
+        else:
+            if grid.ndim < 4 or grid.shape[1] != grid.ndim - 2:
+                raise ValueError(
+                    "normalize_grid() 'grid' must have shape (N, D, ..., X) when 'size' not given"
+                )
+            size = torch.Size(reversed(grid.shape[2:]))  # X,...
     zero = torch.tensor(0, dtype=grid.dtype, device=grid.device)
     size = torch.as_tensor(size, dtype=grid.dtype, device=grid.device)
     size_ = size.sub(1) if align_corners else size
