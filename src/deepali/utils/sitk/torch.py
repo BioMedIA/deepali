@@ -24,7 +24,7 @@ def image_from_tensor(
         SimpleITK image.
 
     """
-    data = data.detach().cpu().rename(None)
+    data = data.detach().cpu()
     nchannels = data.shape[0]
     if nchannels == 1:
         data = data[0]
