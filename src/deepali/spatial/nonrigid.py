@@ -95,6 +95,7 @@ class DisplacementFieldTransform(DenseVectorFieldTransform):
         r"""Update buffered displacement vector field."""
         super().update()
         u = self.data()
+        u = u.view(*u.shape)  # such that named_buffers() returns both 'u' and 'p'
         self.register_buffer("u", u, persistent=False)
         return self
 
@@ -176,6 +177,7 @@ class StationaryVelocityFieldTransform(DenseVectorFieldTransform):
         super().update()
         v = self.data()
         u = self.exp(v)
+        v = v.view(*v.shape)  # such that named_buffers() returns both 'v' and 'p'
         self.register_buffer("v", v, persistent=False)
         self.register_buffer("u", u, persistent=False)
         return self
