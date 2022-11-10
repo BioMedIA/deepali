@@ -54,25 +54,74 @@ class MSE(NormalizedPairwiseImageLoss):
 
 
 class MI(PairwiseImageLoss):
-    r""" Mutual information loss using Parzen window estimate with Gaussian kernel. """
+    r"""Mutual information loss using Parzen window estimate with Gaussian kernel."""
 
     def __init__(
-            self,
-            vmin: Optional[float] = None,
-            vmax: Optional[float] = None,
-            num_bins: int = 64,
-            sample_ratio: Optional[float] = None,
-            normalized: bool = True
+        self,
+        vmin: Optional[float] = None,
+        vmax: Optional[float] = None,
+        bins: Optional[int] = None,
+        sample: Optional[float] = None,
+        num_bins: Optional[int] = None,
+        num_samples: Optional[int] = None,
+        sample_ratio: Optional[float] = None,
+        normalized: bool = False,
     ):
-        r"""Initialize loss term.
-        See `deepali.losses.functional.mi_loss`
+        r"""Initialize mutual information loss term.
+
+        See `deepali.losses.functional.mi_loss`.
+
         """
+
+        if bins is not None:
+            if num_bins is not None:
+                raise ValueError(
+                    f"{type(self).__name__}() 'bins' and 'num_bins' are mutually exclusive"
+                )
+            num_bins = bins
+
+        if sample is not None:
+            if sample_ratio is not None or num_samples is not None:
+                raise ValueError(
+                    f"{type(self).__name__}() 'sample', 'sample_ratio', and 'num_samples' are mutually exclusive"
+                )
+            if 0 < sample < 1:
+                sample_ratio = float(sample)
+            else:
+                try:
+                    num_samples = int(sample)
+                except TypeError:
+                    pass
+                if num_samples is None or float(num_samples) != sample:
+                    raise ValueError(
+                        f"{type(self).__name__}() 'sample' must be float in (0, 1) or positive int"
+                    )
+        if num_samples == -1:
+            num_samples = None
+        if num_samples is not None and (not isinstance(num_samples, int) or num_samples <= 0):
+            raise ValueError(
+                f"{type(self).__name__}() 'num_samples' must be positive integral value"
+            )
+        if sample_ratio is not None and (sample_ratio <= 0 or sample_ratio >= 1):
+            raise ValueError(
+                f"{type(self).__name__}() 'sample_ratio' must be in closed interval [0, 1]"
+            )
+
         super().__init__()
         self.vmin = vmin
         self.vmax = vmax
         self.num_bins = num_bins
+        self.num_samples = num_samples
         self.sample_ratio = sample_ratio
-        self.normalized = normalized
+        self._normalized = normalized
+
+    @property
+    def bins(self) -> int:
+        return self.num_bins
+
+    @property
+    def normalized(self) -> bool:
+        return self._normalized
 
     def forward(self, source: Tensor, target: Tensor, mask: Optional[Tensor] = None) -> Tensor:
         r"""Evaluate patch dissimilarity loss."""
@@ -83,15 +132,58 @@ class MI(PairwiseImageLoss):
             vmin=self.vmin,
             vmax=self.vmax,
             num_bins=self.num_bins,
+            num_samples=self.num_samples,
             sample_ratio=self.sample_ratio,
-            normalized=self.normalized)
+            normalized=self.normalized,
+        )
 
     def extra_repr(self) -> str:
-        return f"vmin={self.vmin}," \
-               f"vmax={self.vmax}," \
-               f"num_bins={self.num_bins}, " \
-               f"sampling_ratio={self.sample_ratio}," \
-               f"normalized={self.normalized}"
+        return (
+            f"vmin={self.vmin!r}, "
+            f"vmax={self.vmax!r}, "
+            f"num_bins={self.num_bins!r}, "
+            f"num_samples={self.num_samples!r}, "
+            f"sampling_ratio={self.sample_ratio!r}, "
+            f"normalized={self.normalized!r}"
+        )
+
+
+class NMI(MI):
+    r"""Normalized mutual information loss using Parzen window estimate with Gaussian kernel."""
+
+    def __init__(
+        self,
+        vmin: Optional[float] = None,
+        vmax: Optional[float] = None,
+        bins: Optional[int] = None,
+        sample: Optional[float] = None,
+        num_bins: Optional[int] = None,
+        num_samples: Optional[int] = None,
+        sample_ratio: Optional[float] = None,
+    ):
+        r"""Initialize normalized mutual information loss term.
+
+        See `deepali.losses.functional.nmi_loss`.
+
+        """
+        super().__init__(
+            vmin=vmin,
+            vmax=vmax,
+            bins=bins,
+            sample=sample,
+            num_bins=num_bins,
+            num_samples=num_samples,
+            sample_ratio=sample_ratio,
+        )
+
+    def extra_repr(self) -> str:
+        return (
+            f"vmin={self.vmin!r}, "
+            f"vmax={self.vmax!r}, "
+            f"num_bins={self.num_bins!r}, "
+            f"num_samples={self.num_samples!r}, "
+            f"sampling_ratio={self.sample_ratio!r}"
+        )
 
 
 class PatchwiseImageLoss(PairwiseImageLoss):

@@ -649,13 +649,12 @@ def mi_loss(
     mask: Optional[Tensor] = None,
     vmin: Optional[float] = None,
     vmax: Optional[float] = None,
-    num_bins: int = 64,
-    sample_ratio: Optional[float] = None,
+    num_bins: Optional[int] = None,
     num_samples: Optional[int] = None,
-    normalized: bool = True,
+    sample_ratio: Optional[float] = None,
+    normalized: bool = False,
 ) -> Tensor:
-    r"""
-    Calculate mutual information loss using Parzen window density and entropy estimations
+    r"""Calculate mutual information loss using Parzen window density and entropy estimations.
 
     References:
     - Qiu, H., Qin, C., Schuh, A., Hammernik, K.: Learning Diffeomorphic and Modality-invariant Registration using B-splines. Medical Imaging with Deep Learning. (2021).
@@ -668,10 +667,13 @@ def mi_loss(
         vmin: Minimal intensity value the joint and marginal density is estimated.
         vmax: Maximal intensity value the joint and marginal density is estimated.
         num_bins: Number of bin edges to discretize the density estimation.
-        sample_ratio: Ratio of voxels in the image domain randomly sampled to compute the loss.
         num_samples: Number of voxels in the image domain randomly sampled to compute the loss,
             ignored if `sample_ratio` is also set.
+        sample_ratio: Ratio of voxels in the image domain randomly sampled to compute the loss.
         normalized: Calculate Normalized Mutual Information instead of Mutual Information if True.
+
+    Returns:
+        Negative mutual information. If ``normalized=True``, 2 is added such that the loss value is in [0, 1].
 
     """
 
@@ -684,6 +686,10 @@ def mi_loss(
         vmin = torch.min(input.min(), target.min()).item()
     if vmax is None:
         vmax = torch.max(input.max(), target.max()).item()
+    if num_bins is None:
+        num_bins = 64
+    elif num_bins == "auto":
+        raise NotImplementedError("mi_loss() automatically setting num_bins based on dynamic range of input")
 
     # Flatten spatial dimensions of inputs
     shape = target.shape
@@ -705,20 +711,22 @@ def mi_loss(
             raise ValueError("mi_loss() 'sample_ratio' must be in open-closed interval (0, 1]")
         num_samples = max(1, int(sample_ratio * target.shape[2:].numel()))
     if num_samples is not None:
-        with torch.no_grad():
-            input, target = rand_sample([input, target], num_samples, mask=mask, replacement=True)
+        input, target = rand_sample([input, target], num_samples, mask=mask, replacement=True)
     elif mask is not None:
         input = input.mul(mask)
         target = target.mul(mask)
 
     # set the bin edges and Gaussian kernel std
     bin_width = (vmax - vmin) / num_bins  # FWHM is one bin width
-    sdev = bin_width * (1 / (2 * math.sqrt(2 * math.log(2))))
-    bins = torch.linspace(vmin, vmax, num_bins, requires_grad=False).unsqueeze(1).type_as(input)
+    bin_center = torch.linspace(vmin, vmax, num_bins, requires_grad=False)
+    bin_center = bin_center.unsqueeze(1).type_as(input)
 
     # calculate Parzen window function response
+    pw_sdev = bin_width * (1 / (2 * math.sqrt(2 * math.log(2))))
+    pw_norm = 1 / math.sqrt(2 * math.pi) * pw_sdev
+
     def parzen_window_fn(x: Tensor) -> Tensor:
-        return torch.exp(-((x - bins) ** 2) / (2 * sdev**2)) / (math.sqrt(2 * math.pi) * sdev)
+        return x.sub(bin_center).square().div(2 * pw_sdev**2).neg().exp().mul(pw_norm)
 
     pw_input = parzen_window_fn(input)  # (N, #bins, H*W*D)
     pw_target = parzen_window_fn(target)
@@ -740,8 +748,31 @@ def mi_loss(
     if normalized:
         loss = 2 - torch.mean((ent_input + ent_target) / ent_joint)
     else:
-        loss = -torch.mean(ent_input + ent_target - ent_joint)
+        loss = torch.mean(ent_input + ent_target - ent_joint).neg()
     return loss
+
+
+def nmi_loss(
+    input: Tensor,
+    target: Tensor,
+    mask: Optional[Tensor] = None,
+    vmin: Optional[float] = None,
+    vmax: Optional[float] = None,
+    num_bins: Optional[int] = None,
+    num_samples: Optional[int] = None,
+    sample_ratio: Optional[float] = None,
+) -> Tensor:
+    return mi_loss(
+        input,
+        target,
+        mask=mask,
+        vmin=vmin,
+        vmax=vmax,
+        num_bins=num_bins,
+        num_samples=num_samples,
+        sample_ratio=sample_ratio,
+        normalized=True,
+    )
 
 
 def grad_loss(

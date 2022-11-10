@@ -37,6 +37,7 @@ from .flow import TotalVariation, TV
 
 from .image import PatchwiseImageLoss, PatchLoss
 from .image import LCC, LNCC
+from .image import MI, NMI
 from .image import MSE
 from .image import SSD
 
@@ -83,7 +84,9 @@ __all__ = (
     "LPD",
     "LCC",
     "LNCC",
+    "MI",
     "MSE",
+    "NMI",
     "Sparsity",
     "SSD",
     "TotalVariation",
