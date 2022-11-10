@@ -2,7 +2,8 @@ r"""Apply spatial transformations."""
 
 from __future__ import annotations
 
-from typing import Dict, Optional, Tuple, Union, overload
+from copy import copy as shallow_copy
+from typing import Dict, Optional, Tuple, Union, cast, overload
 
 from torch import Tensor
 from torch.nn import Module
@@ -77,6 +78,33 @@ class ImageTransform(Module):
         self.register_buffer("grid_coords", grid_coords, persistent=False)
         self.flip_coords = bool(flip_coords)
 
+    @overload
+    def condition(self) -> Tuple[tuple, dict]:
+        r"""Get arguments on which transformation is conditioned.
+
+        Returns:
+            args: Positional arguments.
+            kwargs: Keyword arguments.
+
+        """
+        ...
+
+    @overload
+    def condition(self, *args, **kwargs) -> ImageTransform:
+        r"""Get new transformation which is conditioned on the specified arguments."""
+        ...
+
+    def condition(self, *args, **kwargs) -> Union[ImageTransform, Tuple[tuple, dict]]:
+        r"""Get or set data tensors and parameters on which transformation is conditioned."""
+        if args:
+            return shallow_copy(self).condition_(*args)
+        return self._transform.condition()
+
+    def condition_(self, *args, **kwargs) -> ImageTransform:
+        r"""Set data tensors and parameters on which this transformation is conditioned."""
+        self._transform.condition_(*args, **kwargs)
+        return self
+
     @property
     def transform(self: ImageTransform) -> SpatialTransform:
         r"""Spatial grid transformation."""
@@ -87,13 +115,13 @@ class ImageTransform(Module):
         r"""Source image sampler."""
         return self._sample
 
-    def target(self: ImageTransform) -> Grid:
+    def target_grid(self: ImageTransform) -> Grid:
         r"""Sampling grid of output images."""
-        return self._sample.target()
+        return self._sample.target_grid()
 
-    def source(self: ImageTransform) -> Grid:
+    def source_grid(self: ImageTransform) -> Grid:
         r"""Sampling grid of input images."""
-        return self._sample.source()
+        return self._sample.source_grid()
 
     def align_centers(self: ImageTransform) -> bool:
         r"""Whether grid center points are implicitly aligned."""
@@ -110,20 +138,23 @@ class ImageTransform(Module):
         ...
 
     @overload
-    def forward(self: ImageTransform, input: Dict[str, Tensor]) -> Dict[str, Tensor]:
+    def forward(
+        self: ImageTransform, data: Dict[str, Union[Tensor, Grid]]
+    ) -> Dict[str, Union[Tensor, Grid]]:
         r"""Sample batch of optionally masked images at spatially transformed target grid points."""
         ...
 
     def forward(
         self: ImageTransform,
-        input: Union[Tensor, Dict[str, Union[Tensor, Grid]]],
+        data: Union[Tensor, Dict[str, Union[Tensor, Grid]]],
         mask: Optional[Tensor] = None,
     ) -> Union[Tensor, Tuple[Tensor, Tensor], Dict[str, Union[Tensor, Grid]]]:
         r"""Sample batch of images at spatially transformed target grid points."""
-        grid = self._transform(self.grid_coords, grid=True)
+        grid: Tensor = cast(Tensor, self.grid_coords)
+        grid = self._transform(grid, grid=True)
         if self.flip_coords:
             grid = grid.flip((-1,))
-        return self._sample(grid, input, mask)
+        return self._sample(grid, data, mask)
 
     def extra_repr(self: ImageTransform) -> str:
         return f"transform={self.transform!r}" + self.sample.extra_repr()

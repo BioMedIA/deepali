@@ -1,6 +1,6 @@
 r"""Modules for sampling of image data, e.g., after spatial transformation."""
 
-from typing import Dict, Mapping, Optional, Tuple, Union, overload
+from typing import Dict, Mapping, Optional, Tuple, Union, cast, overload
 
 from torch import Tensor
 from torch.nn import Module
@@ -53,17 +53,17 @@ class SampleImage(Module):
         # Precompute target points to source cube transformation **AFTER** attributes are set!
         self.register_buffer("matrix", self._matrix())
 
-    def target(self) -> Grid:
-        r"""Target sampling grid."""
-        return self._target
-
-    def source(self) -> Grid:
-        r"""Source sampling grid."""
-        return self._source
-
     def axes(self) -> Axes:
         r"""Axes with respect to which target grid points and transformations thereof are defined."""
         return self._axes
+
+    def target_grid(self) -> Grid:
+        r"""Target sampling grid."""
+        return self._target
+
+    def source_grid(self) -> Grid:
+        r"""Source sampling grid."""
+        return self._source
 
     def sampling(self) -> Sampling:
         r"""Image sampling mode."""
@@ -101,7 +101,7 @@ class SampleImage(Module):
 
     def _transform_target_to_source(self, grid: Tensor) -> Tensor:
         r"""Transform target grid points to source cube."""
-        matrix: Tensor = self.matrix
+        matrix = cast(Tensor, self.matrix)
         return homogeneous_transform(matrix, grid)
 
     def _sample_source_image(
@@ -141,7 +141,7 @@ class SampleImage(Module):
         elif input is None:
             if data is None and mask is None:
                 raise ValueError(
-                    f"{type(self).__name__()} 'input', 'data', and/or 'mask' is required"
+                    f"{type(self).__name__} 'input', 'data', and/or 'mask' is required"
                 )
         else:
             raise TypeError(
@@ -188,13 +188,8 @@ class SampleImage(Module):
         return output["data"], output["mask"]
 
     @overload
-    def forward(self, grid: Tensor, data: Tensor) -> Tensor:
+    def forward(self, grid: Tensor, input: Tensor, data=None, mask=None) -> Tensor:
         r"""Sample batch of images at spatially transformed target grid points."""
-        ...
-
-    @overload
-    def forward(self, grid: Tensor, data: Tensor, mask: Tensor) -> Tuple[Tensor, Tensor]:
-        r"""Sample batch of masked images at spatially transformed target grid points."""
         ...
 
     @overload
@@ -279,7 +274,7 @@ class TransformImage(SampleImage):
         mask: Optional[Tensor] = None,
     ) -> Union[Tensor, Tuple[Tensor, Tensor], Dict[str, Tensor]]:
         r"""Sample images at transformed target grid points after mapping these to the source grid cube."""
-        grid: Tensor = self.grid
+        grid = cast(Tensor, self.grid)
         if isinstance(transform, Tensor):
             if transform.ndim == grid.shape[-1] + 1:
                 transform = transform.unsqueeze(0)
@@ -343,13 +338,13 @@ class AlignImage(SampleImage):
         mask: Optional[Tensor] = None,
     ) -> Union[Tensor, Tuple[Tensor, Tensor], Dict[str, Tensor]]:
         r"""Sample batch of optionally masked images at linearly transformed target grid points."""
-        composite_transform: Tensor = self.matrix
+        composite_transform = cast(Tensor, self.matrix)
         if transform is not None:
             if not isinstance(transform, Tensor):
                 raise TypeError("AlignImage() 'transform' must be Tensor")
             if transform.ndim != 3:
                 raise ValueError("AlignImage() 'transform' must be 3-dimensional tensor")
             composite_transform = homogeneous_matmul(composite_transform, transform)
-        grid: Tensor = self.grid
+        grid = cast(Tensor, self.grid)
         grid = homogeneous_transform(composite_transform, grid)
         return self._sample_source_image(grid, input=input, data=data, mask=mask)
