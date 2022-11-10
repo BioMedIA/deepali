@@ -10,7 +10,7 @@ from .types import Array, Device, Scalar
 
 
 def as_tensor(
-    arg: Array, dtype: Optional[torch.dtype] = None, device: Optional[Device] = None
+    arg: Union[Scalar, Array], dtype: Optional[torch.dtype] = None, device: Optional[Device] = None
 ) -> Tensor:
     r"""Create tensor from array if argument is not of type torch.Tensor.
 
@@ -19,7 +19,7 @@ def as_tensor(
     """
     if device is None and isinstance(arg, Tensor):
         device = arg.device
-    return torch.as_tensor(arg, dtype=dtype, device=device)
+    return torch.as_tensor(arg, dtype=dtype, device=device)  # type: ignore
 
 
 def as_float_tensor(arr: Array) -> Tensor:

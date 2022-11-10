@@ -186,6 +186,7 @@ class Grid(object):
         else:
             self.center_(center)
             with torch.no_grad():
+                origin = cat_scalars(origin, num=self.ndim, dtype=self.dtype, device=self.device)
                 if not torch.allclose(origin, self.origin()):
                     raise ValueError("Grid() 'center' and 'origin' are inconsistent")
         # Default align_corners option argument for grid resizing operations
@@ -275,7 +276,9 @@ class Grid(object):
 
     @classmethod
     def from_reader(
-        cls, reader: "sitk.ImageFileReader", align_corners: bool = ALIGN_CORNERS
+        cls,
+        reader: "sitk.ImageFileReader",  # type: ignore
+        align_corners: bool = ALIGN_CORNERS,
     ) -> Grid:
         r"""Create sampling grid from image file reader attributes."""
         return cls(
@@ -287,7 +290,11 @@ class Grid(object):
         )
 
     @classmethod
-    def from_sitk(cls, image: "sitk.Image", align_corners: bool = ALIGN_CORNERS) -> Grid:
+    def from_sitk(
+        cls,
+        image: "sitk.Image",  # type: ignore
+        align_corners: bool = ALIGN_CORNERS,
+    ) -> Grid:
         r"""Create sampling grid from ``SimpleITK.Image`` attributes."""
         return cls(
             size=image.GetSize(),
@@ -438,9 +445,15 @@ class Grid(object):
         r"""Get new grid with specified center point in world space."""
         ...
 
-    def center(self, *args) -> Union[Tensor, Grid]:
+    def center(self, arg: Union[float, Array, None] = None, *args: float) -> Union[Tensor, Grid]:
         r"""Get center point in world space or new grid with specified center point, respectively."""
-        return shallow_copy(self).center_(*args) if args else self._center
+        if arg is None:
+            if args:
+                raise ValueError(
+                    f"{type(self).__name__}.center() 'args' cannot be given when first 'arg' is None"
+                )
+            return self._center
+        return shallow_copy(self).center_(arg, *args)
 
     def center_(self, arg: Union[float, Array], *args: float) -> Grid:
         r"""Set grid center point in world space."""
@@ -457,14 +470,18 @@ class Grid(object):
         r"""Get new grid with specified world coordinates of grid point at index zero."""
         ...
 
-    def origin(self, *args) -> Union[Tensor, Grid]:
+    def origin(self, arg: Union[float, Array, None] = None, *args: float) -> Union[Tensor, Grid]:
         r"""Get grid origin in world space or new grid with specified origin, respectively."""
-        if args:
-            return shallow_copy(self).origin_(*args)
-        size = self.size_tensor()
-        offset = torch.where(size.gt(0), size.sub(1), size).div(2)
-        offset = torch.matmul(self.affine(), offset)
-        return self._center.sub(offset)
+        if arg is None:
+            if args:
+                raise ValueError(
+                    f"{type(self).__name__}.origin() 'args' cannot be given when first 'arg' is None"
+                )
+            size = self.size_tensor()
+            offset = torch.where(size.gt(0), size.sub(1), size).div(2)
+            offset = torch.matmul(self.affine(), offset)
+            return self._center.sub(offset)
+        return shallow_copy(self).origin_(arg, *args)
 
     def origin_(self, arg: Union[float, Array], *args: float) -> Grid:
         r"""Set world coordinates of grid point with zero index."""
@@ -485,9 +502,15 @@ class Grid(object):
         r"""Get new grid with specified spacing between grid points in world units."""
         ...
 
-    def spacing(self, *args) -> Union[Tensor, Grid]:
+    def spacing(self, arg: Union[float, Array, None] = None, *args: float) -> Union[Tensor, Grid]:
         r"""Get spacing between grid points in world units or new grid with specified spacing, respectively."""
-        return shallow_copy(self).spacing_(*args) if args else self._spacing
+        if arg is None:
+            if args:
+                raise ValueError(
+                    f"{type(self).__name__}.spacing() 'args' cannot be given when first 'arg' is None"
+                )
+            return self._spacing
+        return shallow_copy(self).spacing_(arg, *args)
 
     def spacing_(self, arg: Union[float, Array], *args: float) -> Grid:
         r"""Set spacing between grid points in physical world units."""
@@ -507,9 +530,15 @@ class Grid(object):
         r"""Get new grid with specified axes direction cosines."""
         ...
 
-    def direction(self, *args) -> Union[Tensor, Grid]:
+    def direction(self, arg: Union[float, Array, None] = None, *args: float) -> Union[Tensor, Grid]:
         r"""Get grid axes direction cosines matrix or new grid with specified direction, respectively."""
-        return shallow_copy(self).direction_(*args) if args else self._direction
+        if arg is None:
+            if args:
+                raise ValueError(
+                    f"{type(self).__name__}.direction() 'args' cannot be given when first 'arg' is None"
+                )
+            return self._direction
+        return shallow_copy(self).direction_(arg, *args)
 
     def direction_(self, arg: Union[float, Array], *args: float) -> Grid:
         r"""Set grid axes direction cosines matrix of this grid."""
@@ -1131,6 +1160,10 @@ class Grid(object):
         elif spacing == "max":
             assert not args
             spacing = self._spacing.max()
+        elif isinstance(spacing, str):
+            raise ValueError(
+                f"{type(self).__name__}.resample() 'spacing' str must be 'min' or 'max'"
+            )
         spacing = cat_scalars(spacing, *args, num=self.ndim, dtype=self.dtype, device=self.device)
         if torch.allclose(spacing, self._spacing):
             return self
@@ -1170,15 +1203,16 @@ class Grid(object):
             raise NotImplementedError("Grid.pool() 'padding' currently not supported")
         if dilation != 1:
             raise NotImplementedError("Grid.pool() 'dilation' currently not supported")
-        size = self.size_tensor() / kernel_size
+        ks = cat_scalars(kernel_size, num=self.ndim, dtype=self.dtype, device=self.device)
+        size = self.size_tensor() / ks
         size = size.ceil() if ceil_mode else size.floor()
         size = size.type(torch.int)
         grid = Grid(
             size=size,
-            origin=self.index_to_world([(kernel_size - 1) / 2] * 3),
-            spacing=kernel_size * self.spacing(),
+            origin=self.index_to_world(ks.sub(1).div(2)),
+            spacing=self.spacing().mul(ks),
             direction=self.direction(),
-            align_corners=self.align_corners,
+            align_corners=self.align_corners(),
             device=self.device,
         )
         return grid
@@ -1333,8 +1367,8 @@ class Grid(object):
         if isinstance(margin, int):
             num = margin
         elif margin is not None:
-            num = ((n, n) for n in margin)
-            num = tuple(n for nn in num for n in nn)
+            num = tuple(n for n_n in ((n, n) for n in margin) for n in n_n)
+        assert num is not None
         if isinstance(num, int):
             num = (num,) * (2 * self.ndim)
         else:
@@ -1353,7 +1387,7 @@ class Grid(object):
             origin=origin,
             spacing=self.spacing(),
             direction=self.direction(),
-            align_corners=self.align_corners,
+            align_corners=self.align_corners(),
             device=self.device,
         )
 
@@ -1389,8 +1423,8 @@ class Grid(object):
         if isinstance(margin, int):
             num = margin
         elif margin is not None:
-            num = ((n, n) for n in margin)
-            num = tuple(n for nn in num for n in nn)
+            num = tuple(n for n_n in ((n, n) for n in margin) for n in n_n)
+        assert num is not None
         if isinstance(num, int):
             num = (num,) * (2 * self.ndim)
         else:
@@ -1409,7 +1443,7 @@ class Grid(object):
             origin=origin,
             spacing=self.spacing(),
             direction=self.direction(),
-            align_corners=self.align_corners,
+            align_corners=self.align_corners(),
             device=self.device,
         )
 
@@ -1427,7 +1461,7 @@ class Grid(object):
             origin=self.index_to_world(origin),
             spacing=self.spacing(),
             direction=self.direction(),
-            align_corners=self.align_corners,
+            align_corners=self.align_corners(),
             device=self.device,
         )
 
@@ -1445,7 +1479,7 @@ class Grid(object):
             origin=self.index_to_world(origin),
             spacing=self.spacing(),
             direction=self.direction(),
-            align_corners=self.align_corners,
+            align_corners=self.align_corners(),
             device=self.device,
         )
 
@@ -1460,7 +1494,7 @@ class Grid(object):
             origin=self.index_to_world(origin),
             spacing=self.spacing(),
             direction=self.direction(),
-            align_corners=self.align_corners,
+            align_corners=self.align_corners(),
             device=self.device,
         )
 
