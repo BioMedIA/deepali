@@ -35,7 +35,11 @@ def multinomial(
     num_candidates = input.size(-1)
     if not replacement and num_candidates < num_samples:
         raise ValueError("multinomial() 'num_samples' cannot be greater than number of categories")
-    impl = _multinomial if num_candidates > 2**24 else torch.multinomial
+    if num_candidates > 2**24:
+        impl = _multinomial
+    else:
+        impl = torch.multinomial
+        input = input.float()
     return impl(input, num_samples, replacement=replacement, generator=generator, out=out)
 
 
