@@ -30,6 +30,9 @@ from .sample import AlignImage
 from .sample import SampleImage
 from .sample import TransformImage
 
+from .utilities import remove_layers_in_state_dict
+from .utilities import rename_layers_in_state_dict
+
 
 __all__ = (
     "AlignImage",
@@ -49,4 +52,6 @@ __all__ = (
     "ToImmutableOutput",
     "TransformImage",
     "View",
+    "remove_layers_in_state_dict",
+    "rename_layers_in_state_dict",
 )
