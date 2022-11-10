@@ -5,7 +5,7 @@ Data:
 - [x] Implement `Image.split`, `ImageBatch.split`, `FlowField.split`, and `FlowFields.split` such that return value is of same Tensor subclass type with adjusted spatial grid in case of a split along a spatial image dimension.
 
 Loss functions:
-- [ ] Normalized mutual information.
+- [x] Normalized mutual information.
 
 Data transforms:
 - [ ] Basic data augmentations.
