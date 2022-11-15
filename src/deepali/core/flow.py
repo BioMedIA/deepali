@@ -152,6 +152,40 @@ def expv(
     return disp
 
 
+def jacobian_det(u: torch.Tensor, mode: str = "central", channels_last: bool = False) -> Tensor:
+    r"""Evaluate Jacobian determinant of given flow field using finite difference approximations.
+
+    Note that for differentiable parametric spatial transformation models, an accurate Jacobian could
+    be calculated instead from the given transformation parameters. See for example ``cubic_bspline_jacobian_det()``
+    which is specialized for a free-form deformation (FFD) determined by a continuous cubic B-spline function.
+
+    Args:
+        u: Input vector field as tensor of shape ``(N, D, ..., X)`` when ``channels_last=False`` and
+            shape ``(N, ..., X, D)`` when ``channels_last=True``.
+        mode: Mode of ``spatial_derivatives()`` to use for approximating spatial partial derivatives.
+        channels_last: Whether input vector field has vector (channels) dimension at second or last index.
+
+    Returns:
+        Scalar field of approximate Jacobian determinant values as tensor of shape ``(N, 1, ..., X)`` when
+        ``channels_last=False`` and ``(N, ..., X, 1)`` when ``channels_last=True``.
+
+    """
+    if u.ndim < 4:
+        shape_str = "(N, ..., X, D)" if channels_last else "(N, D, ..., X)"
+        raise ValueError(f"jacobian_det() 'u' must be dense vector field of shape {shape_str}")
+    shape = u.shape[1:-1] if channels_last else u.shape[2:]
+    mat = torch.empty((u.shape[0],) + shape + (3, 3), dtype=u.dtype, device=u.device)
+    for i, which in enumerate(("x", "y", "z")):
+        deriv = spatial_derivatives(u, mode=mode, which=which)[which]
+        if not channels_last:
+            deriv = move_dim(deriv, 1, -1)
+        mat[..., i] = deriv
+    for i in range(mat.shape[-1]):
+        mat[..., i, i].add_(1)
+    jac = mat.det().unsqueeze_(-1 if channels_last else 1)
+    return jac
+
+
 def normalize_flow(
     data: Tensor,
     size: Optional[Union[Tensor, torch.Size]] = None,

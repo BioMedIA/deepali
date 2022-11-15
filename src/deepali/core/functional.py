@@ -99,6 +99,7 @@ from .flow import affine_flow
 from .flow import compose_flows
 from .flow import denormalize_flow
 from .flow import expv
+from .flow import jacobian_det
 from .flow import normalize_flow
 from .flow import sample_flow
 from .flow import warp_grid
@@ -206,6 +207,7 @@ __all__ = (
     "grid_resize",
     "grid_sample",
     "grid_sample_mask",
+    "jacobian_det",
     "max_pool",
     "min_pool",
     "normalize_flow",
