@@ -206,10 +206,17 @@ class Grid(object):
 
     @classmethod
     def from_numpy(
-        cls, attrs: Sequence[float], origin: bool = False, align_corners: bool = ALIGN_CORNERS
+        cls,
+        attrs: Union[Sequence[float], np.ndarray],
+        origin: bool = False,
+        align_corners: bool = ALIGN_CORNERS,
     ) -> Grid:
         r"""Create Grid from 1-dimensional NumPy array."""
-        return cls.from_seq(attrs, origin=origin, align_corners=align_corners)
+        if isinstance(attrs, np.ndarray):
+            seq = attrs.astype(float).tolist()
+        else:
+            seq = attrs
+        return cls.from_seq(seq, origin=origin, align_corners=align_corners)
 
     @classmethod
     def from_seq(

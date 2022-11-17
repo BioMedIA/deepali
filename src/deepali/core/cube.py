@@ -87,9 +87,13 @@ class Cube(object):
         )
 
     @classmethod
-    def from_numpy(cls, attrs: Sequence[float], origin: bool = False) -> Cube:
+    def from_numpy(cls, attrs: Union[Sequence[float], np.ndarray], origin: bool = False) -> Cube:
         r"""Create Cube from 1-dimensional NumPy array."""
-        return cls.from_seq(attrs, origin=origin)
+        if isinstance(attrs, np.ndarray):
+            seq = attrs.astype(float).tolist()
+        else:
+            seq = attrs
+        return cls.from_seq(seq, origin=origin)
 
     @classmethod
     def from_seq(cls, attrs: Sequence[float], origin: bool = False) -> Cube:
