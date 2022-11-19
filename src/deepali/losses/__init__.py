@@ -36,6 +36,7 @@ from .flow import Elasticity
 from .flow import TotalVariation, TV
 
 from .image import PatchwiseImageLoss, PatchLoss
+from .image import Dice, DSC
 from .image import LCC, LNCC
 from .image import MI, NMI
 from .image import MSE
@@ -74,7 +75,9 @@ __all__ = (
     "ClosestPointDistance",
     "CPD",
     "Curvature",
+    "Dice"
     "Diffusion",
+    "DSC",
     "Elasticity",
     "L1Norm",
     "L1_Norm",

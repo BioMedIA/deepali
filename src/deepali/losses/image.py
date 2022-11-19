@@ -12,6 +12,24 @@ from .base import PairwiseImageLoss
 from . import functional as L
 
 
+class Dice(PairwiseImageLoss):
+    r"""Generalized Sorensen-Dice similarity coefficient."""
+
+    def __init__(self, epsilon: float = 1e-15) -> None:
+        super().__init__()
+        self.epsilon = epsilon
+
+    def forward(self, source: Tensor, target: Tensor, mask: Optional[Tensor] = None) -> Tensor:
+        r"""Evaluate image dissimilarity loss."""
+        return L.dice_loss(source, target, weight=mask, epsilon=self.epsilon)
+
+    def extra_repr(self) -> str:
+        return f"epsilon={self.epsilon:.2e}"
+
+
+DSC = Dice
+
+
 class LCC(PairwiseImageLoss):
     r"""Local normalized cross correlation."""
 
