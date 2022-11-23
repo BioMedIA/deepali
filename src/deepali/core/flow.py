@@ -372,8 +372,8 @@ def warp_points(flow: Tensor, coords: Tensor, align_corners: bool = ALIGN_CORNER
         Tensor of shape ``(N, ..., D)`` with coordinates of spatially transformed points.
 
     """
+    x = coords
     u = sample_flow(flow, coords, align_corners=align_corners)
-    x = coords.reshape_as(u)
     y = x + u
     return y
 
