@@ -1037,6 +1037,8 @@ def grid_resize(
     grid = grid.resize(size_)
     if grid.shape == data.shape[2:]:
         return data
+    if mode_ in ("area", "nearest", "nearest-exact"):
+        align_corners = None
     return F.interpolate(data, size=grid.shape, mode=mode_, align_corners=align_corners)
 
 
