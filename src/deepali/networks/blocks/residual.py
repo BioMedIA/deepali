@@ -2,16 +2,17 @@ r"""Blocks of network layers with residual skip connections."""
 
 from __future__ import annotations
 
-from typing import Any, Mapping, Optional, Tuple, Union
+from typing import Any, Mapping, Optional, Union
 
 import torch
-from torch.nn import Identity, Sequential, init
+from torch.nn import Identity, Module, Sequential, init
 
 from ...core.enum import PaddingMode
 from ...core.types import ScalarOrTuple
 
-from ..layers.acti import ActivationFunc, activation
+from ..layers.acti import ActivationArg, activation
 from ..layers.conv import ConvLayer, convolution, same_padding
+from ..layers.norm import NormArg
 from ..layers.join import JoinLayer
 
 from .skip import SkipConnection, SkipFunc
@@ -48,8 +49,8 @@ class ResidualUnit(SkipConnection):
         groups: int = 1,
         init: str = "default",
         bias: Optional[Union[bool, str]] = False,
-        norm: Union[str, Tuple[str, Mapping[str, Any]], Tuple[str, int]] = "batch",
-        acti: Union[ActivationFunc, str, Tuple[str, Mapping[str, Any]]] = "relu",
+        norm: NormArg = "batch",
+        acti: ActivationArg = "relu",
         skip: Optional[Union[SkipFunc, str, Mapping[str, Any]]] = "identity | conv1 | conv",
         num_layers: Optional[int] = None,
         order: str = "cna",
@@ -150,6 +151,7 @@ class ResidualUnit(SkipConnection):
                 other_layer = getattr(other.residual, name)
                 assert isinstance(other_layer, ConvLayer)
                 other_conv = other_layer.conv
+                assert isinstance(other_conv, Module)
             if pre_conv == "conv":
                 pre_kernel_size = kernel_size
             elif pre_conv == "conv1":
@@ -180,6 +182,7 @@ class ResidualUnit(SkipConnection):
                 other_layer = getattr(other.residual, name)
                 assert isinstance(other_layer, ConvLayer)
                 other_conv = other_layer.conv
+                assert isinstance(other_conv, Module)
             conv = ConvLayer(
                 spatial_dims=spatial_dims,
                 in_channels=in_channels if is_first_layer else num_channels,
@@ -206,6 +209,7 @@ class ResidualUnit(SkipConnection):
                 other_layer = getattr(other.residual, name)
                 assert isinstance(other_layer, ConvLayer)
                 other_conv = other_layer.conv
+                assert isinstance(other_conv, Module)
             if post_conv == "conv":
                 post_kernel_size = kernel_size
             elif post_conv == "conv1":

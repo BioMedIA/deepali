@@ -238,12 +238,17 @@ def same_padding(kernel_size: int, dilation: int = 1) -> int:
 
 
 @overload
-def same_padding(kernel_size: Sequence[int], dilation: int = 1) -> Tuple[int, ...]:
+def same_padding(kernel_size: Tuple[int, ...], dilation: int = 1) -> Tuple[int, ...]:
     ...
 
 
 @overload
-def same_padding(kernel_size: int, dilation: Sequence[int] = 1) -> Tuple[int, ...]:
+def same_padding(kernel_size: int, dilation: Tuple[int, ...]) -> Tuple[int, ...]:
+    ...
+
+
+@overload
+def same_padding(kernel_size: Tuple[int, ...], dilation: Tuple[int, ...]) -> Tuple[int, ...]:
     ...
 
 
