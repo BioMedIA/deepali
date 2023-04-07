@@ -41,7 +41,10 @@ from .image import Dice, DSC
 from .image import LCC, LNCC
 from .image import SLCC, WLCC
 from .image import MI, NMI
-from .image import MSE
+from .image import MAE, L1ImageLoss
+from .image import HuberImageLoss
+from .image import SmoothL1ImageLoss
+from .image import MSE, L2ImageLoss
 from .image import SSD
 
 from .params import L1Norm, L1_Norm
@@ -82,6 +85,9 @@ __all__ = (
     "Divergence",
     "DSC",
     "Elasticity",
+    "HuberImageLoss",
+    "L1ImageLoss",
+    "L2ImageLoss",
     "L1Norm",
     "L1_Norm",
     "L2Norm",
@@ -90,10 +96,12 @@ __all__ = (
     "LPD",
     "LCC",
     "LNCC",
+    "MAE",
     "MI",
     "MSE",
     "NMI",
     "SLCC",
+    "SmoothL1ImageLoss",
     "Sparsity",
     "SSD",
     "TotalVariation",

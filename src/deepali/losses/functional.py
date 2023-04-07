@@ -1,13 +1,14 @@
 r"""Loss functions, evaluation metrics, and related utilities."""
 
 import itertools
-from typing import Optional, Sequence, Union
+from typing import Protocol, Optional, Sequence, Tuple, Union
 
 import math
 
 import torch
 from torch import Tensor
 from torch.nn.functional import binary_cross_entropy_with_logits, logsigmoid
+import torch.nn.functional as F
 
 from ..core.bspline import evaluate_cubic_bspline
 from ..core.enum import SpatialDerivativeKeys
@@ -28,6 +29,7 @@ __all__ = (
     "dice_loss",
     "kld_loss",
     "lcc_loss",
+    "mae_loss",
     "mse_loss",
     "ssd_loss",
     "mi_loss",
@@ -54,6 +56,13 @@ __all__ = (
     "reduce_loss",
     "wlcc_loss",
 )
+
+
+class ElementwiseLoss(Protocol):
+    r"""Type annotation of a eleemntwise loss function."""
+
+    def __call__(self, input: Tensor, target: Tensor, reduction: str = "mean") -> Tensor:
+        ...
 
 
 def label_smoothing(
@@ -719,6 +728,130 @@ def wlcc_loss(
     return loss
 
 
+def huber_loss(
+    input: Tensor,
+    target: Tensor,
+    mask: Optional[Tensor] = None,
+    norm: Optional[Union[float, Tensor]] = None,
+    reduction: str = "mean",
+    delta: float = 1.0,
+) -> Tensor:
+    r"""Normalized masked Huber loss.
+
+    Args:
+        input: Source image sampled on ``target`` grid.
+        target: Target image with same shape as ``input``.
+        mask: Multiplicative mask with same shape as ``input``.
+        norm: Positive factor by which to divide loss value.
+        reduction: Whether to compute "mean" or "sum" over all grid points.
+            If "none", output tensor shape is equal to the shape of the input tensors.
+        delta: Specifies the threshold at which to change between delta-scaled L1 and L2 loss.
+
+    Returns:
+        Masked, aggregated, and normalized Huber loss.
+
+    """
+
+    def loss_fn(input: Tensor, target: Tensor, reduction: str = "mean") -> Tensor:
+        return F.huber_loss(input, target, reduction=reduction, delta=delta)
+
+    return elementwise_loss(
+        "huber_loss", loss_fn, input, target, mask=mask, norm=norm, reduction=reduction
+    )
+
+
+def smooth_l1_loss(
+    input: Tensor,
+    target: Tensor,
+    mask: Optional[Tensor] = None,
+    norm: Optional[Union[float, Tensor]] = None,
+    reduction: str = "mean",
+    beta: float = 1.0,
+) -> Tensor:
+    r"""Normalized masked smooth L1 loss.
+
+    Args:
+        input: Source image sampled on ``target`` grid.
+        target: Target image with same shape as ``input``.
+        mask: Multiplicative mask with same shape as ``input``.
+        norm: Positive factor by which to divide loss value.
+        reduction: Whether to compute "mean" or "sum" over all grid points.
+            If "none", output tensor shape is equal to the shape of the input tensors.
+        delta: Specifies the threshold at which to change between delta-scaled L1 and L2 loss.
+
+    Returns:
+        Masked, aggregated, and normalized smooth L1 loss.
+
+    """
+
+    def loss_fn(input: Tensor, target: Tensor, reduction: str = "mean") -> Tensor:
+        return F.smooth_l1_loss(input, target, reduction=reduction, beta=beta)
+
+    return elementwise_loss(
+        "smooth_l1_loss", loss_fn, input, target, mask=mask, norm=norm, reduction=reduction
+    )
+
+
+def l1_loss(
+    input: Tensor,
+    target: Tensor,
+    mask: Optional[Tensor] = None,
+    norm: Optional[Union[float, Tensor]] = None,
+    reduction: str = "mean",
+) -> Tensor:
+    r"""Normalized mean absolute error.
+
+    Args:
+        input: Source image sampled on ``target`` grid.
+        target: Target image with same shape as ``input``.
+        mask: Multiplicative mask with same shape as ``input``.
+        norm: Positive factor by which to divide loss value.
+        reduction: Whether to compute "mean" or "sum" over all grid points.
+            If "none", output tensor shape is equal to the shape of the input tensors.
+
+    Returns:
+        Normalized mean absolute error.
+
+    """
+
+    def loss_fn(input: Tensor, target: Tensor, reduction: str = "mean") -> Tensor:
+        return F.l1_loss(input, target, reduction=reduction)
+
+    return elementwise_loss(
+        "l1_loss", loss_fn, input, target, mask=mask, norm=norm, reduction=reduction
+    )
+
+
+def mae_loss(
+    input: Tensor,
+    target: Tensor,
+    mask: Optional[Tensor] = None,
+    norm: Optional[Union[float, Tensor]] = None,
+    reduction: str = "mean",
+) -> Tensor:
+    r"""Normalized mean absolute error.
+
+    Args:
+        input: Source image sampled on ``target`` grid.
+        target: Target image with same shape as ``input``.
+        mask: Multiplicative mask with same shape as ``input``.
+        norm: Positive factor by which to divide loss value.
+        reduction: Whether to compute "mean" or "sum" over all grid points.
+            If "none", output tensor shape is equal to the shape of the input tensors.
+
+    Returns:
+        Normalized mean absolute error.
+
+    """
+
+    def loss_fn(input: Tensor, target: Tensor, reduction: str = "mean") -> Tensor:
+        return F.l1_loss(input, target, reduction=reduction)
+
+    return elementwise_loss(
+        "mae_loss", loss_fn, input, target, mask=mask, norm=norm, reduction=reduction
+    )
+
+
 def mse_loss(
     input: Tensor,
     target: Tensor,
@@ -1330,6 +1463,50 @@ def inverse_consistency_loss(
             count = (mask != 0).sum()
         error /= count
     return error
+
+
+def elementwise_loss(
+    name: str,
+    loss_fn: ElementwiseLoss,
+    input: Tensor,
+    target: Tensor,
+    mask: Optional[Tensor] = None,
+    norm: Optional[Union[float, Tensor]] = None,
+    reduction: str = "mean",
+) -> Tensor:
+    r"""Evaluate, aggregate, and normalize elementwise loss, optionally within masked region.
+
+    Args:
+        input: Source image sampled on ``target`` grid.
+        target: Target image with same shape as ``input``.
+        mask: Multiplicative mask with same shape as ``input``.
+        norm: Positive factor by which to divide loss value.
+        reduction: Whether to compute "mean" or "sum" over all grid points.
+            If "none", output tensor shape is equal to the shape of the input tensors.
+
+    Returns:
+        Aggregated normalized loss value.
+
+    """
+    if not isinstance(input, Tensor):
+        raise TypeError(f"{name}() 'input' must be tensor")
+    if not isinstance(target, Tensor):
+        raise TypeError(f"{name}() 'target' must be tensor")
+    if input.shape != target.shape:
+        raise ValueError(f"{name}() 'input' must have same shape as 'target'")
+    if mask is None:
+        loss = loss_fn(input, target, reduction=reduction)
+    else:
+        loss = loss_fn(input, target, reduction="none")
+        loss = masked_loss(loss, mask, name)
+        loss = reduce_loss(loss, reduction, mask)
+    if norm is not None:
+        norm = torch.as_tensor(norm, dtype=loss.dtype, device=loss.device).squeeze()
+        if not norm.ndim == 0:
+            raise ValueError(f"{name}() 'norm' must be scalar")
+        if norm > 0:
+            loss = loss.div_(norm)
+    return loss
 
 
 def masked_loss(
