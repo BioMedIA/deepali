@@ -968,6 +968,7 @@ class Grid(object):
         center: bool = False,
         normalize: bool = True,
         align_corners: Optional[bool] = None,
+        channels_last: bool = True,
         flip: bool = False,
         dtype: Optional[torch.dtype] = None,
         device: Optional[Device] = None,
@@ -987,20 +988,25 @@ class Grid(object):
                 of ``torch.nn.functional.grid_sample()``, the same ``align_corners`` value
                 should be used for both ``Grid.coords()`` and ``grid_sample()`` calls.
                 If ``None``, use default ``self.align_corners()``.
+            channels_last: Whether to place stacked coordinates at last (``True``) or first (``False``)
+                output tensor dimension. Vector fields are represented with channels first after the
+                batch dimension, whereas point sets such as the sampling points passed to ``grid_sample``
+                are represented with point coordinates in the last tensor dimension.
             flip: Whether to return coordinates in the order (..., x) instead of (x, ...).
             dtype: Data type of coordinates. If ``None``, uses ``torch.int32`` as data type
                 for returned tensor if ``normalize=False``, and ``self.dtype`` otherwise.
             device: Device on which to create PyTorch tensor. If ``None``, use ``self.device``.
 
         Returns:
-            If ``dim`` is ``None``, returns a tensor of shape (...X, C), where C is the number of
-                spatial grid dimensions. If ``normalize=Falze`` and ``center=False``, the tensor values
-                are the multi-dimensional indices in the closed-open interval [0, n) for each grid dimension,
-                where n is the number of points in the respective dimension. The first channel with index 0
-                is the ``x`` coordinate. If ``normalize=False`` and ``center=True``, the indices are shifted
-                such that index 0 corresponds to the grid center point. If ``normalize=True``, the centered
-                coordinates are normalized to ``(-1, 1)``, where the extrema either correspond to the corner
-                points of the grid (``align_corners=True``) or the grid boundary edges (``align_cornes=False``).
+            If ``dim`` is ``None``, returns a tensor of shape (...X, C) if ``channels_last=True`` (default)
+                or ``(C, ..., X)`` if ``channels_last=False``, where C is the number of spatial grid dimensions.
+                If ``normalize=Falze`` and ``center=False``, the tensor values are the multi-dimensional indices
+                in the closed-open interval [0, n) for each grid dimension, where n is the number of points in the
+                respective dimension. The first channel with index 0 is the ``x`` coordinate. If ``normalize=False``
+                and ``center=True``, the indices are shifted such that index 0 corresponds to the grid center point.
+                If ``normalize=True``, the centered coordinates are normalized to ``(-1, 1)``, where the extrema
+                either correspond to the corner points of the grid (``align_corners=True``) or the grid boundary
+                edges (``align_cornes=False``).
             If ``dim`` is not ``None``, a 1D tensor with the coordinates for this grid axis is returned.
 
         """
@@ -1037,12 +1043,13 @@ class Grid(object):
             else:
                 coord = torch.arange(n, dtype=dtype, device=device)
             coords.append(coord)
+        channels_dim = len(coords) if channels_last else 0
         if parse_version(torch.__version__) < parse_version("1.10"):
-            coords = torch.stack(torch.meshgrid(*coords), dim=-1)
+            coords = torch.stack(torch.meshgrid(*coords), dim=channels_dim)
         else:
-            coords = torch.stack(torch.meshgrid(*coords, indexing="ij"), dim=-1)
+            coords = torch.stack(torch.meshgrid(*coords, indexing="ij"), dim=channels_dim)
         if not flip:  # default order (x, ...) requires flipping stacked meshgrid coords
-            coords = torch.flip(coords, dims=(-1,))
+            coords = torch.flip(coords, dims=(channels_dim,))
         return coords
 
     def points(
