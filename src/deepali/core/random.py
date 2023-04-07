@@ -100,11 +100,11 @@ def _multinomial(
         )
         value = value.log_().neg_().log_().neg_().add_(logit)
         if parse_version(torch.__version__) < parse_version("1.12"):
-            _, index = value.topk(num_samples, dim=-1, sorted=False)
+            _, index = torch.topk(value, num_samples, dim=-1, sorted=False)
             out = index if out is None else out.copy_(index)
         else:
             if out is None:
                 out = torch.empty(out_shape, dtype=torch.int64, device=value.device)
             _ = torch.empty(out_shape, dtype=value.dtype, device=value.device)
-            _, out = value.topk(num_samples, dim=-1, sorted=False, out=(_, out))
+            _, out = torch.topk(value, num_samples, dim=-1, sorted=False, out=(_, out))
     return out
