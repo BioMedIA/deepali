@@ -137,6 +137,21 @@ class Diffusion(_SpatialDerivativesLoss):
         )
 
 
+class Divergence(_SpatialDerivativesLoss):
+    r"""Divergence of displacement field."""
+
+    def forward(self, u: Tensor) -> Tensor:
+        r"""Evaluate regularization loss for given transformation."""
+        spacing = self._spacing(u.shape)
+        return L.divergence_loss(
+            u,
+            spacing=spacing,
+            mode=self.mode,
+            sigma=self.sigma,
+            reduction=self.reduction,
+        )
+
+
 class Elasticity(_SpatialDerivativesLoss):
     r"""Linear elasticity of displacement field."""
 
