@@ -3,11 +3,13 @@ r"""Non-rigid transformation models."""
 from __future__ import annotations
 
 from copy import copy as shallow_copy
-from typing import Callable, Optional, TypeVar, Union, cast
+import math
+from typing import Callable, Optional, Sequence, TypeVar, Union, cast
 
 import torch
-from torch import Tensor
+from torch import Size, Tensor
 
+from ..core import functional as U
 from ..core.grid import Axes, Grid
 from ..data.flow import FlowFields
 from ..modules import ExpFlow
@@ -24,11 +26,74 @@ TDenseVectorFieldTransform = TypeVar(
 class DenseVectorFieldTransform(ParametricTransform, NonRigidTransform):
     r"""Dense vector field transformation with linear interpolation at non-grid point locations."""
 
+    def __init__(
+        self,
+        grid: Grid,
+        groups: Optional[int] = None,
+        params: Optional[Union[bool, Tensor, Callable[..., Tensor]]] = True,
+        stride: Optional[Union[float, Sequence[float]]] = None,
+        resize: bool = True,
+    ) -> None:
+        r"""Initialize transformation parameters.
+
+        Args:
+            grid: Grid domain on which transformation is defined.
+            groups: Number of transformations. A given image batch can either be deformed by a
+                single transformation, or a separate transformation for each image in the batch, e.g.,
+                for group-wise or batched registration. The default is one transformation for all images
+                in the batch, or the batch length of the ``params`` tensor if provided.
+            params: Initial parameters. If a tensor is given, it is only registered as optimizable module
+                parameters when of type ``torch.nn.Parameter``. When a callable is given instead, it will be
+                called by ``self.update()`` with arguments set and given by ``self.condition()``. When a boolean
+                argument is given, a new zero-initialized tensor is created. If ``True``, this tensor is registered
+                as optimizable module parameter.
+            stride: Spacing between vector field grid points in units of input ``grid`` points.
+                Can be used to subsample the dense vector field with respect to the image grid of the fixed target
+                image. When ``grid.align_corners() is True``, the corner points of the ``grid`` and the resampled
+                vector field grid are aligned. Otherwise, the edges of the grid domains are aligned.
+            resize: Whether to resize vector field during transformation update. If ``True``, the buffered vector
+                field ``u`` (and ``v`` if applicable) is resized to match the image ``grid`` size. This means that
+                transformation constraints defined on these resized vector fields, such as those based on finite
+                differences, are evaluated at the image grid resolution rather than the resolution of the underlying
+                vector field parameterization. This influences the scale at which these constraints are imposed.
+
+        """
+        if stride is None:
+            stride = 1
+        if isinstance(stride, (int, float)):
+            stride = (stride,) * grid.ndim
+        if len(stride) != grid.ndim:
+            raise ValueError(
+                f"{type(self).__name__}() 'stride' must be float or Sequence of length {grid.ndim}"
+            )
+        self.stride = tuple(float(s) for s in stride)
+        self._resize = resize
+        super().__init__(grid, groups=groups, params=params)
+
     @property
-    def data_shape(self) -> torch.Size:
+    def data_shape(self) -> Size:
         r"""Get shape of transformation parameters tensor."""
         grid = self.grid()
-        return (grid.ndim,) + grid.shape
+        shape = self.data_grid_shape(grid)
+        return Size((grid.ndim,) + shape)
+
+    def data_grid(
+        self, grid: Optional[Grid] = None, stride: Optional[Union[float, Sequence[float]]] = None
+    ) -> Grid:
+        if grid is None:
+            grid = self.grid()
+        if stride is None:
+            stride = self.stride
+        return grid.reshape(self.data_grid_shape(grid, stride))
+
+    def data_grid_shape(
+        self, grid: Optional[Grid] = None, stride: Optional[Union[float, Sequence[float]]] = None
+    ) -> torch.Size:
+        if grid is None:
+            grid = self.grid()
+        if stride is None:
+            stride = self.stride
+        return tuple(int(math.ceil(n / s)) for n, s in zip(grid.shape, stride))
 
     @torch.no_grad()
     def grid_(self: TDenseVectorFieldTransform, grid: Grid) -> TDenseVectorFieldTransform:
@@ -45,7 +110,7 @@ class DenseVectorFieldTransform(ParametricTransform, NonRigidTransform):
             flow_axes = self.axes()
             flow_grid = prev_grid.reshape(params.shape[2:])
             flow = FlowFields(params, grid=flow_grid, axes=flow_axes)
-            flow = flow.sample(grid)
+            flow = flow.sample(self.data_grid(grid))
             flow = flow.axes(grid_axes)
             # Change self._grid before self.data_() as it defines self.data_shape
             super().grid_(grid)
@@ -57,6 +122,18 @@ class DenseVectorFieldTransform(ParametricTransform, NonRigidTransform):
         else:
             super().grid_(grid)
         return self
+
+    def evaluate(self, resize: Optional[bool] = None) -> Tensor:
+        r"""Update buffered displacement vector field."""
+        if resize is None:
+            resize = self._resize
+        u = self.data()
+        u = u.view(*u.shape)  # such that named_buffers() returns both 'u' (or 'v') and 'p'
+        if resize:
+            align_corners = self.align_corners()
+            grid_shape = self.grid().shape
+            u = U.grid_reshape(u, grid_shape, align_corners=align_corners)
+        return u
 
 
 class DisplacementFieldTransform(DenseVectorFieldTransform):
@@ -94,8 +171,7 @@ class DisplacementFieldTransform(DenseVectorFieldTransform):
     def update(self) -> DisplacementFieldTransform:
         r"""Update buffered displacement vector field."""
         super().update()
-        u = self.data()
-        u = u.view(*u.shape)  # such that named_buffers() returns both 'u' and 'p'
+        u = self.evaluate()
         self.register_buffer("u", u, persistent=False)
         return self
 
@@ -108,6 +184,8 @@ class StationaryVelocityFieldTransform(DenseVectorFieldTransform):
         grid: Grid,
         groups: Optional[int] = None,
         params: Optional[Union[bool, Tensor, Callable[..., Tensor]]] = True,
+        stride: Optional[Union[float, Sequence[float]]] = None,
+        resize: bool = True,
         scale: Optional[float] = None,
         steps: Optional[int] = None,
     ) -> None:
@@ -126,11 +204,20 @@ class StationaryVelocityFieldTransform(DenseVectorFieldTransform):
                 model parameters are accessed with the arguments set and returned by ``self.condition()``.
                 When a boolean argument is given, a new zero-initialized tensor is created. If ``True``,
                 it is registered as optimizable parameter.
+            stride: Spacing between vector field grid points in units of input ``grid`` points.
+                Can be used to subsample the dense vector field with respect to the image grid of the fixed target
+                image. When ``grid.align_corners() is True``, the corner points of the ``grid`` and the resampled
+                vector field grid are aligned. Otherwise, the edges of the grid domains are aligned.
+            resize: Whether to resize vector field during transformation update. If ``True``, the buffered vector
+                fields ``v`` and ``u`` are resized to match the image ``grid`` size. This means that transformation
+                constraints defined on these resized vector fields, such as those based on finite differences, are
+                evaluated at the image grid resolution rather than the resolution of the underlying vector field
+                parameterization. This influences the scale at which these constraints are imposed.
             scale: Constant scaling factor of velocity fields.
             steps: Number of scaling and squaring steps.
 
         """
-        super().__init__(grid, groups=groups, params=params)
+        super().__init__(grid, groups=groups, params=params, stride=stride, resize=resize)
         self.exp = ExpFlow(scale=scale, steps=steps, align_corners=grid.align_corners())
 
     def grid_(self, grid: Grid) -> StationaryVelocityFieldTransform:
@@ -175,9 +262,8 @@ class StationaryVelocityFieldTransform(DenseVectorFieldTransform):
     def update(self) -> StationaryVelocityFieldTransform:
         r"""Update buffered velocity and displacement vector fields."""
         super().update()
-        v = self.data()
+        v = self.evaluate()
         u = self.exp(v)
-        v = v.view(*v.shape)  # such that named_buffers() returns both 'v' and 'p'
         self.register_buffer("v", v, persistent=False)
         self.register_buffer("u", u, persistent=False)
         return self
