@@ -155,6 +155,26 @@ class Divergence(_SpatialDerivativesLoss):
 class Elasticity(_SpatialDerivativesLoss):
     r"""Linear elasticity of displacement field."""
 
+    def __init__(
+        self,
+        material_name: Optional[str] = None,
+        first_parameter: Optional[float] = None,
+        second_parameter: Optional[float] = None,
+        poissons_ratio: Optional[float] = None,
+        youngs_modulus: Optional[float] = None,
+        shear_modulus: Optional[float] = None,
+        mode: str = "central",
+        sigma: Optional[float] = None,
+        reduction: str = "mean",
+    ):
+        super().__init__(mode=mode, sigma=sigma, reduction=reduction)
+        self.material_name = material_name
+        self.first_parameter = first_parameter
+        self.second_parameter = second_parameter
+        self.poissons_ratio = poissons_ratio
+        self.youngs_modulus = youngs_modulus
+        self.shear_modulus = shear_modulus
+    
     def forward(self, u: Tensor) -> Tensor:
         r"""Evaluate regularization loss for given transformation."""
         spacing = self._spacing(u.shape)
@@ -164,6 +184,12 @@ class Elasticity(_SpatialDerivativesLoss):
             mode=self.mode,
             sigma=self.sigma,
             reduction=self.reduction,
+            material_name=self.material_name,
+            first_parameter=self.first_parameter,
+            second_parameter=self.second_parameter,
+            poissons_ratio=self.poissons_ratio,
+            youngs_modulus=self.youngs_modulus,
+            shear_modulus=self.shear_modulus,
         )
 
 
