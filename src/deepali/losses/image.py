@@ -1,6 +1,6 @@
 r"""Image dissimilarity measures."""
 
-from typing import Optional
+from typing import Optional, Union
 
 from torch import Tensor
 
@@ -55,20 +55,152 @@ class LCC(PairwiseImageLoss):
 LNCC = LCC
 
 
+class WLCC(PairwiseImageLoss):
+    r"""Weighted local normalized cross correlation."""
+
+    def __init__(self, kernel_size: ScalarOrTuple[int] = 7, epsilon: float = 1e-15) -> None:
+        super().__init__()
+        self.kernel_size = kernel_size
+        self.epsilon = epsilon
+
+    def forward(
+        self,
+        source: Tensor,
+        target: Tensor,
+        mask: Optional[Tensor] = None,
+        source_mask: Optional[Tensor] = None,
+        target_mask: Optional[Tensor] = None,
+    ) -> Tensor:
+        r"""Evaluate image dissimilarity loss."""
+        return L.wlcc_loss(
+            source,
+            target,
+            mask=mask,
+            source_mask=source_mask,
+            target_mask=target_mask,
+            kernel_size=self.kernel_size,
+            epsilon=self.epsilon,
+        )
+
+    def extra_repr(self) -> str:
+        return f"kernel_size={self.kernel_size}, epsilon={self.epsilon:.2e}"
+
+
+SLCC = WLCC  # Sparse local cross correlation (cf. Lewis et al. 2020, arXiv:1812.06932)
+
+
+class L1ImageLoss(NormalizedPairwiseImageLoss):
+    r"""Average absolute intensity differences."""
+
+    def forward(self, source: Tensor, target: Tensor, mask: Optional[Tensor] = None) -> Tensor:
+        r"""Evaluate image dissimilarity loss."""
+        return L.mae_loss(source, target, mask=mask, norm=self.norm)
+
+
+MAE = L1ImageLoss
+
+
+class HuberImageLoss(NormalizedPairwiseImageLoss):
+    r"""Average Huber loss."""
+
+    def __init__(
+        self,
+        source: Optional[Tensor] = None,
+        target: Optional[Tensor] = None,
+        norm: Optional[Union[bool, Tensor]] = None,
+        delta: Optional[float] = None,
+        beta: Optional[float] = None,
+    ):
+        r"""Initialize similarity metric.
+
+        Args:
+            source: Source image from which to compute ``norm``. If ``None``, only use ``target`` if specified.
+            target: Target image from which to compute ``norm``. If ``None``, only use ``source`` if specified.
+            norm: Positive factor by which to divide loss. If ``None`` or ``True``, use ``source`` and/or ``target``.
+                If ``False`` or both ``source`` and ``target`` are ``None``, a normalization factor of one is used.
+            delta: Specifies the threshold at which to change between delta-scaled L1 and L2 loss.
+            beta: Alternative name for ``delta`` to be compatible with ``SmoothL1ImageLoss``.
+
+        """
+        if beta is not None:
+            if delta is not None:
+                raise ValueError(
+                    f"{type(self).__name__}() 'delta' and 'beta' are mutually exclusive"
+                )
+            delta = beta
+        elif delta is None:
+            delta = 1.0
+        super().__init__(source, target, norm)
+        self.delta = delta
+
+    @property
+    def beta(self) -> float:
+        return self.delta
+
+    def forward(self, source: Tensor, target: Tensor, mask: Optional[Tensor] = None) -> Tensor:
+        r"""Evaluate image dissimilarity loss."""
+        return L.huber_loss(source, target, mask=mask, norm=self.norm, delta=self.delta)
+
+
+class SmoothL1ImageLoss(NormalizedPairwiseImageLoss):
+    r"""Average smooth L1 loss."""
+
+    def __init__(
+        self,
+        source: Optional[Tensor] = None,
+        target: Optional[Tensor] = None,
+        norm: Optional[Union[bool, Tensor]] = None,
+        beta: Optional[float] = None,
+        delta: Optional[float] = None,
+    ):
+        r"""Initialize similarity metric.
+
+        Args:
+            source: Source image from which to compute ``norm``. If ``None``, only use ``target`` if specified.
+            target: Target image from which to compute ``norm``. If ``None``, only use ``source`` if specified.
+            norm: Positive factor by which to divide loss. If ``None`` or ``True``, use ``source`` and/or ``target``.
+                If ``False`` or both ``source`` and ``target`` are ``None``, a normalization factor of one is used.
+            beta: Specifies the threshold at which to change between delta-scaled L1 and L2 loss.
+            delta: Alternative name for ``beta`` to be compatible with ``HuberImageLoss``.
+
+        """
+        if delta is not None:
+            if beta is not None:
+                raise ValueError(
+                    f"{type(self).__name__}() 'beta' and 'detla' are mutually exclusive"
+                )
+            beta = delta
+        elif beta is None:
+            beta = 1.0
+        super().__init__(source, target, norm)
+        self.beta = beta
+
+    @property
+    def delta(self) -> float:
+        return self.beta
+
+    def forward(self, source: Tensor, target: Tensor, mask: Optional[Tensor] = None) -> Tensor:
+        r"""Evaluate image dissimilarity loss."""
+        return L.smooth_l1_loss(source, target, mask=mask, norm=self.norm)
+
+
+class L2ImageLoss(NormalizedPairwiseImageLoss):
+    r"""Average squared intensity differences."""
+
+    def forward(self, source: Tensor, target: Tensor, mask: Optional[Tensor] = None) -> Tensor:
+        r"""Evaluate image dissimilarity loss."""
+        return L.mse_loss(source, target, mask=mask, norm=self.norm)
+
+
+MSE = L2ImageLoss
+
+
 class SSD(NormalizedPairwiseImageLoss):
     r"""Sum of squared intensity differences."""
 
     def forward(self, source: Tensor, target: Tensor, mask: Optional[Tensor] = None) -> Tensor:
         r"""Evaluate image dissimilarity loss."""
         return L.ssd_loss(source, target, mask=mask, norm=self.norm)
-
-
-class MSE(NormalizedPairwiseImageLoss):
-    r"""Average squared intensity differences."""
-
-    def forward(self, source: Tensor, target: Tensor, mask: Optional[Tensor] = None) -> Tensor:
-        r"""Evaluate image dissimilarity loss."""
-        return L.mse_loss(source, target, mask=mask, norm=self.norm)
 
 
 class MI(PairwiseImageLoss):

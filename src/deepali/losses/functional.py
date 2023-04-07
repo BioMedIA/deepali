@@ -52,6 +52,7 @@ __all__ = (
     "inverse_consistency_loss",
     "masked_loss",
     "reduce_loss",
+    "wlcc_loss",
 )
 
 
@@ -519,7 +520,7 @@ def kld_loss(mean: Tensor, logvar: Tensor, reduction: str = "mean") -> Tensor:
 
 
 def lcc_loss(
-    input: Tensor,
+    source: Tensor,
     target: Tensor,
     mask: Optional[Tensor] = None,
     kernel_size: ScalarOrTuple[int] = 7,
@@ -528,22 +529,42 @@ def lcc_loss(
 ) -> Tensor:
     r"""Local normalized cross correlation.
 
+    References:
+    - Avants et al., 2008, Symmetric Diffeomorphic Image Registration with Cross Correlation:
+        Evaluating Automated Labeling of Elderly and Neurodegenerative Brain,
+        doi:10.1016/j.media.2007.06.004.
+
     Args:
-        input: Source image sampled on ``target`` grid.
-        target: Target image with same shape as ``input``.
-        mask: Multiplicative mask tensor with same shape as ``input``.
+        source: Source image sampled on ``target`` grid.
+        target: Target image with same shape as ``source``.
+        mask: Multiplicative mask tensor with same shape as ``source``.
         kernel_size: Local rectangular window size in number of grid points.
         epsilon: Small constant added to denominator to avoid division by zero.
-        reduction: Whether to compute "mean" or "sum" over all grid points. If "none",
-            output tensor shape is equal to the shape of the input tensors given an odd
-            kernel size.
+        reduction: Whether to compute "mean" or "sum" over all grid points. If "none", output
+            tensor shape is equal to the shape of the input tensors given an odd kernel size.
 
     Returns:
         Negative local normalized cross correlation plus one.
 
     """
 
-    def pool(data: Tensor) -> Tensor:
+    if not isinstance(source, Tensor):
+        raise TypeError("lcc_loss() 'source' must be tensor")
+    if not isinstance(target, Tensor):
+        raise TypeError("lcc_loss() 'target' must be tensor")
+    if source.shape != target.shape:
+        raise ValueError("lcc_loss() 'source' must have same shape as 'target'")
+
+    def local_sum(data: Tensor) -> Tensor:
+        return avg_pool(
+            data,
+            kernel_size=kernel_size,
+            stride=1,
+            padding=None,
+            divisor_override=1,
+        )
+
+    def local_mean(data: Tensor) -> Tensor:
         return avg_pool(
             data,
             kernel_size=kernel_size,
@@ -552,22 +573,148 @@ def lcc_loss(
             count_include_pad=False,
         )
 
-    if not torch.is_tensor(input):
-        raise TypeError("lcc_loss() 'input' must be tensor")
-    if not torch.is_tensor(target):
-        raise TypeError("lcc_loss() 'target' must be tensor")
-    if input.shape != target.shape:
-        raise ValueError("lcc_loss() 'input' must have same shape as 'target'")
-    input = input.float()
+    source = source.float()
     target = target.float()
-    x = input - pool(input)
-    y = target - pool(target)
-    a = pool(x.mul(y))
-    b = pool(x.square())
-    c = pool(y.square())
-    lcc = a.square().div_(b.mul(c).add_(epsilon))  # A^2 / BC cf. Avants et al., 2007, eq 5
-    loss = lcc.mul_(-1).add_(1)  # minimize 1 - lcc, where loss range is [0, 1]
+
+    source_mean = local_mean(source)
+    target_mean = local_mean(target)
+
+    x = source.sub(source_mean)
+    y = target.sub(target_mean)
+
+    a = local_sum(x.mul(y))
+    b = local_sum(x.square())
+    c = local_sum(y.square())
+
+    loss = a.square_().div_(b.mul_(c).add_(epsilon)).neg_().add_(1)
     loss = masked_loss(loss, mask, "lcc_loss")
+    loss = reduce_loss(loss, reduction, mask)
+    return loss
+
+
+def wlcc_loss(
+    source: Tensor,
+    target: Tensor,
+    mask: Optional[Tensor] = None,
+    source_mask: Optional[Tensor] = None,
+    target_mask: Optional[Tensor] = None,
+    kernel_size: ScalarOrTuple[int] = 7,
+    epsilon: float = 1e-15,
+    reduction: str = "mean",
+) -> Tensor:
+    r"""Weighted local normalized cross correlation.
+
+    References:
+    - Lewis et al., 2020, Fast Learning-based Registration of Sparse 3D Clinical Images, arXiv:1812.06932.
+
+    Args:
+        source: Source image sampled on ``target`` grid.
+        target: Target image with same shape as ``source``.
+        mask: Multiplicative mask tensor ``w_c`` with same shape as ``target`` and ``source``.
+            This tensor is used for computing the weighted local correlation. If ``None`` and
+            both ``source_mask`` and ``target_mask`` are given, it is set to the product of these.
+            Otherwise, no mask is used to aggregate the local cross correlation values. When both
+            ``source_mask`` and ``target_mask`` are ``None``, but ``mask`` is not, then the specified
+            ``mask`` is used both as ``source_mask`` and ``target_mask``.
+        source_mask: Multiplicative mask tensor ``w_m`` with same shape as ``source``.
+            This tensor is used for computing the weighted local ``source`` mean. If ``None``,
+            the local mean is computed over all ``source`` elements within each local neighborhood.
+        target_mask: Multiplicative mask tensor ``w_f`` with same shape as ``source``.
+            This tensor is used for computing the weighted local ``target`` mean. If ``None``,
+            the local mean is computed over all ``target`` elements within each local neighborhood.
+        kernel_size: Local rectangular window size in number of grid points.
+        epsilon: Small constant added to denominator to avoid division by zero.
+        reduction: Whether to compute "mean" or "sum" over all grid points. If "none", output
+            tensor shape is equal to the shape of the input tensors given an odd kernel size.
+
+    Returns:
+        Negative local normalized cross correlation plus one.
+
+    """
+
+    if not isinstance(source, Tensor):
+        raise TypeError("wlcc_loss() 'source' must be tensor")
+    if not isinstance(target, Tensor):
+        raise TypeError("wlcc_loss() 'target' must be tensor")
+
+    if source.shape != target.shape:
+        raise ValueError("wlcc_loss() 'source' must have same shape as 'target'")
+
+    for t, t_name, w, w_name in zip(
+        [target, source, target],
+        ["target", "source", "target"],
+        [mask, source_mask, target_mask],
+        ["mask", "source_mask", "target_mask"],
+    ):
+        if w is None:
+            continue
+        if not isinstance(w, Tensor):
+            raise TypeError(f"wlcc_loss() '{w_name}' must be tensor")
+        if w.shape[0] not in (1, t.shape[0]):
+            raise ValueError(
+                f"wlcc_loss() '{w_name}' batch size ({w.shape[0]}) must be 1 or match '{t_name}' ({t.shape[0]})"
+            )
+        if w.shape[1] not in (1, t.shape[1]):
+            raise ValueError(
+                f"wlcc_loss() '{w_name}' number of channels ({w.shape[1]}) must be 1 or match '{t_name}' ({t.shape[1]})"
+            )
+        if w.shape[2:] != t.shape[2:]:
+            raise ValueError(
+                f"wlcc_loss() '{w_name}' grid shape ({w.shape[2:]}) must match '{t_name}' ({t.shape[2:]})"
+            )
+
+    def local_sum(data: Tensor) -> Tensor:
+        return avg_pool(
+            data,
+            kernel_size=kernel_size,
+            stride=1,
+            padding=None,
+            divisor_override=1,
+        )
+
+    def local_mean(data: Tensor, weight: Optional[Tensor] = None) -> Tensor:
+        if weight is None:
+            return avg_pool(
+                data,
+                kernel_size=kernel_size,
+                stride=1,
+                padding=None,
+                count_include_pad=False,
+            )
+        a = local_sum(data.mul(weight))
+        b = local_sum(weight).add_(epsilon)
+        return a.div_(b)
+
+    if mask is not None and source_mask is None and target_mask is None:
+        source_mask = mask.float()
+        target_mask = source_mask
+    else:
+        if source_mask is not None:
+            source_mask = source_mask.float()
+        if target_mask is not None:
+            target_mask = target_mask.float()
+
+    source = source.float()
+    target = target.float()
+
+    source_mean = local_mean(source, source_mask)
+    target_mean = local_mean(target, target_mask)
+
+    x = source.sub(source_mean)
+    y = target.sub(target_mean)
+
+    if mask is None and source_mask is not None and target_mask is not None:
+        mask = source_mask.mul(target_mask)
+    if mask is not None:
+        x = x.mul_(mask)
+        y = y.mul_(mask)
+
+    a = local_sum(x.mul(y))
+    b = local_sum(x.square())
+    c = local_sum(y.square())
+
+    loss = a.square_().div_(b.mul_(c).add_(epsilon)).neg_().add_(1)
+    loss = masked_loss(loss, mask, name="wlcc_loss")
     loss = reduce_loss(loss, reduction, mask)
     return loss
 
@@ -689,7 +836,9 @@ def mi_loss(
     if num_bins is None:
         num_bins = 64
     elif num_bins == "auto":
-        raise NotImplementedError("mi_loss() automatically setting num_bins based on dynamic range of input")
+        raise NotImplementedError(
+            "mi_loss() automatically setting num_bins based on dynamic range of input"
+        )
 
     # Flatten spatial dimensions of inputs
     shape = target.shape
@@ -972,7 +1121,7 @@ def curvature_loss(
         # No loss for homogeneous coordinate transformations
         if reduction == "none":
             raise NotImplementedError(
-                "curvature_loss() not implemented for linear transformation and 'reduction'='none'"
+                "curvature_loss() not implemented for linear transformation and reduction='none'"
             )
         return torch.tensor(0, dtype=u.dtype, device=u.device)
     D = u.shape[1]
@@ -1011,7 +1160,7 @@ def divergence_loss(
         # No loss for homogeneous coordinate transformations
         if reduction == "none":
             raise NotImplementedError(
-                "div_loss() not implemented for linear transformation and 'reduction'='none'"
+                "divergence_loss() not implemented for linear transformation and reduction='none'"
             )
         return torch.tensor(0, dtype=u.dtype, device=u.device)
     D = u.shape[1]

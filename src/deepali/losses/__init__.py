@@ -38,6 +38,7 @@ from .flow import TotalVariation, TV
 from .image import PatchwiseImageLoss, PatchLoss
 from .image import Dice, DSC
 from .image import LCC, LNCC
+from .image import SLCC, WLCC
 from .image import MI, NMI
 from .image import MSE
 from .image import SSD
@@ -90,10 +91,12 @@ __all__ = (
     "MI",
     "MSE",
     "NMI",
+    "SLCC",
     "Sparsity",
     "SSD",
     "TotalVariation",
     "TV",
+    "WLCC",
     # Factory function
     "create_loss",
     "new_loss",
