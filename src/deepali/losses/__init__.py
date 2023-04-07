@@ -75,7 +75,7 @@ __all__ = (
     "ClosestPointDistance",
     "CPD",
     "Curvature",
-    "Dice"
+    "Dice",
     "Diffusion",
     "DSC",
     "Elasticity",
