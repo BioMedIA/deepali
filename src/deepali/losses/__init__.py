@@ -32,6 +32,7 @@ from .bspline import BSplineBending, BSplineBendingEnergy
 from .flow import Bending, BendingEnergy, BE
 from .flow import Curvature
 from .flow import Diffusion
+from .flow import Divergence
 from .flow import Elasticity
 from .flow import TotalVariation, TV
 
@@ -78,6 +79,7 @@ __all__ = (
     "Curvature",
     "Dice",
     "Diffusion",
+    "Divergence",
     "DSC",
     "Elasticity",
     "L1Norm",
