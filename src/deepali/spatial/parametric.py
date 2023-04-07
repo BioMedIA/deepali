@@ -6,7 +6,7 @@ from copy import copy as shallow_copy
 from typing import Callable, Optional, Union, cast, overload
 
 import torch
-from torch import Tensor
+from torch import Size, Tensor
 from torch.nn import Parameter, init
 
 from ..core.grid import Grid
@@ -107,7 +107,7 @@ class ParametricTransform:
         self.clear_buffers()
 
     @property
-    def data_shape(self) -> torch.Size:
+    def data_shape(self) -> Size:
         r"""Get required shape of transformation parameters tensor, excluding batch dimension."""
         raise NotImplementedError(f"{type(self).__name__}.data_shape")
 

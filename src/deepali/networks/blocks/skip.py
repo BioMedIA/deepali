@@ -61,10 +61,10 @@ class SkipConnection(ReprWithCrossReferences, Module):
     def __init__(
         self,
         *args: Module,
-        name: str,
-        skip: Union[str, SkipFunc],
-        join: Union[str, JoinFunc],
-        dim: int,
+        name: str = "func",
+        skip: Union[str, SkipFunc] = "identity",
+        join: Union[str, JoinFunc] = "cat",
+        dim: int = 1,
     ) -> None:
         ...
 
@@ -72,10 +72,10 @@ class SkipConnection(ReprWithCrossReferences, Module):
     def __init__(
         self,
         arg: Mapping[str, Module],
-        name: str,
-        skip: Union[str, SkipFunc],
-        join: Union[str, JoinFunc],
-        dim: int,
+        name: str = "func",
+        skip: Union[str, SkipFunc] = "identity",
+        join: Union[str, JoinFunc] = "cat",
+        dim: int = 1,
     ) -> None:
         ...
 

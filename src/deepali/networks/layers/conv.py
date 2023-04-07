@@ -5,7 +5,7 @@ r"""Convolutional layers."""
 from collections import OrderedDict
 import math
 from numbers import Integral
-from typing import Any, Mapping, Optional, Tuple, Union
+from typing import Any, Optional, Union
 
 from torch.nn import Module, init
 from torch.nn.modules import Sequential
@@ -22,8 +22,8 @@ from ...core.types import ScalarOrTuple2d
 from ...core.types import ScalarOrTuple3d
 from ...modules import ReprWithCrossReferences
 
-from .acti import ActivationFunc, activation
-from .norm import NormFunc, normalization
+from .acti import ActivationArg, activation
+from .norm import NormArg, normalization
 
 
 __all__ = (
@@ -286,8 +286,8 @@ class ConvLayer(ReprWithCrossReferences, Sequential):
         groups: int = 1,
         init: str = "default",
         bias: Optional[Union[bool, str]] = None,
-        norm: Optional[Union[NormFunc, str, Tuple[str, Mapping[str, Any]], Tuple[str, int]]] = None,
-        acti: Optional[Union[ActivationFunc, str, Tuple[str, Mapping[str, Any]]]] = None,
+        norm: NormArg = None,
+        acti: ActivationArg = None,
         order: str = "CNA",
         transposed: bool = False,
         conv: Optional[Module] = None,
@@ -295,7 +295,7 @@ class ConvLayer(ReprWithCrossReferences, Sequential):
         if spatial_dims < 0 or spatial_dims > 3:
             raise ValueError("ConvLayer() 'spatial_dims' must be 1, 2, or 3")
         if isinstance(kernel_size, Integral):
-            kernel_size = (kernel_size,) * spatial_dims
+            kernel_size = (int(kernel_size),) * spatial_dims
         if padding is None:
             padding = same_padding(kernel_size, dilation)
         # Order of layer operations

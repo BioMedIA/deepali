@@ -7,7 +7,7 @@ from typing import cast, overload
 from typing import Callable, List, Optional, Sequence, Tuple, TypeVar, Union
 
 import torch
-from torch import Tensor
+from torch import Size, Tensor
 
 from ..core import kernels as K
 from ..core import functional as U
@@ -73,11 +73,11 @@ class BSplineTransform(ParametricTransform, NonRigidTransform):
         self.register_kernels(stride)
 
     @property
-    def data_shape(self) -> torch.Size:
+    def data_shape(self) -> Size:
         r"""Get shape of transformation parameters tensor."""
         grid = self.grid()
         shape = U.cubic_bspline_control_point_grid_size(grid.shape, self.data_stride)
-        return (grid.ndim,) + shape
+        return Size((grid.ndim,) + shape)
 
     @property
     def data_stride(self) -> Tuple[int, ...]:
