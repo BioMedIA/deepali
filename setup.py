@@ -28,7 +28,7 @@ namespace = "deepali"
 long_description = Path("README.md").read_text()
 
 packages = find_namespace_packages(where="src")
-package_dir={"": "src"}
+package_dir = {"": "src"}
 
 install_requires = [
     "dacite",
