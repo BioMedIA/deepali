@@ -1133,7 +1133,7 @@ class Image(DataTensor):
     def narrow(self: TImage, dim: int, start: int, length: int) -> TImage:
         r"""Narrow image along specified dimension."""
         batch = self.batch()
-        batch = batch.narrow(dim, start, length)
+        batch = batch.narrow(dim + 1, start, length)
         return batch[0]
 
     def resize(
