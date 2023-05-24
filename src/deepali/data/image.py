@@ -667,7 +667,7 @@ class ImageBatch(DataTensor):
 
         """
         size = cat_scalars(size, *args, num=self.sdim, device=self.device)
-        data = U.center_crop(self, size)
+        data = U.center_crop(self.tensor(), size)
         grid = tuple(grid.center_crop(size) for grid in self._grid)
         return self._make_instance(data, grid)
 
