@@ -40,10 +40,15 @@ def distance_matrix(x: Tensor, y: Tensor) -> Tensor:
         raise ValueError("distance_matrix() 'x' and 'y' must have same batch size N")
     if y.shape[2] != D:
         raise ValueError("distance_matrix() 'x' and 'y' must have same point dimension D")
+    out_dtype = x.dtype
+    if not out_dtype.is_floating_point:
+        out_dtype = torch.float32
+    x = x.type(torch.float64)
+    y = y.type(torch.float64)
     x_norm = x.pow(2).sum(2).view(N, -1, 1)
     y_norm = y.pow(2).sum(2).view(N, 1, -1)
     dist = x_norm + y_norm - 2.0 * torch.bmm(x, torch.transpose(y, 1, 2))
-    return dist
+    return dist.type(out_dtype)
 
 
 def closest_point_distances(x: Tensor, y: Tensor, split_size: int = 10000) -> Tensor:
