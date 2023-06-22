@@ -1,6 +1,6 @@
 # deepali
 
-An [open source](LICENSE) research library for image, point set, and surface registration in [PyTorch], which is developed and maintained by the [HeartFlow-Imperial College London] research lab at the [Biomedical Image Analysis Group].
+An [open source](https://github.com/BioMedIA/deepali/tree/main/LICENSE) research library for image, point set, and surface registration in [PyTorch], which is developed and maintained by the [HeartFlow-Imperial College London] research lab at the [Biomedical Image Analysis Group].
 
 *[Deepali](https://en.wikipedia.org/wiki/Deepali)* is a Hindu/Sanskrit Indian given name, which means "joy" as in the gratification one may feel working with code built on a modern tensor library with support for automatic differentiation, and "chain of lamps" alluding to the application of the chain rule by *torch.autograd*, the concatenation of spatial coordinate transformations, and furthermore the (sequential) composition of PyTorch modules. In addition, the English words "deep" and "ali(-gnment)" partially contained in this name should highlight that this project is not only suitable for traditional non-learning based registration, but in particular facilitates deep learning based approaches to image alignment.
 
@@ -23,13 +23,13 @@ At a granular level, *deepali* is a library that consists of the following compo
 | [deepali.utils] | Optional auxiliaries for interfacing with external libraries and tools. |
 
 
-[deepali.core]: src/deepali/core/
-[deepali.data]: src/deepali/data/
-[deepali.losses]: src/deepali/losses/
-[deepali.modules]: src/deepali/modules/
-[deepali.networks]: src/deepali/networks/
-[deepali.spatial]: src/deepali/spatial/
-[deepali.utils]: src/deepali/utils/
+[deepali.core]: https://biomedia.github.io/deepali/reference/core/index.html
+[deepali.data]: https://biomedia.github.io/deepali/reference/data/index.html
+[deepali.losses]: https://biomedia.github.io/deepali/reference/losses/index.html
+[deepali.modules]: https://biomedia.github.io/deepali/reference/modules/index.html
+[deepali.networks]: https://biomedia.github.io/deepali/reference/networks/index.html
+[deepali.spatial]: https://biomedia.github.io/deepali/reference/spatial/index.html
+[deepali.utils]: https://biomedia.github.io/deepali/reference/utils/index.html
 
 
 ## Dependencies
@@ -37,13 +37,19 @@ At a granular level, *deepali* is a library that consists of the following compo
 The following lists the main dependencies of this project. For a complete list, please open file [setup.py](setup.py).
 
 - [PyTorch]: The automatic differentiation and deep learning framework powering this project.
-- [SimpleITK] (optional): Used by ``deepali.data`` to read and write images in file formats supported by ITK.
-- [NumPy] (optional): Used by ``deepali.utils``. Other components use pure PyTorch.
+- [SimpleITK] (optional): Used by [deepali.data] to read and write images in file formats supported by ITK.
+- [NumPy] (optional): Used by [deepali.utils]. Other components use pure PyTorch.
 - [VTK] (optional): May be used to read and write point sets and surface meshes.
 
 ## Installation
 
-This Python package can be installed with [pip] directly from the GitHub repository, i.e.,
+This Python package can be installed with [pip]:
+
+```
+pip install deepali-hf
+```
+
+The latest development version can be installed directly from the GitHub repository, i.e.,
 
 ```
 pip install git+https://github.com/BioMedIA/deepali.git
@@ -52,26 +58,17 @@ pip install git+https://github.com/BioMedIA/deepali.git
 Alternatively, it can be installed from a previously cloned local Git repository using
 
 ```
-git clone https://github.com/BioMedIA/deepali.git
-cd deepali && pip install .
+git clone https://github.com/BioMedIA/deepali.git && pip install ./deepali
 ```
 
-This will install missing dependencies in the current Python environment from [PyPI]. To use [conda] for installing the required dependencies, create a conda environment with pre-installed dependencies **before** running `pip install`. For further information on how to create and manage project dependencies using conda, see [conda/README.md](conda/README.md).
+This will install missing dependencies in the current Python environment from [PyPI]. To use [conda] for installing the required dependencies (recommended), create a conda environment with pre-installed dependencies **before** running `pip install`. For further information on how to create and manage project dependencies using conda, see [conda/README.md](https://github.com/BioMedIA/deepali/tree/main/conda/README.md).
 
-Additional optional dependencies of the `deepali.utils` library can be installed with the command:
-
-```
-pip install git+https://github.com/BioMedIA/deepali.git#egg=deepali[utils]
-# or: pip install .[utils]
-```
-
-Developers and contributors of this project may install it in development mode using
+Additional optional dependencies of the [deepali.utils] library can be installed with the command:
 
 ```
-pip install --editable .[dev,utils]
+pip install deepali-hf[utils]
+# or pip install git+https://github.com/BioMedIA/deepali.git#egg=deepali[utils]
 ```
-
-This will link the source tree of the package in the Python environment.
 
 
 [conda]: https://docs.conda.io/en/latest/
@@ -82,8 +79,17 @@ This will link the source tree of the package in the Python environment.
 
 ## Contributing
 
-We appreciate all contributions. If you are planning to contribute bug-fixes, please do so without any further discussion. If you plan to contribute new features, utility functions or extensions, we would appreciate if you first open an issue and discuss the feature with us. Please also read the [CONTRIBUTING](CONTRIBUTING.md) notes. The participation in this open source project is subject to the [Code of Conduct](CODE_OF_CONDUCT.md).
+We appreciate all contributions. If you are planning to contribute bug-fixes, please do so without any further discussion. If you plan to contribute new features, utility functions or extensions, we would appreciate if you first open an issue and discuss the feature with us. Please also read the [CONTRIBUTING](https://github.com/BioMedIA/deepali/tree/main/CONTRIBUTING.md) notes. The participation in this open source project is subject to the [Code of Conduct](https://github.com/BioMedIA/deepali/tree/main/CODE_OF_CONDUCT.md).
 
+Contributors to this project may want to install this package in development mode using
+
+```
+git clone https://github.com/BioMedIA/deepali.git
+make -C deepali/conda env EDITABLE=1
+conda activate deepali
+```
+
+This will link the source tree of the package in the Python environment.
 
 ## Related projects
 
