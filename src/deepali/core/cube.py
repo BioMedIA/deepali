@@ -23,12 +23,12 @@ class Cube(object):
     system or the cube defined by the bounding box where coordinate axes are parallel to the
     cube edges and have a uniform side length of 2. The latter are the normalized coordinates
     used by ``torch.nn.functional.grid_sample()``, in particular. In terms of the coordinate
-    transformations, a ``Cube`` is thus equivalent to a ``Grid`` with three points along each
+    transformations, a :class:`Cube` is thus equivalent to a :class:`Grid` with three points along each
     dimension and ``align_corners=True``.
 
-    A regular sampling ``Grid``, on the other hand, subsamples the world space within the bounds
+    A regular sampling :class:`Grid`, on the other hand, subsamples the world space within the bounds
     defined by the cube into a number of equally sized cells or equally spaced points, respectivey.
-    How the grid points relate to the faces of the cube depends on ``Grid.align_corners()``.
+    How the grid points relate to the faces of the cube depends on :meth:`Grid.align_corners`.
 
     """
 

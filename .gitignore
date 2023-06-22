@@ -15,6 +15,9 @@ __pycache__/
 *.so
 *.dll
 
+# documentation
+/docs/_build/
+
 # data files
 *.pt
 *.pth

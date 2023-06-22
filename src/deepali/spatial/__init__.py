@@ -1,7 +1,8 @@
 r"""Spatial coordinate and image transformations.
 
 The spatial transforms defined by this Python package can be used to implement both
-traditional optimization based and machine learning based co-registration approaches.
+co-registration approaches based on traditional optimization as well as those based
+on machine learning (amortized optimization).
 
 """
 

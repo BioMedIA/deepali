@@ -372,7 +372,8 @@ class SpatialTransform(DeviceProperty, Module, metaclass=ABCMeta):
 
         Convenience property for applying the inverse transformation, e.g.,
 
-        .. code::
+        .. code-block::
+
             y = transform(x)
             x = transform.inv(y)
 
@@ -489,13 +490,13 @@ class NonRigidTransform(SpatialTransform):
         r"""Update buffered vector fields.
 
         Required:
-        - ``u``: Displacement vector field representation of non-rigid transformation.
+            ``u``: Displacement vector field representation of non-rigid transformation.
 
         Optional:
-        - ``v``: Velocity vector field representation of non-rigid transformation if applicable.
-            When this buffer is set, it can be used in a regularization term to encourage smoothness
-            or other desired properties on the (stationary) velocity field. Alternatively, a
-            regularization term may be based directly on the optimizable parameters.
+            ``v``: Velocity vector field representation of non-rigid transformation if applicable.
+                When this buffer is set, it can be used in a regularization term to encourage smoothness
+                or other desired properties on the (stationary) velocity field. Alternatively, a
+                regularization term may be based directly on the optimizable parameters.
 
         Returns:
             Self reference to this updated transformation.

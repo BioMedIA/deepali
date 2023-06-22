@@ -1,4 +1,4 @@
-r"""Object oriented decorators for data tensors with additional attributes."""
+r"""Specialized subtypes of ``torch.Tensor`` with additional attributes."""
 
 from .collate import collate_samples
 from .prepare import prepare_batch

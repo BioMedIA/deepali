@@ -1,5 +1,11 @@
 # deepali
 
+![docs](https://github.com/BioMedIA/deepali-hf/workflows/GitHub%20Pages/badge.svg)
+![release](https://github.com/BioMedIA/deepali-hf/workflows/Package%20Release/badge.svg)
+![pypi](https://img.shields.io/pypi/v/deepali-hf)
+![downloads](https://img.shields.io/pypi/dm/deepali-hf)
+![python versions](https://img.shields.io/pypi/pyversions/deepali-hf)
+
 An [open source](https://github.com/BioMedIA/deepali/tree/main/LICENSE) research library for image, point set, and surface registration in [PyTorch], which is developed and maintained by the [HeartFlow-Imperial College London] research lab at the [Biomedical Image Analysis Group].
 
 *[Deepali](https://en.wikipedia.org/wiki/Deepali)* is a Hindu/Sanskrit Indian given name, which means "joy" as in the gratification one may feel working with code built on a modern tensor library with support for automatic differentiation, and "chain of lamps" alluding to the application of the chain rule by *torch.autograd*, the concatenation of spatial coordinate transformations, and furthermore the (sequential) composition of PyTorch modules. In addition, the English words "deep" and "ali(-gnment)" partially contained in this name should highlight that this project is not only suitable for traditional non-learning based registration, but in particular facilitates deep learning based approaches to image alignment.

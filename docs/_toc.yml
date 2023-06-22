@@ -1,0 +1,36 @@
+# Table of contents
+# Learn more at https://jupyterbook.org/customize/toc.html
+
+format: jb-book
+root: index
+parts:
+- caption: Basics
+  chapters:
+  - file: basics/markdown
+- caption: Tutorials
+  chapters:
+  - file: tutorials/notebooks
+  - file: tutorials/markdown-notebooks
+- caption: Reference
+  chapters:
+  - file: reference/core/index
+    sections:
+    - file: reference/core/domain
+    - file: reference/core/image
+    - file: reference/core/flow
+  - file: reference/data/index
+    sections:
+    - file: reference/data/tensor
+    - file: reference/data/dataset
+    - file: reference/data/sampler
+    - file: reference/data/transforms
+  - file: reference/losses/index
+  - file: reference/modules/index
+  - file: reference/networks/index
+  - file: reference/spatial/index
+    sections:
+    - file: reference/spatial/parametric
+    - file: reference/spatial/configurable
+    - file: reference/spatial/composite
+    - file: reference/spatial/transformer
+  - file: reference/utils/index

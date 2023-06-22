@@ -1,4 +1,5 @@
-name: Build packages
+name: Package Release
+
 on:
   push:
     branches:

@@ -2,7 +2,7 @@ r"""Losses for image, point set, and/or surface registration.
 
 Classes representing loss terms defined by this package are derived from ``torch.nn.Module``
 and follow a stateful object oriented design. The underlying functions implementing these loss
-terms are defined in the ``losses.functional`` module following a stateless functional API.
+terms are defined in the :mod:`deepali.losses.functional` module following a stateless functional API.
 
 The following import statement can be used to access the functional API:
 

@@ -13,10 +13,11 @@
     "[python]": {
         "editor.formatOnSave": true,
         "editor.formatOnSaveMode": "file",
+        "editor.defaultFormatter": "ms-python.black-formatter",
     },
     "restructuredtext.confPath": "",
     "jupyter.jupyterServerType": "local",
-    "python.formatting.provider": "black",
+    "python.formatting.provider": "none",
     "python.linting.enabled": true,
     "python.linting.flake8Enabled": true,
     "python.testing.unittestEnabled": false,

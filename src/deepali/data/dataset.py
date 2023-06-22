@@ -198,10 +198,10 @@ class MetaDataset(Dataset):
     r"""Dataset of file path template strings and sample meta-data given by Pandas DataFrame.
 
     This dataset can be used in conjunction with data reader transforms to load the data from
-    configured input file paths. For example, use the ``ReadImage`` transform followed by image
-    data preprocessing and augmentation functions for image data. The specified file path strings
-    are Python format strings, where keywords are replaced by the respective column entries for the
-    sample in the dataset index table (`pandas.DataFrame`).
+    configured input file paths. For example, use the :class:`deepali.data.transforms.ReadImage`
+    transform followed by image data preprocessing and augmentation functions for image data.
+    The specified file path strings are Python format strings, where keywords are replaced by the
+    respective column entries for the sample in the dataset index table (`pandas.DataFrame`).
 
     """
 
