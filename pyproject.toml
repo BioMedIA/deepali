@@ -1,6 +1,73 @@
 [build-system]
-requires = ["setuptools", "setuptools-scm", "wheel"]
+requires = [
+    "setuptools>=61.0",
+    "setuptools-scm[toml]>=6.2",
+]
+build-backend = "setuptools.build_meta"
 
+[project]
+# Unfortunately there exists a dummy PyPI package named deepali by a user whose
+# name is Deepali Sharma (deepali.sharma@sganalytics.com). The package appears to
+# be unmaintained and was only a test of how to publish a PyPI package. While that
+# package exists, use a package name that slightly differs from this project's name.
+name = "deepali-hf"
+description = "Image, point set, and surface registration library for PyTorch."
+readme = {file = "README.md", content-type = "text/markdown"}
+license = {text = "Apache-2.0"}
+
+maintainers = [
+    {name = "Andreas Schuh", email = "andreas.schuh@imperial.ac.uk"}
+]
+
+classifiers=[
+    "Development Status :: 2 - Pre-Alpha",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3 :: Only",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Image Processing",
+    "Typing :: Typed",
+]
+
+keywords = [
+    "medical-imaging",
+    "image-registration",
+    "spatial-transformer-networks",
+]
+
+requires-python = ">=3.9"
+dynamic = ["version"]
+
+dependencies = [
+    "dacite",
+    "pandas",
+    "pyyaml",
+    "SimpleITK>=2.0",
+    "torch>=1.9",
+    "typing-extensions",
+]
+
+[project.optional-dependencies]
+all = [
+    "deepali-hf[utils]"
+]
+utils = [
+    "boto3",
+    "numpy",
+    "scipy",
+    "SimpleITK>=2.0",
+    "vtk>=9.0",
+]
+
+[project.urls]
+"Homepage" = "https://biomedia.github.io/deepali"
+"Repository" = "https://github.com/BioMedIA/deepali.git"
+"Bug Tracker" = "https://github.com/BioMedIA/deepali/issues"
 
 [tool.black]
 line-length = 100
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools_scm]
