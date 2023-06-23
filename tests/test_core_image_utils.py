@@ -1,5 +1,6 @@
 import os
 
+import pytest
 import torch
 from torch import Tensor
 
@@ -44,8 +45,8 @@ def test_fill_border():
     assert result.sum() == 680
 
 
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA not available")
 def test_rand_sample_cuda() -> None:
-
     if "CUDA_VISIBLE_DEVICES" not in os.environ:
         os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 

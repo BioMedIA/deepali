@@ -42,9 +42,12 @@ def zeros(request) -> Tensor:
 @pytest.mark.parametrize("zeros,grid", [(d, d) for d in (3,)], indirect=True)
 def test_flowfield_torch_function(zeros: Tensor, grid: Grid) -> None:
     data = zeros
+    axes = Axes.WORLD  # different from default to check if attribute is preserved
 
-    image = FlowField(data, grid)
+    image = FlowField(data, grid, axes)
     assert type(image) is FlowField
+    assert hasattr(image, "_axes")
+    assert image.axes() is axes
     assert hasattr(image, "_grid")
     assert image.grid() is grid
 
@@ -54,6 +57,8 @@ def test_flowfield_torch_function(zeros: Tensor, grid: Grid) -> None:
     result = image.type(torch.int16)
     assert result is not image
     assert type(result) is FlowField
+    assert hasattr(result, "_axes")
+    assert result.axes() is axes
     assert hasattr(result, "_grid")
     assert result.grid() is image.grid()
     assert result.dtype is torch.int16
@@ -61,6 +66,8 @@ def test_flowfield_torch_function(zeros: Tensor, grid: Grid) -> None:
 
     result = image.eq(0)
     assert type(result) is FlowField
+    assert hasattr(result, "_axes")
+    assert result.axes() is axes
     assert hasattr(result, "_grid")
     assert result.grid() is image.grid()
     assert result.dtype is torch.bool
@@ -68,30 +75,39 @@ def test_flowfield_torch_function(zeros: Tensor, grid: Grid) -> None:
 
     result = result.all()
     assert type(result) is Tensor
+    assert not hasattr(result, "_axes")
     assert not hasattr(result, "_grid")
     assert result.ndim == 0
     assert result.item() is True
 
     result = torch.add(image, 2)
     assert type(result) is FlowField
+    assert hasattr(result, "_axes")
+    assert result.axes() is image.axes()
     assert hasattr(result, "_grid")
     assert result.grid() is image.grid()
     assert result.eq(2).all()
 
     result = torch.add(4, image)
     assert type(result) is FlowField
+    assert hasattr(result, "_axes")
+    assert result.axes() is image.axes()
     assert hasattr(result, "_grid")
     assert result.grid() is image.grid()
     assert result.eq(4).all()
 
     result = image.add(1)
     assert type(result) is FlowField
+    assert hasattr(result, "_axes")
+    assert result.axes() is image.axes()
     assert hasattr(result, "_grid")
     assert result.grid() is image.grid()
     assert result.eq(1).all()
 
     result = image.clone()
     assert type(result) is FlowField
+    assert hasattr(result, "_axes")
+    assert result.axes() is image.axes()
     assert hasattr(result, "_grid")
     assert result.grid() is not image.grid()
     assert result.grid() == image.grid()
@@ -99,6 +115,8 @@ def test_flowfield_torch_function(zeros: Tensor, grid: Grid) -> None:
 
     result = image.to("cpu", torch.int16)
     assert type(result) is FlowField
+    assert hasattr(result, "_axes")
+    assert result.axes() is image.axes()
     assert hasattr(result, "_grid")
     assert result.grid() is image.grid()
     assert result.device == torch.device("cpu")
@@ -107,6 +125,8 @@ def test_flowfield_torch_function(zeros: Tensor, grid: Grid) -> None:
     if torch.cuda.is_available():
         result = image.cuda()
         assert type(result) is FlowField
+        assert hasattr(result, "_axes")
+        assert result.axes() is image.axes()
         assert hasattr(result, "_grid")
         assert result.grid() is image.grid()
         assert result.is_cuda
@@ -114,6 +134,7 @@ def test_flowfield_torch_function(zeros: Tensor, grid: Grid) -> None:
     result = torch.cat([image, image], dim=0)
     assert isinstance(result, Image)
     assert type(result) == Image
+    assert not hasattr(result, "_axes")
     assert hasattr(result, "_grid")
     assert result.shape[0] == image.shape[0] * 2
     assert result.shape[1:] == image.shape[1:]
@@ -126,16 +147,25 @@ def test_flowfields_torch_function(zeros: Tensor, grid: Grid) -> None:
 
     batch = FlowFields(data.unsqueeze(0), grid, Axes.WORLD)
 
+    result = batch.detach()
+    assert isinstance(result, FlowFields)
+    assert result.shape == batch.shape
+    assert result.axes() == batch.axes()
+    assert result.grids() == batch.grids()
+
     result = torch.cat([batch, batch], dim=0)
     assert isinstance(result, FlowFields)
     assert result.shape[0] == batch.shape[0] + batch.shape[0]
     assert result.shape[1:] == batch.shape[1:]
+    assert result.axes() == batch.axes()
+    assert result.grids() == batch.grids() * 2
 
     result = torch.cat([batch, batch], dim=1)
     assert type(result) == ImageBatch
     assert result.shape[0] == batch.shape[0]
     assert result.shape[1] == batch.shape[1] * 2
     assert result.shape[2:] == batch.shape[2:]
+    assert result.grids() == batch.grids()
 
     with pytest.raises(ValueError):
         # Cannot batch together flow fields with mismatching Axes
