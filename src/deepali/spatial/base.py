@@ -38,10 +38,10 @@ class SpatialTransform(DeviceProperty, Module, metaclass=ABCMeta):
     of a target sampling grid, to points defined with respect to the same domain, i.e., the domain
     and codomain of the spatial coordinate map are identical. In order to transform an image defined
     with respect to a different sampling grid, this transformation has to be followed by a mapping
-    from target cube domain to source cube domain. This is done, for example, by the image transformer
-    implemented by ``ImageTransform``.
+    from target cube domain to source cube domain. This is done, for example, by the spatial transformer
+    implemented by :class:`.ImageTransformer`.
 
-    This forward pass of a ``SpatialTransform`` can be used to spatially transform any set of points
+    This forward pass of a :class:`SpatialTransform` can be used to spatially transform any set of points
     defined with respect to the grid domain of the spatial transformation, including in particular
     a tensor of shape ``(N, M, D)``, i.e., a batch of ``N`` point sets with cardianality ``M``. It can
     also be applied to a tensor of grid points of shape ``(N, ..., X, D)`` regardless if the grid points

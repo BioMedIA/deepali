@@ -29,6 +29,7 @@ dependencies:
   - sphinx_rtd_theme =1.2
   # Main libraries
   - dacite =1.8
+  - deprecation =2.1
   - numpy =1.25
   - pandas =1.5
   - pytorch =2.0,!=2.0.0  # ["osx" not in get_env("PLATFORM")]
