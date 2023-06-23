@@ -4,6 +4,7 @@ on:
   push:
     branches:
     - main
+    - pypi
   release:
     types: [released, prereleased]
   workflow_dispatch:
@@ -12,7 +13,7 @@ permissions:
   contents: read
 
 jobs:
-  pypi:
+  build-and-deploy-pypi-packages:
     name: Upload release to PyPI
     runs-on: ubuntu-latest
     environment:

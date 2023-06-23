@@ -1,0 +1,62 @@
+name: Update Docs
+
+on:
+  push:
+    branches:
+      - main
+      - docs
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
+# However, do NOT cancel in-progress runs as we want to allow these production deployments to complete.
+concurrency:
+  group: docs
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy-gh-pages:
+    name: Update GitHub Pages
+    runs-on: ubuntu-latest
+    environment:
+      name: docs
+      url: ${{ steps.deployment.outputs.page_url }}
+    permissions:
+      pages: write
+      id-token: write
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+      with:
+        fetch-depth: 0
+    # See https://dev.to/epassaro/caching-anaconda-environments-in-github-actions-5hde
+    - name: Set up Mambaforge
+      uses: conda-incubator/setup-miniconda@v2
+      with:
+          miniforge-variant: Mambaforge
+          miniforge-version: 22.9.0-3
+          activate-environment: deepali
+          use-mamba: true
+    - id: cache
+      uses: actions/cache@v2
+      with:
+        path: /usr/share/miniconda3/envs/deepali
+        key: conda-env-deepali-${{ hashFiles('conda/environment.linux-64.lock') }}
+    - name: Update environment
+      run: mamba --no-banner update --name deepali --file conda/environment.linux-64.lock
+      if: steps.cache.outputs.cache-hit != 'true'
+    - name: Install package
+      run: conda run --name deepali pip install .
+    - name: Build Pages
+      run: conda run --name deepali jupyter-book build docs
+    - name: Set up Pages
+      uses: actions/configure-pages@v3
+    - name: Upload Pages
+      uses: actions/upload-pages-artifact@v1
+      with:
+        path: docs/_build/html
+    - id: deployment
+      name: Deploy Pages
+      uses: actions/deploy-pages@v2

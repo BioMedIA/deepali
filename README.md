@@ -1,10 +1,10 @@
 # deepali
 
-![docs](https://github.com/BioMedIA/deepali-hf/workflows/GitHub%20Pages/badge.svg)
-![release](https://github.com/BioMedIA/deepali-hf/workflows/Package%20Release/badge.svg)
 ![pypi](https://img.shields.io/pypi/v/deepali-hf)
 ![downloads](https://img.shields.io/pypi/dm/deepali-hf)
 ![python versions](https://img.shields.io/pypi/pyversions/deepali-hf)
+[![docs](https://github.com/BioMedIA/deepali-hf/actions/workflows/docs.yml/badge.svg)](https://github.com/BioMedIA/deepali-hf/actions/workflows/docs.yml)
+[![deployment](https://github.com/BioMedIA/deepali-hf/actions/workflows/packages.yml/badge.svg)](https://github.com/BioMedIA/deepali-hf/actions/workflows/packages.yml)
 
 An [open source](https://github.com/BioMedIA/deepali/tree/main/LICENSE) research library for image, point set, and surface registration in [PyTorch], which is developed and maintained by the [HeartFlow-Imperial College London] research lab at the [Biomedical Image Analysis Group].
 
