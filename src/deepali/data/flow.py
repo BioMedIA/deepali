@@ -127,8 +127,10 @@ class FlowFields(ImageBatch):
                 data._grid = grid
                 data._axes = axes
             else:
-                data = cls(data, grid)
-        return ImageBatch._torch_function_result(func, data, grid)
+                data = cls(data, grid, axes)
+        else:
+            data = ImageBatch._torch_function_result(func, data, grid)
+        return data
 
     @classmethod
     def __torch_function__(cls, func, types, args=(), kwargs=None):
@@ -415,8 +417,10 @@ class FlowField(Image):
                 data._grid = grid
                 data._axes = axes
             else:
-                data = cls(data, grid)
-        return Image._torch_function_result(func, data, grid)
+                data = cls(data, grid, axes)
+        else:
+            data = Image._torch_function_result(func, data, grid)
+        return data
 
     @classmethod
     def __torch_function__(cls, func, types, args=(), kwargs=None):
