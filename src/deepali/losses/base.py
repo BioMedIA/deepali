@@ -115,7 +115,13 @@ class NormalizedPairwiseImageLoss(PairwiseImageLoss):
         self.norm = norm
 
     def extra_repr(self) -> str:
-        return f"norm={float(self.norm):.5f}"
+        s = ""
+        norm = self.norm
+        if isinstance(norm, Tensor) and norm.nelement() != 1:
+            s += f"norm={self.norm!r}"
+        elif norm is not None:
+            s += f"norm={float(norm):.5f}"
+        return s
 
 
 class DisplacementLoss(Module, metaclass=ABCMeta):
