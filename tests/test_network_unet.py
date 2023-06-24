@@ -13,9 +13,9 @@ from deepali.networks.unet import UNet, UNetConfig, last_num_channels
 @pytest.fixture(scope="function")
 def input_tensor(request) -> Tensor:
     if request.param == 2:
-        return torch.rand((1, 1, 256, 256))
+        return torch.rand((1, 1, 128, 128))
     elif request.param == 3:
-        return torch.rand((1, 1, 128, 256, 256))
+        return torch.rand((1, 1, 64, 128, 128))
     else:
         raise ValueError("input_tensor() 'request.param' must be 2 or 3")
 
@@ -70,7 +70,6 @@ def test_unet_with_single_output_layer(input_tensor: Tensor) -> None:
 
 @pytest.mark.parametrize("input_tensor", [2, 3], indirect=True)
 def test_unet_with_multiple_output_layers(input_tensor: Tensor) -> None:
-
     spatial_dims = input_tensor.ndim - 2
     config = UNetConfig()
 
