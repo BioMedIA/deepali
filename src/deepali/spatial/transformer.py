@@ -167,7 +167,7 @@ class ImageTransformer(Module):
 class PointSetTransformer(Module):
     r"""Spatially transform a set of points.
 
-    The :class:`.PointTransformer` applies a :class:`.SpatialTransform` to a set of input points
+    The :class:`.PointSetTransformer` applies a :class:`.SpatialTransform` to a set of input points
     with coordinates defined with respect to a specified target domain. This coordinate map may
     further be followed by a linear transformation from the grid domain of the spatial transform
     to a given source domain. When no spatial transform is given, use :func:`.grid_transform_points`.
