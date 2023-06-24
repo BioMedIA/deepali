@@ -46,7 +46,7 @@ dependencies = [
 
 [project.optional-dependencies]
 all = [
-    "hf-deepali[utils]"
+    "hf-deepali[utils,tests]"
 ]
 utils = [
     "boto3",
@@ -54,6 +54,10 @@ utils = [
     "scipy",
     "SimpleITK>=2.0",
     "vtk>=9.0",
+]
+tests = [
+    "pytest",
+    "torchinfo",
 ]
 
 [project.urls]
