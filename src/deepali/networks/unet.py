@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 from collections import OrderedDict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Callable, Iterable, Mapping, NamedTuple, Optional, Sequence, Tuple, Type, Union
 from typing import Dict, List
 
@@ -88,7 +88,6 @@ def last_num_channels(num_channels: NumChannels) -> int:
 
 @dataclass
 class UNetLayerConfig(DataclassConfig):
-
     kernel_size: ScalarOrTuple[int] = 3
     dilation: ScalarOrTuple[int] = 1
     padding: Optional[ScalarOrTuple[int]] = None
@@ -106,7 +105,6 @@ class UNetLayerConfig(DataclassConfig):
 
 @dataclass
 class UNetDownsampleConfig(DataclassConfig):
-
     mode: str = "conv"
     factor: Union[int, Sequence[int]] = 2
     kernel_size: Optional[ScalarOrTuple[int]] = None
@@ -115,7 +113,6 @@ class UNetDownsampleConfig(DataclassConfig):
 
 @dataclass
 class UNetUpsampleConfig(DataclassConfig):
-
     mode: Union[str, UpsampleMode] = "deconv"
     factor: Union[int, Sequence[int]] = 2
     kernel_size: Optional[ScalarOrTuple[int]] = None
@@ -125,7 +122,6 @@ class UNetUpsampleConfig(DataclassConfig):
 
 @dataclass
 class UNetOutputConfig(DataclassConfig):
-
     channels: int = 1
     kernel_size: int = 1
     dilation: int = 1
@@ -144,12 +140,11 @@ class UNetOutputConfig(DataclassConfig):
 
 @dataclass
 class UNetEncoderConfig(DataclassConfig):
-
     num_channels: NumChannels = (8, 16, 32, 64)
     num_blocks: NumBlocks = 2
     num_layers: NumLayers = None
-    conv_layer: UNetLayerConfig = UNetLayerConfig()
-    downsample: Union[str, UNetDownsampleConfig] = UNetDownsampleConfig()
+    conv_layer: UNetLayerConfig = field(default_factory=UNetLayerConfig)
+    downsample: Union[str, UNetDownsampleConfig] = field(default_factory=UNetDownsampleConfig)
     residual: bool = False
 
     # When torch.backends.cudnn.deterministic == True, then a dilated convolution at layer_1_2
@@ -179,12 +174,11 @@ class UNetEncoderConfig(DataclassConfig):
 
 @dataclass
 class UNetDecoderConfig(DataclassConfig):
-
     num_channels: NumChannels = (64, 32, 16, 8)
     num_blocks: NumBlocks = 2
     num_layers: NumLayers = None
-    conv_layer: UNetLayerConfig = UNetLayerConfig()
-    upsample: Union[str, UNetUpsampleConfig] = UNetUpsampleConfig()
+    conv_layer: UNetLayerConfig = field(default_factory=UNetLayerConfig)
+    upsample: Union[str, UNetUpsampleConfig] = field(default_factory=UNetUpsampleConfig)
     join_mode: str = "cat"
     crop_skip: bool = False
     residual: bool = False
@@ -248,8 +242,7 @@ class UNetDecoderConfig(DataclassConfig):
 
 @dataclass
 class UNetConfig(DataclassConfig):
-
-    encoder: UNetEncoderConfig = UNetEncoderConfig()
+    encoder: UNetEncoderConfig = field(default_factory=UNetEncoderConfig)
     decoder: Optional[UNetDecoderConfig] = None
     output: Optional[UNetOutputConfig] = None
 
