@@ -1,10 +1,10 @@
 # deepali
 
-![pypi](https://img.shields.io/pypi/v/deepali-hf)
-![downloads](https://img.shields.io/pypi/dm/deepali-hf)
-![python versions](https://img.shields.io/pypi/pyversions/deepali-hf)
-[![docs](https://github.com/BioMedIA/deepali-hf/actions/workflows/docs.yml/badge.svg)](https://github.com/BioMedIA/deepali-hf/actions/workflows/docs.yml)
-[![deployment](https://github.com/BioMedIA/deepali-hf/actions/workflows/packages.yml/badge.svg)](https://github.com/BioMedIA/deepali-hf/actions/workflows/packages.yml)
+![pypi](https://img.shields.io/pypi/v/hf-deepali)
+![downloads](https://img.shields.io/pypi/dm/hf-deepali)
+![python versions](https://img.shields.io/pypi/pyversions/hf-deepali)
+[![docs](https://github.com/BioMedIA/hf-deepali/actions/workflows/docs.yml/badge.svg)](https://github.com/BioMedIA/hf-deepali/actions/workflows/docs.yml)
+[![deployment](https://github.com/BioMedIA/hf-deepali/actions/workflows/packages.yml/badge.svg)](https://github.com/BioMedIA/hf-deepali/actions/workflows/packages.yml)
 
 An [open source](https://github.com/BioMedIA/deepali/tree/main/LICENSE) research library for image, point set, and surface registration in [PyTorch], which is developed and maintained by the [HeartFlow-Imperial College London] research lab at the [Biomedical Image Analysis Group].
 
@@ -52,7 +52,7 @@ The following lists the main dependencies of this project. For a complete list, 
 This Python package can be installed with [pip]:
 
 ```
-pip install deepali-hf
+pip install hf-deepali
 ```
 
 The latest development version can be installed directly from the GitHub repository, i.e.,
@@ -72,7 +72,7 @@ This will install missing dependencies in the current Python environment from [P
 Additional optional dependencies of the [deepali.utils] library can be installed with the command:
 
 ```
-pip install deepali-hf[utils]
+pip install hf-deepali[utils]
 # or pip install git+https://github.com/BioMedIA/deepali.git#egg=deepali[utils]
 ```
 

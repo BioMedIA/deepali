@@ -6,11 +6,7 @@ requires = [
 build-backend = "setuptools.build_meta"
 
 [project]
-# Unfortunately there exists a dummy PyPI package named deepali by a user whose
-# name is Deepali Sharma (deepali.sharma@sganalytics.com). The package appears to
-# be unmaintained and was only a test of how to publish a PyPI package. While that
-# package exists, use a package name that slightly differs from this project's name.
-name = "deepali-hf"
+name = "hf-deepali"
 description = "Image, point set, and surface registration library for PyTorch."
 readme = {file = "README.md", content-type = "text/markdown"}
 license = {text = "Apache-2.0"}
@@ -50,7 +46,7 @@ dependencies = [
 
 [project.optional-dependencies]
 all = [
-    "deepali-hf[utils]"
+    "hf-deepali[utils]"
 ]
 utils = [
     "boto3",

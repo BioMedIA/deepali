@@ -73,7 +73,7 @@ from .types import is_namedtuple
 from .types import is_path_str
 
 
-__version__ = metadata.version("deepali-hf")
+__version__ = metadata.version("hf-deepali")
 r"""Version string of installed deepali core libraries."""
 
 __all__ = (
