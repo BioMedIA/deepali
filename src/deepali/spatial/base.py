@@ -227,7 +227,7 @@ class SpatialTransform(DeviceProperty, Module, metaclass=ABCMeta):
                 break
 
     def forward(self, points: Tensor, grid: bool = False) -> Tensor:
-        r"""Transform points by this spatial transformation.
+        r"""Transform normalized points by this spatial transformation.
 
         Args:
             points: Tensor of shape ``(N, M, D)`` or ``(N, ..., Y, X, D)``.
@@ -241,6 +241,56 @@ class SpatialTransform(DeviceProperty, Module, metaclass=ABCMeta):
         apply = U.transform_grid if grid else U.transform_points
         align_corners = self.align_corners()
         return apply(transform, points, align_corners=align_corners)
+
+    def points(
+        self,
+        points: Tensor,
+        grid: Optional[Grid] = None,
+        axes: Optional[Union[Axes, str]] = None,
+        to_grid: Optional[Grid] = None,
+        to_axes: Optional[Union[Axes, str]] = None,
+    ) -> Tensor:
+        r"""Transform points by this spatial transformation.
+
+        Args:
+            points: Tensor of shape ``(N, M, D)`` or ``(N, ..., Y, X, D)``.
+            grid: Grid with respect to which input ``points`` are defined. Uses ``self.grid()`` if ``None``.
+            axes: Coordinate axes with respect to which ``points`` are defined. Uses ``self.axes()`` if ``None``.
+            to_grid: Grid with respect to which output points are defined. Same as ``grid`` if ``None``.
+            to_axes: Coordinate axes to which ``points`` should be mapped to. Same as ``axes`` if ``None``.
+
+        Returns:
+            Point coordinates in ``(grid, axes)`` spatially transformed and mapped to coordinates with respect to ``(to_grid, to_axes)``.
+
+        """
+        if grid is None:
+            grid = self.grid()
+        if axes is None:
+            axes = self.axes()
+        else:
+            axes = Axes.from_arg(axes)
+        if to_grid is None:
+            to_grid = grid
+        if to_axes is None:
+            to_axes = axes
+        else:
+            to_axes = Axes.from_arg(to_axes)
+        points = grid.transform_points(
+            points,
+            axes=axes,
+            to_grid=self.grid(),
+            to_axes=self.axes(),
+            decimals=None,
+        )
+        points = self.forward(points)
+        points = self.grid().transform_points(
+            points,
+            axes=self.axes(),
+            to_grid=to_grid,
+            to_axes=to_axes,
+            decimals=None,
+        )
+        return points
 
     def disp(self, grid: Optional[Grid] = None) -> Tensor:
         r"""Get displacement vector field representation of this transformation.
@@ -310,16 +360,17 @@ class SpatialTransform(DeviceProperty, Module, metaclass=ABCMeta):
         r"""Get tensor representation of this transformation.
 
         The tensor representation of a transformation is with respect to the unit cube axes defined
-        by its sampling grid as specified by ``self.axes()``. For a non-rigid transformation, and
-        is a displacement vector field. For linear transformations, it is a batch of homogeneous
+        by its sampling grid as specified by ``self.axes()``. For a non-rigid transformation it is
+        a displacement vector field. For linear transformations, it is a batch of homogeneous
         transformation tensors whose shape determines the type of linear transformation.
 
         Returns:
-            In case of a ``LinearTransform``, returns a batch of homogeneous transformation matrices
-            as tensor of shape ``(N, D, 1)`` (translation),  ``(N, D, D)`` (affine) or ``(N, D, D + 1)``,
-            i.e., a 3-dimensional tensor. In case of a non-rigid transformation, a displacement vector
-            field is returned as tensor of shape ``(N, D, ..., X)``, i.e., a higher dimensional tensor,
-            where ``D = self.ndim`` and the number of tensor dimensions is equal to ``D + 2``.
+            Returns a batch of homogeneous transformation matrices as tensor of shape ``(N, D, 1)``
+            (translation),  ``(N, D, D)`` (affine) or ``(N, D, D + 1)``, i.e., a 3-dimensional tensor,
+            if this transformation is a :class:`.LinearTransform`. In case of a non-rigid transformation,
+            a displacement vector field is returned as tensor of shape ``(N, D, ..., X)``, i.e., a
+            higher dimensional tensor, where ``D = self.ndim`` and the number of tensor dimensions is
+            equal to ``D + 2``.
 
         """
         raise NotImplementedError(f"{type(self).__name__}.tensor()")
