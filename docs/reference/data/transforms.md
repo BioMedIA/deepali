@@ -2,106 +2,42 @@
 
 ```{eval-rst}
 .. automodule:: deepali.data.transforms
+    :noindex:
 ```
 
-## Base transforms
-
-### ItemTransform
+## Item transforms
 
 ```{eval-rst}
-.. autoclass:: deepali.data.transforms.ItemTransform
-    :members:
-```
+.. autoapisummary::
 
-### ItemwiseTransform
+    deepali.data.transforms.item.ItemTransform
+    deepali.data.transforms.item.ItemwiseTransform
 
-```{eval-rst}
-.. autoclass:: deepali.data.transforms.ItemwiseTransform
-    :members:
 ```
 
 ## Image transforms
 
-### AvgPoolImage
-
 ```{eval-rst}
-.. autoclass:: deepali.data.transforms.AvgPoolImage
-    :members:
+.. autoapisummary::
+
+    deepali.data.transforms.image.AvgPoolImage
+    deepali.data.transforms.image.CastImage
+    deepali.data.transforms.image.CenterCropImage
+    deepali.data.transforms.image.CenterPadImage
+    deepali.data.transforms.image.ClampImage
+    deepali.data.transforms.image.ImageToTensor
+    deepali.data.transforms.image.NarrowImage
+    deepali.data.transforms.image.NormalizeImage
+    deepali.data.transforms.image.ReadImage
+    deepali.data.transforms.image.ResampleImage
+    deepali.data.transforms.image.RescaleImage
+    deepali.data.transforms.image.ResizeImage
+
 ```
 
-### CastImage
+Image transforms can also be instantiated based on a configuration, e.g., in YAML format:
 
 ```{eval-rst}
-.. autoclass:: deepali.data.transforms.CastImage
-    :members:
-```
-
-### CenterCropImage
-
-```{eval-rst}
-.. autoclass:: deepali.data.transforms.CenterCropImage
-    :members:
-```
-
-### CenterPadImage
-
-```{eval-rst}
-.. autoclass:: deepali.data.transforms.CenterPadImage
-    :members:
-```
-
-### ClampImage
-
-```{eval-rst}
-.. autoclass:: deepali.data.transforms.ClampImage
-    :members:
-```
-
-### ImageToTensor
-
-```{eval-rst}
-.. autoclass:: deepali.data.transforms.ImageToTensor
-    :members:
-```
-
-### NarrowImage
-
-```{eval-rst}
-.. autoclass:: deepali.data.transforms.NarrowImage
-    :members:
-```
-
-### NormalizeImage
-
-```{eval-rst}
-.. autoclass:: deepali.data.transforms.NormalizeImage
-    :members:
-```
-
-### ReadImage
-
-```{eval-rst}
-.. autoclass:: deepali.data.transforms.ReadImage
-    :members:
-```
-
-### ResampleImage
-
-```{eval-rst}
-.. autoclass:: deepali.data.transforms.ResampleImage
-    :members:
-```
-
-### RescaleImage
-
-```{eval-rst}
-.. autoclass:: deepali.data.transforms.RescaleImage
-    :members:
-```
-
-### ResizeImage
-
-```{eval-rst}
-.. autoclass:: deepali.data.transforms.ResizeImage
-    :members:
+.. autoapifunction:: deepali.data.transforms.image.image_transforms
+    :noindex:
 ```

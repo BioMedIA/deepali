@@ -1,4 +1,4 @@
-r"""Auxiliary functions for working with VTK data structures."""
+r"""Auxiliary functions for working with `VTK <https://vtk.org/>`_ data structures."""
 
 from .idlist import iter_id_list
 from .idlist import iter_cell_point_ids

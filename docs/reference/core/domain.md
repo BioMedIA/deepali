@@ -3,20 +3,32 @@
 ## Image domain
 
 ```{eval-rst}
-.. autoclass:: deepali.core.Cube
-    :members:
-```
-
-## Grid axes
-
-```{eval-rst}
-.. autoclass:: deepali.core.Axes
-    :members:
+.. automodule:: deepali.core.Cube
+    :noindex:
 ```
 
 ## Image grid
 
 ```{eval-rst}
-.. autoclass:: deepali.core.Grid
-    :members:
+.. automodule:: deepali.core.Grid
+    :noindex:
+```
+
+## Grid axes
+
+```{eval-rst}
+.. automodule:: deepali.core.Axes
+    :noindex:
+
+.. autoattribute:: deepali.core.Axes.CUBE
+    :noindex:
+
+.. autoattribute:: deepali.core.Axes.CUBE_CORNERS
+    :noindex:
+
+.. autoattribute:: deepali.core.Axes.GRID
+    :noindex:
+
+.. autoattribute:: deepali.core.Axes.WORLD
+    :noindex:
 ```

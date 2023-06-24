@@ -5,16 +5,18 @@ this core library in particular defines functions which operate on objects of ty
 This functional API defines a set of reusable state-less functions similar to ``torch.nn.functional``.
 Object-oriented APIs use this functional API to realize their functionality. In particular, the
 ``forward()`` method of ``torch.nn.Module`` subclasses, such as for example data transformations
-(cf. ``transforms``) and neural network components (cf. ``modules`` and ``networks``) are implemented
-using these functional building blocks.
+(cf. :mod:`.data.transforms`) and neural network components (cf. :mod:`.modules` and :mod:`.networks`)
+are implemented using these functional building blocks.
 
 The following import statement can be used to access the functional API:
 
-.. code::
+.. code-block::
 
     import deepali.core.functional as U
 
 """
+
+from importlib import metadata
 
 from .config import DataclassConfig
 from .config import join_kwargs_in_sequence
@@ -70,6 +72,9 @@ from .types import is_uint_dtype
 from .types import is_namedtuple
 from .types import is_path_str
 
+
+__version__ = metadata.version("deepali-hf")
+r"""Version string of installed deepali core libraries."""
 
 __all__ = (
     "ALIGN_CORNERS",

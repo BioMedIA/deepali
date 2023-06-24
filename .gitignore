@@ -17,6 +17,7 @@ __pycache__/
 
 # documentation
 /docs/_build/
+/docs/reference/api/
 
 # data files
 *.pt

@@ -275,7 +275,7 @@ def evaluate_cubic_bspline(
             transposed convolution used to upsample the control point displacements to the output size.
             If a sequence of values is given, these must be the strides for the different spatial
             dimensions in the order ``(sx, ...)``.
-        size: Spatial size of output tensor in the order ``(nx, ...).
+        size: Spatial size of output tensor in the order ``(nx, ...)``.
         shape: Spatial size of output tensor in the order ``(..., nx)``.
         kernel: Precomputed cubic B-spline interpolation kernel. When multiple 1D kernels are given,
             these must be in the order ``(kx, ...)``.
@@ -408,7 +408,7 @@ def cubic_bspline_jacobian_dict(
         stride: Number of output grid points between control points plus one. If a sequence of
             values is given, these must be the strides for the different spatial dimensions in
             the order ``(sx, ...)``.
-        size: Spatial size of output tensor in the order ``(nx, ...).
+        size: Spatial size of output tensor in the order ``(nx, ...)``.
         shape: Spatial size of output tensor in the order ``(..., nx)``.
         add_identity: Whether to calculate derivatives of :math:`u(x)` (False) or the free-form
             deformation given by :math:`x + u(x)` (True), where :math:`u` is the cubic B-spline
@@ -462,7 +462,7 @@ def cubic_bspline_jacobian_matrix(
         stride: Number of output grid points between control points plus one. If a sequence of
             values is given, these must be the strides for the different spatial dimensions in
             the order ``(sx, ...)``.
-        size: Spatial size of output tensor in the order ``(nx, ...).
+        size: Spatial size of output tensor in the order ``(nx, ...)``.
         shape: Spatial size of output tensor in the order ``(..., nx)``.
         add_identity: Whether to calculate derivatives of :math:`u(x)` (False) or the free-form
             deformation given by :math:`x + u(x)` (True), where :math:`u` is the cubic B-spline
@@ -498,7 +498,7 @@ def cubic_bspline_jacobian_triu(
         stride: Number of output grid points between control points plus one. If a sequence of
             values is given, these must be the strides for the different spatial dimensions in
             the order ``(sx, ...)``.
-        size: Spatial size of output tensor in the order ``(nx, ...).
+        size: Spatial size of output tensor in the order ``(nx, ...)``.
         shape: Spatial size of output tensor in the order ``(..., nx)``.
         add_identity: Whether to calculate derivatives of :math:`u(x)` (False) or the free-form
             deformation given by :math:`x + u(x)` (True), where :math:`u` is the cubic B-spline

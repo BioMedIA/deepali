@@ -219,7 +219,7 @@ class MI(PairwiseImageLoss):
     ):
         r"""Initialize mutual information loss term.
 
-        See `deepali.losses.functional.mi_loss`.
+        See :func:`deepali.losses.functional.mi_loss`.
 
         """
 
@@ -313,7 +313,7 @@ class NMI(MI):
     ):
         r"""Initialize normalized mutual information loss term.
 
-        See `deepali.losses.functional.nmi_loss`.
+        See :func:`deepali.losses.functional.nmi_loss`.
 
         """
         super().__init__(

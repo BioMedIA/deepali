@@ -46,7 +46,8 @@ class ExpFlow(Module):
     def inv(self) -> ExpFlow:
         r"""Get inverse exponential map.
 
-        .. code::
+        .. code-block:: python
+
             u = exp(v)
             w = exp.inv(v)
 

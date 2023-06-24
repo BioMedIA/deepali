@@ -1,7 +1,7 @@
 from deprecation import deprecated
 
+from ..core import __version__
 from .transformer import ImageTransformer
-from ..version import __version__
 
 
 @deprecated(

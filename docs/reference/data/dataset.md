@@ -1,56 +1,27 @@
-# Map-style datasets
+# Input datasets
 
 ```{eval-rst}
 .. automodule:: deepali.data.dataset
-```
-
-```{eval-rst}
-.. autoclass:: deepali.data.Dataset
-    :members:
+    :noindex:
 ```
 
 ## Generic datasets
 
-### MetaDataset
-
 ```{eval-rst}
-.. autoclass:: deepali.data.MetaDataset
-    :members:
-    :inherited-members:
-```
+.. autoapisummary::
 
-### GroupDataset
+    deepali.data.dataset.MetaDataset
+    deepali.data.dataset.GroupDataset
+    deepali.data.dataset.JoinDataset
 
-```{eval-rst}
-.. autoclass:: deepali.data.GroupDataset
-    :members:
-    :inherited-members:
-```
-
-### JoinDataset
-
-```{eval-rst}
-.. autoclass:: deepali.data.JoinDataset
-    :members:
-    :inherited-members:
 ```
 
 ## Image datasets
 
-### ImageDataset
-
 ```{eval-rst}
-.. autoclass:: deepali.data.ImageDataset
-    :members:
-    :inherited-members:
-    :undoc-members:
-```
+.. autoapisummary::
 
-### ImageDatasetConfig
+    deepali.data.dataset.ImageDataset
+    deepali.data.dataset.ImageDatasetConfig
 
-```{eval-rst}
-.. autoclass:: deepali.data.ImageDatasetConfig
-    :members:
-    :inherited-members:
-    :undoc-members:
 ```

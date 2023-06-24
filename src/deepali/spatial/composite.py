@@ -1,4 +1,4 @@
-r"""Defines composite spatial transformations."""
+r"""Composite spatial transformations are composed of other spatial transforms."""
 
 from __future__ import annotations
 
@@ -194,7 +194,16 @@ class CompositeTransform(SpatialTransform):
 
 
 class MultiLevelTransform(CompositeTransform):
-    r"""Sum of spatial transformations applied to any set of points."""
+    r"""Sum of spatial transformations applied to any set of points.
+
+    A :class:`.MultiLevelTransform` adds the sum of the displacement vectors across all
+    spatial transforms at the input points that are being mapped to new locations, i.e.,
+
+    .. math::
+
+        \vec{y} = \vec{x} + \sum_{i=0}^{n-1} \vec{u}_i(\vec{x})
+
+    """
 
     def forward(self, points: Tensor, grid: bool = False) -> Tensor:
         r"""Transform set of points by sum of spatial transformations.
@@ -249,7 +258,15 @@ class MultiLevelTransform(CompositeTransform):
 
 
 class SequentialTransform(CompositeTransform):
-    r"""Composition of spatial transformations applied to any set of points."""
+    r"""Composition of spatial transformations applied to any set of points.
+
+    A :class:`.SequentialTransform` is the functional composition of spatial transforms, i.e.,
+
+    .. math::
+
+        \vec{y} = \vec{u}_{n-1} \circ \cdots \circ \vec{u}_0 \circ \vec{x}
+
+    """
 
     def forward(self, points: Tensor, grid: bool = False) -> Tensor:
         r"""Transform points by sequence of spatial transformations.

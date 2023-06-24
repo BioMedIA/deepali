@@ -37,4 +37,4 @@ Tests:
 - [ ] Tests of loss terms.
 
 Documentation:
-- [ ] Add Sphinx based `docs`, see `docs/source/conf.py` of PyTorch or kornia.
+- [x] Add Sphinx based `docs`, see `docs/source/conf.py` of PyTorch or kornia.

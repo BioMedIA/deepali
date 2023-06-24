@@ -1,10 +1,7 @@
-r"""Apply spatial transformations.
+r"""Modules which apply a spatial transformation to a given input data tensor.
 
 A spatial transformer applies a :class:`.SpatialTransform`, which takes as input point coordinates
-and maps these to new spatial locations, to a given input data tensor. In case of an input
-image tensor, the image is sampled at these mapped locations to produce the transformed
-image by assigning the sampled image value to the respective input image grid point. If the
-spatial transformation is non-rigid, this is also referred to as warping the input image.
+and maps these to new spatial locations, to a given input data tensor.
 
 """
 
@@ -27,9 +24,11 @@ from .base import SpatialTransform
 class ImageTransformer(Module):
     r"""Spatially transform an image.
 
-    This module applies a :class:`.SpatialTransform` to the sampling grid points of the target domain,
-    optionally followed by linear transformation from target to source domain, and samples
-    the input image ``x`` of shape ``(N, C, ..., X)`` at these deformed source grid points.
+    The :class:`.ImageTransformer` applies a :class:`.SpatialTransform` to the sampling grid
+    points of the target domain, optionally followed by linear transformation from target to
+    source domain, and samples the input image of shape ``(N, C, ..., X)`` at these deformed
+    source grid points. If the spatial transformation is non-rigid, this is also commonly
+    referred to as warping the input image.
 
     """
 

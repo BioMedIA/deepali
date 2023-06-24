@@ -1,4 +1,4 @@
-r"""Auxiliary functions for implementing argparse based command line interfaces."""
+r"""Auxiliary functions for implementing `argparse <https://docs.python.org/3/library/argparse.html>`_ based command line interfaces."""
 
 from .environ import cuda_visible_devices
 from .environ import check_cuda_visible_devices

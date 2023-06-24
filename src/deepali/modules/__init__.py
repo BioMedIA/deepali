@@ -1,7 +1,7 @@
 r"""Modules without learnable parameters.
 
-This package defines subclasses of ``torch.nn.Module`` which expose the tensor operations
-available in the :mod:`deepali.core` package via a stateful functor object that can be used
+This library defines subclasses of ``torch.nn.Module`` which expose the tensor operations
+available in the :mod:`.core` library via a stateful functor object that can be used
 in PyTorch models to perform predefined operations with in general no optimizable parameters.
 
 """

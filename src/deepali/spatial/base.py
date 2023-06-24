@@ -32,37 +32,15 @@ class ReadOnlyParameters(RuntimeError):
 
 
 class SpatialTransform(DeviceProperty, Module, metaclass=ABCMeta):
-    r"""Base class of all spatial coordinate transformations.
-
-    A spatial transformation maps points from a target domain defined with respect to the unit cube
-    of a target sampling grid, to points defined with respect to the same domain, i.e., the domain
-    and codomain of the spatial coordinate map are identical. In order to transform an image defined
-    with respect to a different sampling grid, this transformation has to be followed by a mapping
-    from target cube domain to source cube domain. This is done, for example, by the spatial transformer
-    implemented by :class:`.ImageTransformer`.
-
-    This forward pass of a :class:`SpatialTransform` can be used to spatially transform any set of points
-    defined with respect to the grid domain of the spatial transformation, including in particular
-    a tensor of shape ``(N, M, D)``, i.e., a batch of ``N`` point sets with cardianality ``M``. It can
-    also be applied to a tensor of grid points of shape ``(N, ..., X, D)`` regardless if the grid points
-    are located at the undeformed grid positions or an already deformed grid. In case of a non-rigid
-    deformation, the point displacements are by default sampled at the input points. The sampled flow
-    vectors ``u`` are then added to these input points ``x``, i.e., ``y = x + u(x)``. If the boolean
-    flag ``grid=True`` is passed to the ``forward()`` function, it is assumed that the coordinates
-    correspond to the positions of undeformed spatial grid points with domain equal to the domain
-    of the transformation. In this special case, a simple interpolation to resize the vector field
-    to the size of the input tensor is used. In case of a ``LinearTransform``, ``y = Ax + t``.
-
-    The unit cube domain is ``Axes.CUBE`` if ``grid.align_corners() == False``,
-    and ``Axes.CUBE_CORNERS`` otherwise.
-
-    """
+    r"""Base class of all spatial coordinate transformations."""
 
     def __init__(self, grid: Grid):
         r"""Initialize base class.
 
         Args:
             grid: Spatial domain with respect to which transformation is defined.
+                The unit cube domain is :attr:`.Axes.CUBE` if ``grid.align_corners() == False``,
+                and :attr:`.Axes.CUBE_CORNERS` otherwise.
 
         """
         if not isinstance(grid, Grid):
@@ -372,7 +350,7 @@ class SpatialTransform(DeviceProperty, Module, metaclass=ABCMeta):
 
         Convenience property for applying the inverse transformation, e.g.,
 
-        .. code-block::
+        .. code-block:: python
 
             y = transform(x)
             x = transform.inv(y)

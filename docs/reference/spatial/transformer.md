@@ -2,11 +2,12 @@
 
 ```{eval-rst}
 .. automodule:: deepali.spatial.transformer
+    :noindex:
 ```
 
-## ImageTransformer
+## Image transformer
 
 ```{eval-rst}
-.. autoclass:: deepali.spatial.ImageTransformer
-    :members:
+.. automodule:: deepali.spatial.ImageTransformer
+    :noindex:
 ```

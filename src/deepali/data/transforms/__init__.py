@@ -1,13 +1,13 @@
-r"""The transforms in this Python package generally built on the :mod:`deepali.core` package.
+r"""The transforms in this Python package generally built on the :mod:`.core` library.
 The classes defined by these modules can be used, for example, in a data input pipeline
-which is attached to a data loader. The spatial transforms defined in :mod:`deepali.spatial`,
-on the other hand, can be used to implement either a traditional or machine learning
-based co-registration approach.
+which is attached to a data loader. The spatial transforms defined in the :mod:`.spatial`
+library, on the other hand, can be used to implement either a traditional or machine
+learning based co-registration approach.
 
-Note that data transforms are included in the :mod:`deepali.data` package to avoid cyclical
-imports between modules defining specialized tensor types (e.g., :mod:`deepali.data.image`)
-and datasets defined in :mod:`deepali.data.dataset` which also use these transforms to read
-and preprocess the loaded data (c.f., :class:`ImageDataset`).
+Note that data transforms are included in the :mod:`.data` library to avoid cyclical
+imports between modules defining specialized tensor types such as :mod:`.data.image`
+and datasets defined in :mod:`.data.dataset`, which also use these transforms to read
+and preprocess the loaded data.
 
 Following torchvision's lead, data transform classes which operate on tensors and do not require
 lambda functions are derived from ``torch.nn.Module``. Use ``torch.nn.Sequential`` to compose

@@ -6,7 +6,7 @@ from typing import Optional, Union
 import torch
 from torch import Tensor
 
-from .linalg import homogeneous_transform as apply_transform
+from .linalg import homogeneous_transform
 from .tensor import as_float_tensor, atleast_1d, cat_scalars
 from .types import Array, Device, Scalar, Shape
 
@@ -25,6 +25,11 @@ __all__ = (
     "transform_points",
     "transform_vectors",
 )
+
+
+def apply_transform(transform: Tensor, points: Tensor, vectors: bool = False) -> Tensor:
+    r"""Alias for :func:`.homogeneous_transform`."""
+    return homogeneous_transform(transform, points, vectors=vectors)
 
 
 def affine_rotation_matrix(matrix: Tensor) -> Tensor:
@@ -106,6 +111,11 @@ def identity_transform(
     matrix = torch.zeros(*shape_, D + 1 if homogeneous else D, dtype=dtype, device=device)
     matrix[..., J, J] = 1
     return matrix
+
+
+def rotation_matrix(*args, **kwargs) -> Tensor:
+    r"""Alias for :func:`.euler_rotation_matrix`."""
+    return euler_rotation_matrix(*args, **kwargs)
 
 
 def euler_rotation_matrix(
@@ -324,9 +334,6 @@ def euler_rotation_order(arg: Optional[str] = None, ndim: int = 3) -> str:
     if not re.match("^[XYZ][XYZ][XYZ]$", order):
         raise ValueError(f"euler_rotation_order() invalid argument '{arg}'")
     return order
-
-
-rotation_matrix = euler_rotation_matrix
 
 
 def scaling_transform(

@@ -1,4 +1,4 @@
-r"""Auxiliary functions for writing to TensorBoard event file."""
+r"""Auxiliary functions for writing to `TensorBoard <https://www.tensorflow.org/tensorboard>`_ event files."""
 
 import re
 from typing import Callable, Optional, Union

@@ -2,14 +2,14 @@
 
 ```{eval-rst}
 .. automodule:: deepali.data.sampler
+    :noindex:
 ```
 
 ## Random samplers
 
-### DistributedWeightedRandomSampler
-
 ```{eval-rst}
-.. autoclass:: deepali.data.sampler.DistributedWeightedRandomSampler
-    :members:
-    :inherited-members:
+.. autoapisummary::
+
+    deepali.data.sampler.DistributedWeightedRandomSampler
+
 ```

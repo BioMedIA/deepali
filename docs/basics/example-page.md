@@ -1,4 +1,4 @@
-# Markdown Files
+# Example Page
 
 Whether you write your book's content in Jupyter Notebooks (`.ipynb`) or
 in regular markdown files (`.md`), you'll write in the same flavor of markdown
@@ -31,7 +31,7 @@ Here is a note
 
 It will be rendered in a special box when you build your book.
 
-Here is an inline directive to refer to a document: {doc}`../tutorials/markdown-notebooks`.
+Here is an inline directive to refer to a document: {doc}`../tutorials/example-notebook`.
 
 
 ## Citations

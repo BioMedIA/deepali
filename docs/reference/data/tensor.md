@@ -1,41 +1,31 @@
 # Spatial tensors
 
-## Oriented image
+## Spatial image
 
 ```{eval-rst}
 .. automodule:: deepali.data.image
+    :noindex:
 ```
-
-### Image
 
 ```{eval-rst}
-.. autoclass:: deepali.data.Image
-    :members:
+.. autoapisummary::
+
+    deepali.data.image.Image
+    deepali.data.image.ImageBatch
+
 ```
 
-### ImageBatch
-
-```{eval-rst}
-.. autoclass:: deepali.data.ImageBatch
-    :members:
-```
-
-## Vector field
+## Spatial vector field
 
 ```{eval-rst}
 .. automodule:: deepali.data.flow
+    :noindex:
 ```
 
-### FlowField
-
 ```{eval-rst}
-.. autoclass:: deepali.data.FlowField
-    :members:
-```
+.. autoapisummary::
 
-### FlowFields
+    deepali.data.flow.FlowField
+    deepali.data.flow.FlowFields
 
-```{eval-rst}
-.. autoclass:: deepali.data.FlowFields
-    :members:
 ```

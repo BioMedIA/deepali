@@ -105,9 +105,9 @@ class DataclassConfig(object):
         a dictionary of keyword arguments for the respective layer. In a YAML file, it may
         be convenient, however, to specify these arguments on a single line as follows:
 
-        ```
+        .. code-block:: yaml
+
             norm: [batch, momentum: 0.1, eps: 0.001]
-        ```
 
         This represents a sequence, where the first item is a string and the following items
         are dictionaries with a single key. This ``__post_init__`` function merges these separate
@@ -118,9 +118,9 @@ class DataclassConfig(object):
 
         Alternatively, one could use a single dictionary in the YAML configuration:
 
-        ```
+        .. code-block:: yaml
+
             norm: {name: batch, momentum: 0.1, eps: 0.001}
-        ```
 
         Args:
             attr: Name of dataclass attribute to modify in place.
@@ -140,9 +140,9 @@ def join_kwargs_in_sequence(arg):
     a dictionary of keyword arguments for the respective layer. In a YAML file, it may
     be convenient, however, to specify these arguments on a single line as follows:
 
-    ```
+    .. code-block:: yaml
+
         norm: [batch, momentum: 0.1, eps: 0.001]
-    ```
 
     This represents a sequence, where the first item is a string and the following items
     are dictionaries with a single key. This ``__post_init__`` function merges these separate
@@ -153,9 +153,9 @@ def join_kwargs_in_sequence(arg):
 
     Alternatively, one could use a single dictionary in the YAML configuration:
 
-    ```
+    .. code-block:: yaml
+
         norm: {name: batch, momentum: 0.1, eps: 0.001}
-    ```
 
     Args:
         attr: Name of dataclass attribute to modify in place.
