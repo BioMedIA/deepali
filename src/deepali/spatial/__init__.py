@@ -85,7 +85,8 @@ from .bspline import FreeFormDeformation
 from .bspline import StationaryVelocityFreeFormDeformation
 
 # Spatial transformers based on a coordinate transformation
-from .image import ImageTransform  # noqa
+from .image import ImageTransform  # noqa (deprecated)
+from .transformer import SpatialTransformer  # noqa
 from .transformer import ImageTransformer  # noqa
 from .transformer import PointSetTransformer  # noqa
 
@@ -172,6 +173,7 @@ __all__ = (
         "PointSetTransformer",
         "ReadOnlyParameters",
         "SpatialTransform",
+        "SpatialTransformer",
         "TransformConfig",
         "affine_first",
         "has_affine_component",
