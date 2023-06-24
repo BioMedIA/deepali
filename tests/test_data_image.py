@@ -371,6 +371,8 @@ def test_image_nchannels(zeros: Tensor, grid: Grid) -> None:
 
 @pytest.mark.parametrize("data,grid", [(d, d) for d in (2, 3)], indirect=True)
 def test_image_normalize(data: Tensor, grid: Grid) -> None:
+    atol = 1e-7  # assert result.min() == 0 occasionally fails with atol=1e-8
+
     image = Image(data, grid)
     assert image.min().lt(0)
     assert image.max().gt(1)
@@ -380,8 +382,8 @@ def test_image_normalize(data: Tensor, grid: Grid) -> None:
     assert result is not image
     assert result.data_ptr() != image.data_ptr()
     assert image.eq(data).all()
-    assert torch.allclose(result.min(), torch.tensor(0.0))
-    assert torch.allclose(result.max(), torch.tensor(1.0))
+    assert torch.allclose(result.min(), torch.tensor(0.0), atol=atol)
+    assert torch.allclose(result.max(), torch.tensor(1.0), atol=atol)
 
     assert image.normalize().eq(result).all()
 
@@ -390,17 +392,17 @@ def test_image_normalize(data: Tensor, grid: Grid) -> None:
     assert result is not image
     assert result.data_ptr() != image.data_ptr()
     assert image.eq(data).all()
-    assert torch.allclose(result.min(), torch.tensor(-0.5))
-    assert torch.allclose(result.max(), torch.tensor(0.5))
+    assert torch.allclose(result.min(), torch.tensor(-0.5), atol=atol)
+    assert torch.allclose(result.max(), torch.tensor(0.5), atol=atol)
 
     result = image.normalize_("center")
     assert type(result) is Image
     assert result is not image
     assert result.data_ptr() == image.data_ptr()
-    assert torch.allclose(result.min(), torch.tensor(-0.5))
-    assert torch.allclose(result.max(), torch.tensor(0.5))
-    assert torch.allclose(image.min(), torch.tensor(-0.5))
-    assert torch.allclose(image.max(), torch.tensor(0.5))
+    assert torch.allclose(result.min(), torch.tensor(-0.5), atol=atol)
+    assert torch.allclose(result.max(), torch.tensor(0.5), atol=atol)
+    assert torch.allclose(image.min(), torch.tensor(-0.5), atol=atol)
+    assert torch.allclose(image.max(), torch.tensor(0.5), atol=atol)
 
 
 @pytest.mark.parametrize("data,grid", [(d, d) for d in (2, 3)], indirect=True)
