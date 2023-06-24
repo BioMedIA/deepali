@@ -65,7 +65,7 @@ class Axes(Enum):
     def from_arg(cls, arg: Union[Axes, str, None]) -> Axes:
         r"""Create enumeration value from function argument."""
         if arg is None or arg == "default":
-            return cls.CUBE
+            return cls.CUBE_CORNERS if ALIGN_CORNERS else cls.CUBE
         return cls(arg)
 
     @classmethod
