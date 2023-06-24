@@ -114,9 +114,9 @@ def temp_file(
 def unlink_or_mkdir(path: PathStr) -> Path:
     r"""Unlink existing file or make parent directory if non-existent.
 
-    This function is useful when a script output file is managed by DVC using protected symbolic or hard links.
-    Call this function before writing the new output file. It will unlike any existing output file, and ensure
-    that the output directory exists.
+    This function is useful when a script output file is managed by `DVC <https://dvc.org>` using
+    protected symbolic or hard links. Call this function before writing the new output file. It will
+    remove any existing output file, and ensure that the output directory exists.
 
     Args:
         path: File path.

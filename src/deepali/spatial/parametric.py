@@ -1,4 +1,25 @@
-r"""Mix-ins for spatial transformations that have (optimizable) parameters."""
+r"""Mix-ins for spatial transformations that have (optimizable) parameters.
+
+These `mix-ins <https://en.wikipedia.org/wiki/Mixin>`_ add property ``params`` to a
+:class:`.SpatialTransform`, which can be either one of the following. In addition, functional
+setter and getter functions are added, which check the type and shape of its arguments.
+
+- ``None``: This spatial transformation has no required parameters set.
+    This value can be specified when initializing a spatial transformation whose parameters
+    will be set at a later time point, e.g., to the output of a neural network. An exception
+    is raised by functions which attempt to access yet uninitialized transformation parameters.
+- ``Parameter``: Tensor of optimizable parameters, e.g., for classic registration.
+    To temporarily disable optimization of the parameters, set ``params.requires_grad = False``.
+- ``Tensor``: Tensor of fixed non-optimizable parameters.
+    These parameters are not returned by :meth:`.SpatialTransform.parameters`. This could be a
+    tensor of spatial transformation parameters inferred by a neural network.
+- ``Callable``: A callable such as a function or ``torch.nn.Module``.
+    Method :meth:`.SpatialTransform.update`, which is registered as pre-forward hook for any spatial
+    transformation, invokes this callable to obtain the current transformation parameters with arguments
+    set and obtained by :meth:`.SpatialTransform.condition`. For example, an input batch of a neural
+    network can be passed to a ``torch.nn.Module`` this way to infer parameters from this input.
+
+"""
 
 from __future__ import annotations
 
@@ -15,24 +36,7 @@ from .base import ReadOnlyParameters, TSpatialTransform
 
 
 class ParametricTransform:
-    r"""Mix-in for spatial transformations that have (optimizable) parameters.
-
-    This mix-in adds property 'params' to a SpatialTransform class, which can be either one
-    of the following. In addition, functional setter and getter functions are added. These
-    functions check the type and shape of its arguments.
-
-    - ``None``: Can be specified when initializing a spatial transformation whose parameters
-        will be set at a later time point, e.g., to the output of a neural network. An exception
-        is raised by functions which attempt to access yet uninitialized transformation parameters.
-    - ``Parameter``: Tensor of optimizable parameters, e.g., for classic registration.
-        To temporarily disable optimization of the parameters, set ``params.requires_grad = False``.
-    - ``Tensor``: Tensor of fixed parameters which are thus not be returned by ``Module.parameters()``.
-    - ``Callable``: A callable such as a function or ``torch.nn.Module``. Function ``update()``, which is
-        registered as pre-forward hook, invokes this callable to obtain the current transformation parameters
-        with arguments set and obtained by ``SpatialTransform.condition()``. For example, an input batch of
-        a neural network can be passed to a ``torch.nn.Module`` this way to infer parameters from this input.
-
-    """
+    r"""Mix-in for spatial transformations that have (optimizable) parameters."""
 
     def __init__(
         self: Union[TSpatialTransform, ParametricTransform],
@@ -121,7 +125,9 @@ class ParametricTransform:
         r"""Get shallow copy with specified parameters."""
         ...
 
-    def data(self: Union[TSpatialTransform, ParametricTransform], arg: Optional[Tensor] = None) -> Union[TSpatialTransform, Tensor]:
+    def data(
+        self: Union[TSpatialTransform, ParametricTransform], arg: Optional[Tensor] = None
+    ) -> Union[TSpatialTransform, Tensor]:
         r"""Get transformation parameters or shallow copy with specified parameters, respectively."""
         params = self.params  # Note: May be None!
         if arg is None:
@@ -234,7 +240,7 @@ class ParametricTransform:
 
     def link_(
         self: Union[TSpatialTransform, ParametricTransform],
-        other: Union[TSpatialTransform, ParametricTransform]
+        other: Union[TSpatialTransform, ParametricTransform],
     ) -> TSpatialTransform:
         r"""Link this transformation to another of the same type.
 
@@ -324,7 +330,7 @@ class InvertibleParametricTransform(ParametricTransform):
     def inverse(
         self: Union[TSpatialTransform, InvertibleParametricTransform],
         link: bool = False,
-        update_buffers: bool = False
+        update_buffers: bool = False,
     ) -> TSpatialTransform:
         r"""Get inverse of this transformation.
 

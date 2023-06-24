@@ -1,39 +1,54 @@
 channels:
-  - anaconda
   - conda-forge
   - pytorch
+  - nvidia
+  - nodefaults
 dependencies:
   # Python
-  - python =3.9
+  - python =3.10
   # Installation tools
-  - pip =22.1
-  - setuptools =59.5
-  - setuptools-scm >=6.2
+  - pip =23.1
+  - setuptools =67.7
+  - setuptools-scm =7.1
   # Developer tools
   - black =22.3
-  - flake8 =4.0
-  - flake8-black =0.3.3
-  - ipykernel
-  - jupyter
-  - notebook
-  - python-build =0.7
-  - pytest =6.2
+  - docutils =0.17
+  - flake8 =6.0
+  - flake8-black =0.3.6
+  - ghp-import =2.1
+  - graphviz =7.0
+  - ipykernel =6.23
+  - jupyter =1.0
+  - jupyter-book =0.15
+  - jupyter-cache =0.6
+  - myst-nb =0.17
+  - myst-parser =0.18
+  - notebook =6.5
+  - python-build =0.10
+  - pytest =7.3
+  - sphinx =4.5.0
+  - sphinx-autoapi =2.1
+  - sphinx-notfound-page =0.8
+  - sphinx_rtd_theme =1.2
   # Main libraries
-  - cudatoolkit =11.2.2  # ["osx" not in get_env("PLATFORM")]
-  - dacite =1.6
-  - numpy =1.22
-  - pandas =1.4
-  - pytorch =1.9.1
-  - pytorch-gpu =1.9.1  # ["linux" in get_env("PLATFORM")]
-  - pytorch-ignite =0.4
+  - dacite =1.8
+  - deprecation =2.1
+  - numpy =1.25
+  - pandas =1.5
+  - pytorch =2.0,!=2.0.0  # ["osx" not in get_env("PLATFORM")]
+  - pytorch-cuda =11.8  # ["osx" not in get_env("PLATFORM")]
+  - pytorch::pytorch =2.0,!=2.0.0  # ["osx" in get_env("PLATFORM")]
   - pyyaml =6.0
-  - SimpleITK =2.0
-  - typing-extensions =4.2
+  - SimpleITK =2.2
+  - typing-extensions =4.6
   # Utility libraries
-  - boto3 =1.18
-  - scipy =1.8
-  - tensorboard =2.8
-  - vtk =9.1
+  - boto3 =1.26
+  - matplotlib =3.7
+  - scipy =1.10
+  - tensorboard =2.13
+  - vtk =9.2
+  # Examples / Tutorials
+  - pytorch-lightning =2.0
   # Tests
-  - torchinfo =1.6
+  - torchinfo =1.8
 name: deepali

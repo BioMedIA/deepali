@@ -539,9 +539,9 @@ def lcc_loss(
     r"""Local normalized cross correlation.
 
     References:
-    - Avants et al., 2008, Symmetric Diffeomorphic Image Registration with Cross Correlation:
-        Evaluating Automated Labeling of Elderly and Neurodegenerative Brain,
-        doi:10.1016/j.media.2007.06.004.
+        Avants et al., 2008, Symmetric Diffeomorphic Image Registration with Cross Correlation:
+            Evaluating Automated Labeling of Elderly and Neurodegenerative Brain,
+            doi:10.1016/j.media.2007.06.004.
 
     Args:
         source: Source image sampled on ``target`` grid.
@@ -614,7 +614,7 @@ def wlcc_loss(
     r"""Weighted local normalized cross correlation.
 
     References:
-    - Lewis et al., 2020, Fast Learning-based Registration of Sparse 3D Clinical Images, arXiv:1812.06932.
+        Lewis et al., 2020, Fast Learning-based Registration of Sparse 3D Clinical Images, arXiv:1812.06932.
 
     Args:
         source: Source image sampled on ``target`` grid.
@@ -937,8 +937,10 @@ def mi_loss(
     r"""Calculate mutual information loss using Parzen window density and entropy estimations.
 
     References:
-    - Qiu, H., Qin, C., Schuh, A., Hammernik, K.: Learning Diffeomorphic and Modality-invariant Registration using B-splines. Medical Imaging with Deep Learning. (2021).
-    - Thévenaz, P., Unser, M.: Optimization of mutual information for multiresolution image registration. IEEE Trans. Image Process. 9, 2083–2099 (2000).
+        Qiu, H., Qin, C., Schuh, A., Hammernik, K.: Learning Diffeomorphic and Modality-invariant
+            Registration using B-splines. Medical Imaging with Deep Learning. (2021).
+        Thévenaz, P., Unser, M.: Optimization of mutual information for multiresolution image registration.
+            IEEE Trans. Image Process. 9, 2083–2099 (2000).
 
     Args:
         input: Source image sampled on ``target`` grid.
@@ -1236,7 +1238,9 @@ def curvature_loss(
 ) -> Tensor:
     r"""Loss term based on unmixed 2nd order spatial derivatives of vector fields.
 
-    Fischer & Modersitzki (2003). Curvature based image registration. Journal Mathematical Imaging and Vision, 18(1), 81–85.
+    References:
+        Fischer & Modersitzki (2003). Curvature based image registration.
+            Journal Mathematical Imaging and Vision, 18(1), 81–85.
 
     Args:
         u: Batch of vector fields as tensor of shape ``(N, D, ..., X)``. When a tensor with less than
@@ -1429,7 +1433,8 @@ def elasticity_loss(
     r"""Loss term based on Navier-Cauchy PDE of linear elasticity.
 
     References:
-    - Fischer & Modersitzki, 2004, A unified approach to fast image registration and a new curvature based registration technique.
+        Fischer & Modersitzki, 2004, A unified approach to fast image registration and a new
+            curvature based registration technique.
 
     Args:
         u: Batch of vector fields as tensor of shape ``(N, D, ..., X)``. When a tensor with less than

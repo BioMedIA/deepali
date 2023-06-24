@@ -1,4 +1,4 @@
-r"""Custom samplers for torch.utils.data.DataLoader."""
+r"""Custom samplers for ``torch.utils.data.DataLoader``."""
 
 import math
 import multiprocessing as mp

@@ -10,9 +10,9 @@ import numpy as np
 from pkg_resources import parse_version
 
 try:
-    import SimpleITK as sitk
+    import SimpleITK as _sitk
 except ImportError:
-    sitk = None
+    _sitk = None
 
 import torch
 import torch.nn.functional as F
@@ -30,33 +30,36 @@ from .types import Array, Device, PathStr, ScalarOrTuple, Shape, Size
 from .types import is_int_dtype
 
 
-# By default, grid corner points define the domain within which the data is defined.
-# The normalized coordinates with respect to the grid cube are thus in [-1, 1] between
-# the first and last grid points (grid cell center points). This is such that when a
-# grid is downsampled or upsampled, respectively, the grid points at the boundary of
-# the domain remain unchanged. Points are only inserted or removed between these.
 ALIGN_CORNERS = True
+r"""By default, grid corner points define the domain within which the data is defined.
+
+The normalized coordinates with respect to the grid cube are thus in [-1, 1] between
+the first and last grid points (grid cell center points). This is such that when a
+grid is downsampled or upsampled, respectively, the grid points at the boundary of
+the domain remain unchanged. Points are only inserted or removed between these.
+
+"""
 
 
 class Axes(Enum):
     r"""Enumeration of grid axes with respect to which grid coordinates are defined."""
 
-    # Oriented along grid axes with units corresponding to voxel units with origin
-    # with respect to world space at grid/image point with zero indices.
     GRID = "grid"
+    r"""Oriented along grid axes with units corresponding to voxel units with origin
+       with respect to world space at grid/image point with zero indices."""
 
-    # Oriented along grid axes with units corresponding to unit cube [-1, 1]^dim
-    # with origin with respect to world space at grid/image center and extrema -1/1
-    # coinciding with the grid border (align_corners=False).
     CUBE = "cube"
+    r"""Oriented along grid axes with units corresponding to unit cube :math:`[-1, 1]^D`
+       with origin with respect to world space at grid/image center and extrema -1/1
+       coinciding with the grid border (``align_corners=False``)."""
 
-    # Oriented along grid axes with units corresponding to unit cube [-1, 1]^dim
-    # with origin with respect to world space at grid/image center and extrema -1/1
-    # coinciding with the grid corner points (align_corners=True).
     CUBE_CORNERS = "cube_corners"
+    r"""Oriented along grid axes with units corresponding to unit cube :math:`[-1, 1]^D`
+       with origin with respect to world space at grid/image center and extrema -1/1
+       coinciding with the grid corner points (``align_corners=True``)."""
 
-    # Oriented along world axes (physical space) with units corresponding to grid spacing (mm).
     WORLD = "world"
+    r"""Oriented along world axes (physical space) with units corresponding to grid spacing (mm)."""
 
     @classmethod
     def from_arg(cls, arg: Union[Axes, str, None]) -> Axes:
@@ -79,28 +82,28 @@ class Axes(Enum):
 class Grid(object):
     r"""Oriented regularly spaced data sampling grid.
 
-    The dimensions of ``Grid.shape`` are in reverse order of the dimensions of ``Grid.size()``.
-    The latter is consistent with SimpleITK, and the order of coordinates of ``Grid.origin()``,
-    ``Grid.spacing()``, and ``Grid.direction()``. Property ``Grid.shape``, on the other hand,
+    The dimensions of :attr:`.Grid.shape` are in reverse order of the dimensions of :meth:`.Grid.size`.
+    The latter is consistent with SimpleITK, and the order of coordinates of :meth:`.Grid.origin`,
+    :meth:`.Grid.spacing`, and :meth:`.Grid.direction`. Property :attr:`.Grid.shape`, on the other hand,
     is consistent with the order of dimensions of an image data tensor of type ``torch.Tensor``.
 
-    To not confuse ``Grid.size()`` with ``torch.Tensor.size()``, it is recommended to prefer
+    To not confuse :meth:`.Grid.size` with ``torch.Tensor.size()``, it is recommended to prefer
     property ``torch.Tensor.shape``. The ``shape`` property is also known from ``numpy.ndarray.shape``.
 
-    A ``Grid`` instance stores the grid center point instead of the origin corresponding to the grid
+    A :class:`.Grid` instance stores the grid center point instead of the origin corresponding to the grid
     point with zero index along each grid dimension. This simplifies resizing and resampling operations,
     which do not need to modify the origin explicitly, but keep the center point fixed. To get the
-    coordinates of the grid origin, use ``Grid.origin()``. For convenience, the ``Grid`` initialization
-    function also accepts an ``origin`` instead of a ``center`` point as keyword argument. Conversion
-    between center point and origin are taken care internally. When both ``origin`` and ``center`` are
-    specified, an error is raised if these are inconsistent with one another.
+    coordinates of the grid origin, use :meth:`.Grid.origin`. For convenience, the :class:`.Grid`
+    initialization function also accepts an ``origin`` instead of a ``center`` point as keyword argument.
+    Conversion between center point and origin are taken care internally. When both ``origin`` and ``center``
+    are specified, an error is raised if these are inconsistent with one another.
 
-    In addition, ``Grid.points()``, ``Grid.transform()``, and ``Grid.apply_transform()`` support
+    In addition, :meth:`.Grid.points`, :meth:`.Grid.transform`, and :meth`.Grid.apply_transform` support
     coordinates with respect to different axes: 1) (continuous) grid indices, 2) world space, and
-    3) grid-aligned cube with side length 2. The latter, i.e., ``Axes.CUBE`` or ``Axes.CUBE_CORNERS``
-    makes coordinates independent of ``Grid.size()`` and ``Grid.spacing()``. These normalized coordinates
+    3) grid-aligned cube with side length 2. The latter, i.e., :attr:`.Axes.CUBE` or :attr:`.Axes.CUBE_CORNERS`
+    makes coordinates independent of :meth:`.Grid.size` and :meth:`.Grid.spacing`. These normalized coordinates
     are furthermore compatible with the ``grid`` argument of ``torch.nn.functional.grid_sample()``. Use
-    ``Grid.cube()` to obtain a ``Cube`` defining the data domain without spatial sampling attributes.
+    :meth:`.Grid.cube` to obtain a :class:`.Cube` defining the data domain without spatial sampling attributes.
 
     """
 
@@ -274,9 +277,9 @@ class Grid(object):
     @classmethod
     def from_file(cls, path: PathStr, align_corners: bool = ALIGN_CORNERS) -> Grid:
         r"""Create sampling grid from image file header information."""
-        if sitk is None:
+        if _sitk is None:
             raise RuntimeError(f"{cls.__name__}.from_file() requires SimpleITK")
-        reader = sitk.ImageFileReader()
+        reader = _sitk.ImageFileReader()
         reader.SetFileName(str(path))
         reader.ReadImageInformation()
         return cls.from_reader(reader, align_corners=align_corners)
@@ -284,7 +287,7 @@ class Grid(object):
     @classmethod
     def from_reader(
         cls,
-        reader: "sitk.ImageFileReader",  # type: ignore
+        reader: "_sitk.ImageFileReader",  # type: ignore
         align_corners: bool = ALIGN_CORNERS,
     ) -> Grid:
         r"""Create sampling grid from image file reader attributes."""
@@ -299,7 +302,7 @@ class Grid(object):
     @classmethod
     def from_sitk(
         cls,
-        image: "sitk.Image",  # type: ignore
+        image: "_sitk.Image",  # type: ignore
         align_corners: bool = ALIGN_CORNERS,
     ) -> Grid:
         r"""Create sampling grid from ``SimpleITK.Image`` attributes."""
@@ -999,15 +1002,15 @@ class Grid(object):
 
         Returns:
             If ``dim`` is ``None``, returns a tensor of shape (...X, C) if ``channels_last=True`` (default)
-                or ``(C, ..., X)`` if ``channels_last=False``, where C is the number of spatial grid dimensions.
-                If ``normalize=Falze`` and ``center=False``, the tensor values are the multi-dimensional indices
-                in the closed-open interval [0, n) for each grid dimension, where n is the number of points in the
-                respective dimension. The first channel with index 0 is the ``x`` coordinate. If ``normalize=False``
-                and ``center=True``, the indices are shifted such that index 0 corresponds to the grid center point.
-                If ``normalize=True``, the centered coordinates are normalized to ``(-1, 1)``, where the extrema
-                either correspond to the corner points of the grid (``align_corners=True``) or the grid boundary
-                edges (``align_cornes=False``).
-            If ``dim`` is not ``None``, a 1D tensor with the coordinates for this grid axis is returned.
+            or ``(C, ..., X)`` if ``channels_last=False``, where C is the number of spatial grid dimensions.
+            If ``normalize=Falze`` and ``center=False``, the tensor values are the multi-dimensional indices
+            in the closed-open interval [0, n) for each grid dimension, where n is the number of points in the
+            respective dimension. The first channel with index 0 is the ``x`` coordinate. If ``normalize=False``
+            and ``center=True``, the indices are shifted such that index 0 corresponds to the grid center point.
+            If ``normalize=True``, the centered coordinates are normalized to ``(-1, 1)``, where the extrema
+            either correspond to the corner points of the grid (``align_corners=True``) or the grid boundary
+            edges (``align_cornes=False``). If ``dim`` is not ``None``, a 1D tensor with the coordinates for
+            this grid axis is returned.
 
         """
         if align_corners is None:
@@ -1617,8 +1620,29 @@ def grid_transform_points(
     axes: Axes,
     to_grid: Grid,
     to_axes: Optional[Axes] = None,
+    decimals: Optional[int] = -1,
 ):
-    return grid.transform_points(points, axes=axes, to_axes=to_axes, to_grid=to_grid)
+    r"""Map point coordinates from one grid domain to another.
+
+    Args:
+        points: Coordinates of points to transform as tensor of shape ``(..., D)``.
+        grid: Grid with respect to which input ``points`` are defined.
+        axes: Coordinate axes with respect to which ``points`` are defined.
+        to_grid: Grid with respect to which the codomain is defined. If ``None``, the target
+            and source sampling grids are assumed to be identical.
+        to_axes: Coordinate axes to which ``points`` should be mapped to. If ``None``, use ``axes``.
+        decimals: If positive or zero, number of digits right of the decimal point to round to.
+            When mapping points to codomain ``Axes.GRID``, ``Axes.CUBE``, or ``Axes.CUBE_CORNERS``,
+            this function by default (``decimals=-1``) rounds the transformed coordinates.
+            Explicitly set ``decimals=None`` to suppress this default rounding.
+
+    Returns:
+        Point coordinates in ``axes`` mapped to coordinates with respect to ``to_axes``.
+
+    """
+    return grid.transform_points(
+        points, axes=axes, to_axes=to_axes, to_grid=to_grid, decimals=decimals
+    )
 
 
 def grid_transform_vectors(
@@ -1628,4 +1652,19 @@ def grid_transform_vectors(
     to_grid: Grid,
     to_axes: Optional[Axes] = None,
 ):
+    r"""Rescale and reorient flow vectors.
+
+    Args:
+        vectors: Displacement vectors to transform, e.g., as tensor of shape ``(..., D)``.
+        grid: Grid with respect to which input ``vectors`` are defined.
+        axes: Coordinate axes with respect to which input ``vectors`` are defined.
+        to_grid: Grid with respect to which ``to_axes`` is defined. If ``None``, the target
+            and source sampling grids are assumed to be identical.
+        to_axes: Coordinate axes to which ``vectors`` should be mapped to. If ``None``, use ``axes``.
+
+    Returns:
+        Rescaled and reoriented vectors. If ``to_grid == grid`` and ``to_axes == axes``,
+        a reference to the unmodified input ``vectors`` tensor is returned.
+
+    """
     return grid.transform_vectors(vectors, axes=axes, to_axes=to_axes, to_grid=to_grid)

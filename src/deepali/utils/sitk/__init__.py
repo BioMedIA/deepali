@@ -1,4 +1,4 @@
-r"""Utility functions for SimpleITK data objects."""
+r"""Utility functions for `SimpleITK <https://simpleitk.org/>`_ data objects."""
 
 from .imageio import read_image, write_image
 

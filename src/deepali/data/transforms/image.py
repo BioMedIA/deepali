@@ -364,7 +364,6 @@ ImageTransformConfig = Union[
     str, ImageTransformMapping, Sequence[Union[str, ImageTransformMapping]]
 ]
 
-
 IMAGE_TRANSFORM_TYPES = {
     "avgpool": AvgPoolImage,
     "cast": CastImage,
@@ -437,7 +436,32 @@ def image_transform(
 
 
 def image_transforms(config: ImageTransformConfig, key: Optional[str] = None) -> List[Module]:
-    r"""Create image data transforms from configuration."""
+    r"""Create image data transforms from configuration.
+
+    A sequence of image transforms can be configured using names:
+
+    - ``avgpool``: :class:`.AvgPoolImage`
+    - ``cast``: :class:`.CastImage`
+    - ``centercrop``: :class:`.CenterCropImage`
+    - ``centerpad``: :class:`.CenterPadImage`
+    - ``clamp``: :class:`.ClampImage`
+    - ``narrow``: :class:`.NarrowImage`
+    - ``normalize``: :class:`.NormalizeImage`
+    - ``read``: :class:`.ReadImage`
+    - ``rescale``: :class:`.RescaleImage`
+    - ``resample``: :class:`.ResampleImage`
+    - ``resize``: :class:`.ResizeImage`
+
+    Parameters can be passed to the data transform as keyword arguments, e.g.,
+
+    .. code-block:: yaml
+
+        transforms:
+        - read: {dtype: float32}
+        - avgpool: {kernel_size: 2}
+        - normalize: {min: 0, max: 255, mode: unit}
+
+    """
     transforms = []
     if isinstance(config, str):
         transforms.append(image_transform(config, key=key))

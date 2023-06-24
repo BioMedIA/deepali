@@ -1,7 +1,32 @@
-r"""Spatial coordinate and image transformations.
+r"""Spatial coordinate and input data transformation modules.
 
-The spatial transforms defined by this Python package can be used to implement both
-traditional optimization based and machine learning based co-registration approaches.
+.. hint::
+
+    The spatial transforms defined by this library can be used to implement co-registration
+    approaches based on traditional optimization as well as those based on machine learning
+    (amortized optimization).
+
+A spatial transformation maps points from a target domain defined with respect to the unit cube
+of a target sampling grid, to points defined with respect to the same domain, i.e., the domain
+and codomain of the spatial coordinate map are identical. In order to transform an image defined
+with respect to a different sampling grid, this transformation has to be followed by a mapping
+from target cube domain to source cube domain. This is done, for example, by the spatial transformer
+implemented by :class:`.ImageTransformer`.
+
+The ``forward()`` method of a :class:`.SpatialTransform` can be used to spatially transform any set
+of points defined with respect to the grid domain of the spatial transformation, including in particular
+a tensor of shape ``(N, M, D)``, i.e., a batch of ``N`` point sets with cardinality ``M``. It can
+also be applied to a tensor of grid points of shape ``(N, ..., X, D)`` regardless if the grid points
+are located at the undeformed grid positions or those of an already deformed grid. In case of a
+non-rigid deformation, the point displacements are by default sampled at the input points. The sampled
+flow vectors :math:`u` are then added to the input points :math:`x`, producing the output :math:`y = x + u(x)`.
+If the boolean flag ``grid=True`` is passed to the :meth:`.SpatialTransform.forward` function, it is assumed
+that the coordinates correspond to the positions of undeformed spatial grid points with domain equal to the
+domain of the transformation. In this special case, a simple interpolation to resize the vector field to the
+size of the input tensor is used. In case of a linear transformation, :math:`y = Ax + t`.
+
+The coordinate domain is :attr:`.Axes.CUBE_CORNERS` if ``grid.align_corners() == True`` (default),
+and :attr:`.Axes.CUBE` otherwise.
 
 """
 
@@ -24,14 +49,14 @@ from .composite import CompositeTransform  # noqa
 from .composite import MultiLevelTransform  # noqa
 from .composite import SequentialTransform  # noqa
 
-# Configurable transformation
-from .configurable import TransformConfig  # noqa
-from .configurable import ConfigurableTransform  # noqa
-from .configurable import affine_first  # noqa
-from .configurable import has_affine_component  # noqa
-from .configurable import has_nonrigid_component  # noqa
-from .configurable import nonrigid_components  # noqa
-from .configurable import transform_components  # noqa
+# Configurable generic transformation
+from .generic import TransformConfig  # noqa
+from .generic import GenericSpatialTransform  # noqa
+from .generic import affine_first  # noqa
+from .generic import has_affine_component  # noqa
+from .generic import has_nonrigid_component  # noqa
+from .generic import nonrigid_components  # noqa
+from .generic import transform_components  # noqa
 
 # Elemental linear transformations
 from .linear import EulerRotation
@@ -61,6 +86,7 @@ from .bspline import StationaryVelocityFreeFormDeformation
 
 # Spatial transformers based on a coordinate transformation
 from .image import ImageTransform  # noqa
+from .transformer import ImageTransformer  # noqa
 
 
 # Aliases
@@ -135,9 +161,10 @@ COMPOSITE_TRANSFORMS = (
 __all__ = (
     (
         "CompositeTransform",
-        "ConfigurableTransform",
         "DenseVectorFieldTransform",
+        "GenericSpatialTransform",
         "ImageTransform",
+        "ImageTransformer",
         "LinearTransform",
         "NonRigidTransform",
         "ParametricTransform",

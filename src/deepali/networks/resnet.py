@@ -1,6 +1,7 @@
 r"""Convolutional network with residual shortcut connections.
 
 For further reference implementations of 2D and 3D ResNet, see for example:
+
 - https://github.com/pytorch/vision/blob/1703e4ca4f879f509e797ea816670ee72fae55dd/torchvision/models/resnet.py
 - https://github.com/kenshohara/3D-ResNets-PyTorch/blob/540a0ea1abaee379fa3651d4d5afbd2d667a1f49/models/resnet.py
 

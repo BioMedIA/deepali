@@ -1,6 +1,6 @@
 r"""Access most core library functions with a single import.
 
-.. code::
+.. code-block:: python
 
     import deepali.core.functional as U
 

@@ -1,4 +1,4 @@
-r"""Configurable spatial transformation."""
+r"""Generic spatial transformation model."""
 
 from __future__ import annotations
 
@@ -28,8 +28,6 @@ from .nonrigid import DisplacementFieldTransform, StationaryVelocityFieldTransfo
 ParamsDict = Mapping[str, Tensor]
 
 
-# Names of elementary affine transformation child modules
-# - key: Letter used in affine model definition (cf. TransformConfig)
 AFFINE_NAMES = {
     "A": "affine",
     "K": "shearing",
@@ -38,9 +36,19 @@ AFFINE_NAMES = {
     "S": "scaling",
     "Q": "quaternion",
 }
+r"""Names of elementary affine transformation child modules.
 
-# Types of elementary affine transformations
-# - key: Letter used in affine model definition (cf. TransformConfig)
+The dictionary key is the letter used in :attr:`TransformConfig.affine_model`, i.e.,
+
+- ``A``: ``"affine"``
+- ``K``: ``"shearing"``
+- ``T``: ``"translation"``
+- ``R``: ``"rotation"``
+- ``S``: ``"scaling"``
+- ``Q``: ``"quaternion"``
+
+"""
+
 AFFINE_TRANSFORMS = {
     "A": HomogeneousTransform,
     "K": Shearing,
@@ -49,6 +57,18 @@ AFFINE_TRANSFORMS = {
     "S": AnisotropicScaling,
     "Q": QuaternionRotation,
 }
+r"""Types of elementary affine transformations.
+
+The dictionary key is the letter used in :attr:`TransformConfig.affine_model`, i.e.,
+
+- ``A``: :class:`.HomogeneousTransform`
+- ``K``: :class:`.Shearing`
+- ``T``: :class:`.Translation`
+- ``R``: :class:`.EulerRotation`
+- ``S``: :class:`.AnisotropicScaling`
+- ``Q``: :class:`.QuaternionRotation`
+
+"""
 
 NONRIGID_TRANSFORMS = {
     "DDF": DisplacementFieldTransform,
@@ -56,8 +76,23 @@ NONRIGID_TRANSFORMS = {
     "SVF": StationaryVelocityFieldTransform,
     "SVFFD": StationaryVelocityFreeFormDeformation,
 }
+r"""Types of non-rigid transformations.
+
+The dictionary key is the string used in :attr:`TransformConfig.transform`, i.e.,
+
+- ``DDF``: :class:`.DisplacementFieldTransform`
+- ``FFD``: :class:`.FreeFormDeformation`
+- ``SVF``: :class:`.StationaryVelocityFieldTransform`
+- ``SVFFD``: :class:`.StationaryVelocityFreeFormDeformation`
+
+"""
 
 VALID_COMPONENTS = ("Affine",) + tuple(NONRIGID_TRANSFORMS.keys())
+r"""Valid transformation names in :attr:`TransformConfig.transform` string value.
+
+This includes "Affine" and all keys of the :data:`NONRIGID_TRANSFORMS` dictionary.
+
+"""
 
 
 def transform_components(model: str) -> List[str]:
@@ -112,36 +147,71 @@ def affine_first(model: str) -> bool:
 
 @dataclass
 class TransformConfig(DataclassConfig):
-    r"""Configuration of spatial transformation model."""
+    r"""Configuration of generic spatial transformation model."""
 
-    # Spatial transformation model to use
     transform: str = "Affine o SVF"
-    # Composition of affine transformation.
-    #
-    # The string value of this configuration entry can be in one of two forms:
-    # - Matrix notation: Each letter is a factor in the sequence of matrix-matrix products.
-    # - Function composition: Use deliminator " o " between transformations to denote composition.
+    r"""String encoding of spatial transformation model to use.
+
+    The linear transforms making up the ``Affine`` component are defined by :attr:`affine_model`.
+
+    The non-rigid component can be one of the following:
+
+    - ``DDF``: :class:`.DisplacementFieldTransform`
+    - ``FFD``: :class:`.FreeFormDeformation`
+    - ``SVF``: :class:`.StationaryVelocityFieldTransform`
+    - ``SVFFD``: :class:`.StationaryVelocityFreeFormDeformation`
+
+    """
+
     affine_model: str = "TRS"  # same as "T o R o S"
-    # Order of elementary Euler rotations. This configuration value is only used
-    # when ``affine_model`` contains an ``EulerRotation`` denoted by letter "R".
-    # Valid values are "ZXZ", "XZX", ... (cf. euler_rotation() function).
+    r"""String encoding of composition of elementary linear transformations.
+
+    The string value of this configuration entry can be in one of two forms:
+
+    - Matrix notation: Each letter is a factor in the sequence of matrix-matrix products.
+    - Function composition: Use deliminator " o " between transformations to denote composition.
+
+    Valid elementary linear transform identifiers are:
+
+    - ``A``: :class:`.HomogeneousTransform`
+    - ``K``: :class:`.Shearing`
+    - ``T``: :class:`.Translation`
+    - ``R``: :class:`.EulerRotation`
+    - ``S``: :class:`.AnisotropicScaling`
+    - ``Q``: :class:`.QuaternionRotation`
+
+    """
+
     rotation_model: str = "ZXZ"
-    # Control point spacing of non-rigid transformations in voxel units of
-    # the grid domain with respect to which the transformations are defined.
+    r"""Order of elementary Euler rotations.
+
+    This configuration value is only used when :attr:`affine_model` contains an :class:`EulerRotation`
+    denoted by letter "R". Valid values are "ZXZ", "XZX", ... (cf. :func:`.core.affine.euler_rotation_matrix`).
+
+    """
+
     control_point_spacing: ScalarOrTuple[int] = 1
-    # Number of scaling and squaring steps
+    r"""Control point spacing of non-rigid transformations.
+
+    The spacing must be given in voxel units of the grid domain with respect to
+    which the transformations are defined.
+
+    """
+
     scaling_and_squaring_steps: int = 6
-    # Whether predicted transformation parameters are with respect to a grid
-    # with point coordinates in the order (..., x) instead of (x, ...).
+    r"""Number of scaling and squaring steps in case of a stationary velocity field transform."""
+
     flip_grid_coords: bool = False
+    r"""Whether predicted transformation parameters are with respect to a grid
+        with point coordinates in the order (..., x) instead of (x, ...)."""
 
     def _finalize(self, parent: Path) -> None:
         r"""Finalize parameters after loading these from input file."""
         super()._finalize(parent)
 
 
-class ConfigurableTransform(SequentialTransform):
-    r"""Configurable spatial transformation."""
+class GenericSpatialTransform(SequentialTransform):
+    r"""Configurable generic spatial transformation."""
 
     def __init__(
         self,
@@ -236,7 +306,7 @@ class ConfigurableTransform(SequentialTransform):
             for name, transform in self.named_transforms():
                 params[name] = transform.data()
             return params
-        if isinstance(params, ConfigurableTransform):
+        if isinstance(params, GenericSpatialTransform):
             return {}  # transforms are individually linked to their counterparts
         if callable(params):
             args, kwargs = self.condition()
@@ -250,7 +320,7 @@ class ConfigurableTransform(SequentialTransform):
         else:
             raise TypeError(
                 f"{type(self).__name__} 'params' attribute must be a"
-                " callable, Mapping, linked ConfigurableTransform, or None"
+                " callable, Mapping, linked GenericSpatialTransform, or None"
             )
         data = {}
         flip_grid_coords = self.config.flip_grid_coords
@@ -312,7 +382,7 @@ class ConfigurableTransform(SequentialTransform):
             data["nonrigid"] = vfield
         return data
 
-    def inverse(self, link: bool = False, update_buffers: bool = False) -> ConfigurableTransform:
+    def inverse(self, link: bool = False, update_buffers: bool = False) -> GenericSpatialTransform:
         r"""Get inverse of this transformation.
 
         Args:
@@ -341,7 +411,7 @@ class ConfigurableTransform(SequentialTransform):
             inv.params = self
         return inv
 
-    def update(self) -> ConfigurableTransform:
+    def update(self) -> GenericSpatialTransform:
         r"""Update transformation parameters."""
         if self.params is not None:
             params = self._data()

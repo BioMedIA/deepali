@@ -120,7 +120,7 @@ def is_optional_type_hint(type_hint: Any) -> bool:
 
 
 def is_path_str(arg: Any) -> bool:
-    r"""Whether given object is of type ``pathlib.Path`` or ``str`."""
+    r"""Whether given object is of type ``pathlib.Path`` or ``str``."""
     return isinstance(arg, (Path, str))
 
 

@@ -9,7 +9,7 @@ from torch.nn import Module
 
 from deepali.core import DataclassConfig, Grid, PaddingMode, Sampling
 from deepali.core import functional as U
-from deepali.spatial import ConfigurableTransform, ImageTransform, ParametricTransform
+from deepali.spatial import GenericSpatialTransform, ImageTransformer, ParametricTransform
 
 from .itn import ImageTransformerConfig, ImageTransformerNetwork
 from .stn import SpatialTransformerConfig, SpatialTransformerNetwork
@@ -17,7 +17,6 @@ from .stn import SpatialTransformerConfig, SpatialTransformerNetwork
 
 @dataclass
 class InputConfig(DataclassConfig):
-
     size: Sequence[int]
     channels: int = 1
 
@@ -32,7 +31,6 @@ class InputConfig(DataclassConfig):
 
 @dataclass
 class ImageAndSpatialTransformerConfig(DataclassConfig):
-
     input: InputConfig
     itn: Optional[Union[str, ImageTransformerConfig]] = "miccai2019"
     stn: SpatialTransformerConfig = SpatialTransformerConfig()
@@ -56,8 +54,8 @@ class ImageAndSpatialTransformerNetwork(Module):
         self.itn = itn
         self.stn = stn
         grid = Grid(size=stn.in_size)
-        transform = ConfigurableTransform(grid, params=None, config=stn.config)
-        self.warp = ImageTransform(transform, sampling=sampling, padding=padding)
+        transform = GenericSpatialTransform(grid, params=None, config=stn.config)
+        self.warp = ImageTransformer(transform, sampling=sampling, padding=padding)
 
     @property
     def config(self) -> ImageAndSpatialTransformerConfig:
@@ -73,7 +71,7 @@ class ImageAndSpatialTransformerNetwork(Module):
         )
 
     @property
-    def transform(self) -> ConfigurableTransform:
+    def transform(self) -> GenericSpatialTransform:
         r"""Reference to spatial coordinates transformation."""
         return self.warp.transform
 

@@ -70,7 +70,7 @@ def cubic_bspline(
     dtype: Optional[torch.dtype] = None,
     device: Optional[Device] = None,
 ):
-    r"""Get n-dimensional Gaussian kernel.
+    r"""Get n-dimensional cubic B-spline kernel.
 
     Args:
         stride: Spacing between control points with respect to original (upsampled) image grid.
