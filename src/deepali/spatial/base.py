@@ -49,7 +49,7 @@ class SpatialTransform(DeviceProperty, Module, metaclass=ABCMeta):
         self._grid = grid
         self._args = ()
         self._kwargs = {}
-        self.register_forward_pre_hook(self.update_hook)
+        self.register_update_hook()
 
     def __copy__(self: TSpatialTransform) -> TSpatialTransform:
         r"""Make shallow copy of this transformation.
@@ -390,10 +390,20 @@ class SpatialTransform(DeviceProperty, Module, metaclass=ABCMeta):
         return self
 
     @staticmethod
-    def update_hook(transform: Module, *args, **kwargs) -> None:
+    def _update_hook(transform: Module, *args, **kwargs) -> None:
         r"""Update callback which is registered as pre-forward hook."""
         assert isinstance(transform, SpatialTransform)
         transform.update()
+
+    def register_update_hook(self) -> None:
+        r"""Register a forward pre-hook which invokes :meth:`.SpatialTransform.update`."""
+        self._update_hook_handle = self.register_forward_pre_hook(self._update_hook)
+
+    def remove_update_hook(self) -> None:
+        r"""Remove previously registered :meth:`.SpatialTransform.update` hook."""
+        if self._update_hook_handle is not None:
+            self._update_hook_handle.remove()
+            self._update_hook_handle = None
 
     @property
     def inv(self: TSpatialTransform) -> TSpatialTransform:
