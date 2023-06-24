@@ -14,7 +14,7 @@ from torch import Tensor
 from torch.nn import Module
 
 from ..core.enum import PaddingMode, Sampling
-from ..core.grid import Grid
+from ..core.grid import Axes, Grid
 from ..core.types import Scalar
 from ..modules import SampleImage
 
@@ -162,3 +162,113 @@ class ImageTransformer(Module):
         if self.flip_coords:
             grid = grid.flip((-1,))
         return self._sample(grid, data, mask)
+
+
+class PointSetTransformer(Module):
+    r"""Spatially transform a set of points.
+
+    The :class:`.PointTransformer` applies a :class:`.SpatialTransform` to a set of input points
+    with coordinates defined with respect to a specified target domain. This coordinate map may
+    further be followed by a linear transformation from the grid domain of the spatial transform
+    to a given source domain. When no spatial transform is given, use :func:`.grid_transform_points`.
+
+    """
+
+    def __init__(
+        self,
+        transform: SpatialTransform,
+        grid: Optional[Grid] = None,
+        axes: Optional[Union[Axes, str]] = None,
+        to_grid: Optional[Grid] = None,
+        to_axes: Optional[Union[Axes, str]] = None,
+    ) -> None:
+        r"""Initialize point set transformer.
+
+        This point set transformer calls :meth:`.SpatialTransform.points` with the specified module attributes.
+
+        Args:
+            transform: Spatial coordinate transformation which is applied to input points.
+            grid: Grid with respect to which input points are defined. Uses ``transform.grid()`` if ``None``.
+            axes: Coordinate axes with respect to which input points are defined. Uses ``transform.axes()`` if ``None``.
+            to_grid: Grid with respect to which output points are defined. Same as ``grid`` if ``None``.
+            to_axes: Coordinate axes to which input points should be mapped to. Same as ``axes`` if ``None``.
+
+        """
+        if not isinstance(transform, SpatialTransform):
+            raise TypeError(f"{type(self).__name__}() 'transform' must be a SpatialTransform")
+        if grid is None:
+            grid = transform.grid()
+        if axes is None:
+            axes = transform.axes()
+        else:
+            axes = Axes.from_arg(axes)
+        if to_grid is None:
+            to_grid = grid
+        if to_axes is None:
+            to_axes = axes
+        else:
+            to_axes = Axes.from_arg(to_axes)
+        super().__init__()
+        self._transform = transform
+        self._grid = grid
+        self._axes = axes
+        self._to_grid = to_grid
+        self._to_axes = to_axes
+
+    @overload
+    def condition(self) -> Tuple[tuple, dict]:
+        r"""Get arguments on which transformation is conditioned.
+
+        Returns:
+            args: Positional arguments.
+            kwargs: Keyword arguments.
+
+        """
+        ...
+
+    @overload
+    def condition(self, *args, **kwargs) -> PointSetTransformer:
+        r"""Get new transformation which is conditioned on the specified arguments."""
+        ...
+
+    def condition(self, *args, **kwargs) -> Union[PointSetTransformer, Tuple[tuple, dict]]:
+        r"""Get or set data tensors and parameters on which transformation is conditioned."""
+        if args:
+            return shallow_copy(self).condition_(*args)
+        return self._transform.condition()
+
+    def condition_(self, *args, **kwargs) -> PointSetTransformer:
+        r"""Set data tensors and parameters on which this transformation is conditioned."""
+        self._transform.condition_(*args, **kwargs)
+        return self
+
+    @property
+    def transform(self) -> SpatialTransform:
+        r"""Spatial transformation."""
+        return self._transform
+
+    def target_axes(self) -> Axes:
+        r"""Coordinate axes with respect to which input points are defined."""
+        return self._axes
+
+    def target_grid(self) -> Grid:
+        r"""Sampling grid with respect to which input points are defined."""
+        return self._grid
+
+    def source_axes(self) -> Axes:
+        r"""Coordinate axes with respect to which output points are defined."""
+        return self._to_axes
+
+    def source_grid(self) -> Grid:
+        r"""Sampling grid with respect to which output points are defined."""
+        return self._to_grid
+
+    def forward(self, points: Tensor) -> Tensor:
+        r"""Spatially transform a set of points."""
+        return self._transform.points(
+            points,
+            grid=self._grid,
+            axes=self._axes,
+            to_grid=self._to_grid,
+            to_axes=self._to_axes,
+        )
