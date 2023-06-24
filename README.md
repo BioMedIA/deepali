@@ -1,8 +1,8 @@
 # deepali
 
 ![pypi](https://img.shields.io/pypi/v/hf-deepali)
-![downloads](https://img.shields.io/pypi/dm/hf-deepali)
-![python versions](https://img.shields.io/pypi/pyversions/hf-deepali)
+<!-- ![downloads](https://img.shields.io/pypi/dm/hf-deepali) -->
+![python](https://img.shields.io/pypi/pyversions/hf-deepali)
 [![docs](https://github.com/BioMedIA/deepali/actions/workflows/docs.yml/badge.svg)](https://github.com/BioMedIA/deepali/actions/workflows/docs.yml)
 [![tests](https://github.com/BioMedIA/deepali/actions/workflows/tests.yml/badge.svg)](https://github.com/BioMedIA/deepali/actions/workflows/tests.yml)
 [![release](https://github.com/BioMedIA/deepali/actions/workflows/release.yml/badge.svg)](https://github.com/BioMedIA/deepali/actions/workflows/release.yml)
