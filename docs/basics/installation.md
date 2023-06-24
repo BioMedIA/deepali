@@ -5,7 +5,7 @@
 This Python package can be installed with [pip]:
 
 ```
-pip install deepali-hf
+pip install hf-deepali
 ```
 
 The latest development version can be installed directly from the GitHub repository, i.e.,
@@ -28,7 +28,7 @@ to create and manage project dependencies using conda, see [conda/README.md](htt
 Additional optional dependencies of the {mod}`deepali.utils` library can be installed with the command:
 
 ```
-pip install deepali-hf[utils]
+pip install hf-deepali[utils]
 # or pip install git+https://github.com/BioMedIA/deepali.git#egg=deepali[utils]
 ```
 
