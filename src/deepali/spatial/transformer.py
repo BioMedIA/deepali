@@ -8,7 +8,7 @@ and maps these to new spatial locations, to a given input data tensor.
 from __future__ import annotations
 
 from copy import copy as shallow_copy
-from typing import Dict, Optional, Tuple, Union, cast, overload
+from typing import Dict, Optional, Tuple, TypeVar, Union, cast, overload
 
 from torch import Tensor
 from torch.nn import Module
@@ -21,6 +21,9 @@ from ..modules import SampleImage
 from .base import SpatialTransform
 
 
+TSpatialTransformer = TypeVar("TSpatialTransformer", bound="SpatialTransformer")
+
+
 class SpatialTransformer(Module):
     r"""Spatially transform input data.
 
@@ -28,14 +31,12 @@ class SpatialTransformer(Module):
     transformation is applied to produce a transformed output is determined by the type of spatial transformer.
 
     The forward method of a spatial transformer invokes the spatial transform as a functor such that any registered
-    pre-forward and post-forward hooks are executed as part of the spatial transform evaluation. This includes
-    in particular the :meth:`.SpatialTransform.update` function if the :meth:`.SpatialTransform.update_hook`
-    is registered as pre-forward hook of the spatial transform. Note that this hook is by default installed during
-    initialization of a spatial transform. When the update of spatial transform parameters, which may be inferred by
-    a neural network, is done explicitly by the application, use :meth:`.SpatialTransform.remove_update_hook` to
-    remove the pre-forward update hook before subsequent evaluations of the spatial transform. When doing so, ensure
-    to update the parameters when necessary using either :meth:`.SpatialTransformer.update` or
-    :meth:`.SpatialTransform.update`, respectively.
+    forward pre- and post-hooks are executed as part of the spatial transform evaluation. This includes in particular
+    the :meth:`.SpatialTransform.update` function if it is registered as a forward pre-hook. Note that this hook is by
+    default installed during initialization of a spatial transform. When the update of spatial transform parameters,
+    which may be inferred by a neural network, is done explicitly by the application, use :meth:`.SpatialTransform.remove_update_hook`
+    to remove this forward pre-hook before subsequent evaluations of the spatial transform. When doing so, ensure to
+    update the parameters when necessary using either :meth:`.SpatialTransformer.update` or :meth:`.SpatialTransform.update`.
 
     """
 
@@ -53,6 +54,11 @@ class SpatialTransformer(Module):
         super().__init__()
         self._transform = transform
 
+    @property
+    def transform(self) -> SpatialTransform:
+        r"""Spatial grid transformation."""
+        return self._transform
+
     @overload
     def condition(self) -> Tuple[tuple, dict]:
         r"""Get arguments on which transformation is conditioned.
@@ -65,25 +71,27 @@ class SpatialTransformer(Module):
         ...
 
     @overload
-    def condition(self, *args, **kwargs) -> ImageTransformer:
+    def condition(self: TSpatialTransformer, *args, **kwargs) -> TSpatialTransformer:
         r"""Get new transformation which is conditioned on the specified arguments."""
         ...
 
-    def condition(self, *args, **kwargs) -> Union[ImageTransformer, Tuple[tuple, dict]]:
+    def condition(
+        self: TSpatialTransformer, *args, **kwargs
+    ) -> Union[TSpatialTransformer, Tuple[tuple, dict]]:
         r"""Get or set data tensors and parameters on which transformation is conditioned."""
         if args:
             return shallow_copy(self).condition_(*args)
         return self._transform.condition()
 
-    def condition_(self, *args, **kwargs) -> ImageTransformer:
+    def condition_(self: TSpatialTransformer, *args, **kwargs) -> TSpatialTransformer:
         r"""Set data tensors and parameters on which this transformation is conditioned."""
         self._transform.condition_(*args, **kwargs)
         return self
 
-    @property
-    def transform(self) -> SpatialTransform:
-        r"""Spatial grid transformation."""
-        return self._transform
+    def update(self: TSpatialTransformer) -> TSpatialTransformer:
+        r"""Update internal state of spatial transformation (cf. :meth:`.SpatialTransform.update`)."""
+        self._transform.update()
+        return self
 
 
 class ImageTransformer(SpatialTransformer):
@@ -96,9 +104,9 @@ class ImageTransformer(SpatialTransformer):
     referred to as warping the input image.
 
     Note that the :meth:`.ImageTransformer.forward` method invokes the spatial transform as
-    functor, i.e., it triggers any pre-forward and post-forward hooks that are registered
-    with the spatial transform when evaluating it. This includes in particular the
-    :meth:`.SpatialTransform.update_hook` (see also :class:`.SpatialTransformer`).
+    functor, i.e., it triggers any pre-forward and post-forward hooks that are registered with
+    the spatial transform when evaluating it. This in particular includes the forward pre-hook
+    that invokes :meth:`.SpatialTransform.update` (cf. :class:`.SpatialTransformer`).
 
     """
 
@@ -208,8 +216,8 @@ class PointSetTransformer(SpatialTransformer):
     The forward method of a point set transformer performs the same operation as :meth:`.SpatialTransform.points`,
     but with the target and source domain arguments specified during transformer initialization. In addition,
     the point set transformer module invokes the spatial transform as a functor such that any registered
-    pre-forward and post-forward hooks are executed as part of the spatial transform evaluation. This includes
-    in particular the :meth:`.SpatialTransform.update_hook` (see also :class:`.SpatialTransformer`).
+    forward pre- and post-hooks are executed as part of the spatial transform evaluation. This includes the
+    forward pre-hook that invokes :meth:`.SpatialTransform.update` (cf. :class:`.SpatialTransformer`).
 
     """
 
