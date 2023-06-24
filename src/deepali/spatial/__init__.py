@@ -87,6 +87,7 @@ from .bspline import StationaryVelocityFreeFormDeformation
 # Spatial transformers based on a coordinate transformation
 from .image import ImageTransform  # noqa
 from .transformer import ImageTransformer  # noqa
+from .transformer import PointSetTransformer  # noqa
 
 
 # Aliases
@@ -168,6 +169,7 @@ __all__ = (
         "LinearTransform",
         "NonRigidTransform",
         "ParametricTransform",
+        "PointSetTransformer",
         "ReadOnlyParameters",
         "SpatialTransform",
         "TransformConfig",

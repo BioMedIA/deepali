@@ -11,3 +11,10 @@
 .. automodule:: deepali.spatial.ImageTransformer
     :noindex:
 ```
+
+## Point set transformer
+
+```{eval-rst}
+.. automodule:: deepali.spatial.PointSetTransformer
+    :noindex:
+```
