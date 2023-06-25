@@ -2,6 +2,7 @@ r"""Image tensors."""
 
 from __future__ import annotations
 
+from types import EllipsisType
 from typing import Any, Dict, Optional, Sequence, Tuple, Type, TypeVar, Union, overload
 
 import torch
@@ -83,6 +84,10 @@ class ImageBatch(DataTensor):
         r"""Create a new instance while preserving subclass (meta-)data."""
         kwargs["grid"] = self._grid if grid is None else grid
         return super()._make_instance(data, **kwargs)
+
+    def _make_image(self, data: Tensor, grid: Grid) -> Image:
+        r"""Create Image in __getitem__. Can be overridden by subclasses to return a subtype."""
+        return Image(data, grid)
 
     def __deepcopy__(self: TImageBatch, memo) -> TImageBatch:
         if id(self) in memo:
@@ -289,13 +294,59 @@ class ImageBatch(DataTensor):
         r"""Number of images in batch."""
         return self.shape[0]
 
+    @overload
     def __getitem__(self: TImageBatch, index: int) -> Image:
-        r"""Get image at specified batch index."""
-        if index < 0 or index >= len(self):
-            raise IndexError(f"Image batch index ({index}) out of range [0, {len(self)}]")
-        # Attention: Tensor.__getitem__ leads to endless recursion!
-        data = self.tensor().narrow(0, index, 1).squeeze(0)
-        return Image(data, self._grid[index])
+        ...
+
+    @overload
+    def __getitem__(self: TImageBatch, index: Union[EllipsisType, slice]) -> TImageBatch:
+        ...
+
+    def __getitem__(
+        self: TImageBatch,
+        index: Union[EllipsisType, int, slice, Sequence[Union[EllipsisType, int, slice]]],
+    ) -> Union[Image, TImageBatch, Tensor]:
+        r"""Get image at specified batch index, get a sub-batch, or a region of interest tensor."""
+        if index is ...:
+            return self._make_instance(self.tensor(), self.grid())
+        if isinstance(index, Sequence):
+            # Resolve additional ellipses
+            index = [j for i, j in enumerate(index) if j is not ... or ... not in index[:i]]
+            # Discard trailing ellipsis
+            if index[-1] is ...:
+                index = index[:-1]
+            # Substitute remaining ellipsis with full slices
+            try:
+                i = index.index(...)
+                j = len(index) - i - 1
+                index = index[:i] + [slice(None)] * (self.ndim - i - j) + index[-j:]
+            except ValueError:
+                pass
+            # Channel dimension is always a slice
+            if len(index) > 1 and isinstance(index[1], int):
+                index[1] = slice(index[1], index[1] + 1)
+            index = tuple(index)
+        data = self.tensor()[index]
+        grid_index = index[0] if isinstance(index, Sequence) else index
+        grid = self._grid[grid_index]
+        if isinstance(index, Sequence) and len(index) > 2:
+            same_grid = True
+            for i, n in zip(index[2:], self.shape[2:]):
+                if isinstance(i, int) or not isinstance(i, slice):
+                    same_grid = False
+                    break
+                if i.start not in (None, 0) or i.stop not in (None, n) or i.step not in (None, 1):
+                    same_grid = False
+                    break
+            if not same_grid:
+                return data
+        if isinstance(grid, Grid):
+            if data.ndim < 3:
+                return data
+            return self._make_image(data, grid)
+        elif data.ndim < 4:
+            return data
+        return self._make_instance(data, grid)
 
     @property
     def sdim(self: TImageBatch) -> int:

@@ -43,7 +43,6 @@ def zeros(request) -> Tensor:
 
 @pytest.mark.parametrize("zeros,grid", [(d, d) for d in (2, 3)], indirect=True)
 def test_image_init(zeros: Tensor, grid: Grid) -> None:
-
     data = zeros
 
     image = Image(data)
@@ -289,6 +288,112 @@ def test_image_batch(zeros: Tensor, grid: Grid) -> None:
     assert type(batch._grid) is tuple
     assert len(batch._grid) == 1
     assert batch.data_ptr() == image.data_ptr()
+
+
+@pytest.mark.parametrize("zeros,grid", [(d, d) for d in (2, 3)], indirect=True)
+def test_image_batch_getitem(zeros: Tensor, grid: Grid) -> None:
+    batch = ImageBatch(zeros.unsqueeze(0).expand((5,) + zeros.shape), grid, dtype=torch.uint8)
+    for i in range(len(batch)):
+        batch.tensor()[i] = i
+    for i in range(len(batch)):
+        image = batch[i]
+        assert isinstance(image, Image)
+        assert image.grid() is grid
+        assert torch.allclose(image, torch.tensor(i, dtype=batch.dtype))
+
+    image = batch[-1]
+    assert isinstance(image, Image)
+    assert image.grid() is grid
+    assert torch.allclose(image, torch.tensor(len(batch) - 1, dtype=batch.dtype))
+
+    with pytest.raises(IndexError):
+        batch[len(batch)]
+
+    other = batch[0:1]
+    assert isinstance(other, ImageBatch)
+    assert len(other) == 1
+    assert other.grids() == batch.grids()[0:1]
+    assert torch.allclose(other, torch.tensor(0, dtype=batch.dtype))
+
+    other = batch[1:-1, 0:1]
+    assert isinstance(other, ImageBatch)
+    assert len(other) == len(batch) - 2
+    assert other.grids() == batch.grids()[1:-1]
+    for i, j in enumerate(range(1, len(batch) - 1)):
+        assert torch.allclose(other.tensor()[i], torch.tensor(j, dtype=batch.dtype))
+
+    image = batch[3, :]
+    assert isinstance(image, Image)
+    assert image.grid() == grid
+    assert torch.allclose(image, torch.tensor(3, dtype=image.dtype))
+
+    image = batch[4, 0]
+    assert isinstance(image, Image)
+    assert image.nchannels == 1
+    assert image.grid() == grid
+    assert torch.allclose(image, torch.tensor(4, dtype=image.dtype))
+
+    image = batch[4, 0:1]
+    assert isinstance(image, Image)
+    assert image.nchannels == 1
+    assert image.grid() == grid
+    assert torch.allclose(image, torch.tensor(4, dtype=image.dtype))
+
+    other = batch[:, :, :, :]
+    assert isinstance(other, ImageBatch)
+    assert other.grid() == batch.grid()
+    assert other.shape == batch.shape
+    assert torch.allclose(other, batch)
+
+    other = batch[...]
+    assert isinstance(other, ImageBatch)
+    assert other.grid() == batch.grid()
+    assert other.shape == batch.shape
+    assert torch.allclose(other, batch)
+
+    other = batch[:, ...]
+    assert isinstance(other, ImageBatch)
+    assert other.grid() == batch.grid()
+    assert other.shape == batch.shape
+    assert torch.allclose(other, batch)
+
+    other = batch[:, :, ...]
+    assert isinstance(other, ImageBatch)
+    assert other.grid() == batch.grid()
+    assert other.shape == batch.shape
+    assert torch.allclose(other, batch)
+
+    other = batch[..., :]
+    assert isinstance(other, ImageBatch)
+    assert other.grid() == batch.grid()
+    assert other.shape == batch.shape
+    assert torch.allclose(other, batch)
+
+    other = batch[..., 2, 0, :, :]
+    if batch.ndim == 4:
+        assert isinstance(other, Image)
+        assert other.grid() == batch.grid()
+        assert other.nchannels == 1
+        assert other.shape[1:] == batch.shape[2:]
+        assert torch.allclose(other, torch.tensor(2, dtype=image.dtype))
+        another = batch[2, ..., 0, ..., :, :, ...]
+        assert isinstance(another, Image)
+        assert another.grid() == other.grid()
+        assert torch.allclose(another, other)
+    else:
+        assert isinstance(other, Tensor)
+
+    another = batch[..., 2, ..., 0, ..., :, :, ...]
+    assert type(another) == type(other)
+    assert torch.allclose(another, other)
+
+    other = batch[:, ..., 0]
+    assert isinstance(other, Tensor)
+
+    image = batch[3, ...]
+    assert isinstance(image, Image)
+    assert image.grid() == grid
+    assert torch.allclose(image, torch.tensor(3, dtype=image.dtype))
 
 
 @pytest.mark.parametrize("zeros,grid", [(d, d) for d in (3,)], indirect=True)
