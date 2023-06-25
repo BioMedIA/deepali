@@ -43,12 +43,12 @@ jobs:
           twine check dist/*
         env:
           SETUPTOOLS_SCM_PRETEND_VERSION: ${{ env.version }}
-      - name: Publish packages to PyPI
-        if: github.event_name == 'release'
-        uses: pypa/gh-action-pypi-publish@release/v1
       - name: Publish packages to Test PyPI
         if: ${{ github.event_name == 'release' || (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/pypi')) }}
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           repository-url: https://test.pypi.org/legacy/
           skip-existing: true
+      - name: Publish packages to PyPI
+        if: github.event_name == 'release'
+        uses: pypa/gh-action-pypi-publish@release/v1
