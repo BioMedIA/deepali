@@ -13,6 +13,7 @@ from torch import Tensor
 
 RE_OUTPUT_KEY_INDEX = re.compile(r"\[([0-9]+)\]")
 
+EllipsisType = type(...)
 
 T = TypeVar("T")
 ScalarOrTuple = Union[T, Tuple[T, ...]]
