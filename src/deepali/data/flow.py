@@ -2,7 +2,6 @@ r"""Flow vector fields."""
 
 from __future__ import annotations
 
-from types import EllipsisType
 from typing import Any, Optional, Sequence, Type, TypeVar, Union, overload
 
 import torch
@@ -13,7 +12,7 @@ from ..core.enum import PaddingMode, Sampling
 from ..core import flow as U
 from ..core.grid import Axes, Grid, grid_transform_vectors
 from ..core.tensor import move_dim
-from ..core.types import Array, Device, DType, PathStr, Scalar
+from ..core.types import Array, Device, DType, EllipsisType, PathStr, Scalar
 
 from .image import Image, ImageBatch
 

@@ -2,7 +2,6 @@ r"""Image tensors."""
 
 from __future__ import annotations
 
-from types import EllipsisType
 from typing import Any, Dict, Optional, Sequence, Tuple, Type, TypeVar, Union, overload
 
 import torch
@@ -23,7 +22,7 @@ from ..core import image as U
 from ..core.itertools import zip_longest_repeat_last
 from ..core.path import unlink_or_mkdir
 from ..core.tensor import cat_scalars
-from ..core.types import Array, Device, DType, PathStr, Scalar, ScalarOrTuple, Size
+from ..core.types import Array, Device, DType, EllipsisType, PathStr, Scalar, ScalarOrTuple, Size
 
 from .tensor import DataTensor
 
