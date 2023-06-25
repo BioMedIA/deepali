@@ -16,7 +16,7 @@ maintainers = [
 ]
 
 classifiers=[
-    "Development Status :: 2 - Alpha",
+    "Development Status :: 3 - Alpha",
     "License :: OSI Approved :: Apache Software License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3.9",
