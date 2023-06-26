@@ -3,7 +3,7 @@
 <!-- ![downloads](https://img.shields.io/pypi/dm/hf-deepali) -->
 ![pypi](https://img.shields.io/pypi/v/hf-deepali)
 ![python](https://img.shields.io/pypi/pyversions/hf-deepali)
-[![docs](https://github.com/BioMedIA/deepali/actions/workflows/docs.yml/badge.svg)](https://github.com/BioMedIA/deepali/actions/workflows/docs.yml)
+[![docs](https://readthedocs.org/projects/deepali/badge/?version=latest&style=flat)](https://deepali.readthedocs.io/en/latest/?badge=latest)
 [![tests](https://github.com/BioMedIA/deepali/actions/workflows/tests.yml/badge.svg)](https://github.com/BioMedIA/deepali/actions/workflows/tests.yml)
 [![release](https://github.com/BioMedIA/deepali/actions/workflows/release.yml/badge.svg)](https://github.com/BioMedIA/deepali/actions/workflows/release.yml)
 
