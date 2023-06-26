@@ -43,9 +43,9 @@ pyproject.tmp
 .pytest_cache/
 
 # other
-/conda/environment.linux-64.yml
-/conda/environment.osx-64.yml
-/conda/environment.win-64.yml
+/conda/environment.devenv.linux-64.yml
+/conda/environment.devenv.osx-64.yml
+/conda/environment.devenv.win-64.yml
 .ipynb_checkpoints/
 /.venv/
 /venv/
