@@ -63,21 +63,22 @@ win: clear lock-win render
 
 clear:
 	@echo "Remove all generated files"
-	@rm -f $(LOCKFILE) environment.{linux-64,osx-64,win-64}.{lock,yml}
+	@rm -f $(LOCKFILE) environment.devenv.{linux-64,osx-64,win-64}.yml environment.{linux-64,osx-64,win-64}.{lock,yml}
 
 lock-linux:
-	@$(CONDA_DEVENV) --name $(NAME) --file $(DEVENV) --env-manager $(CONDA) --env-var PLATFORM=linux-64 --print > environment.linux-64.yml
-	@$(CONDA_LOCK) $(CONDA_LOCK_OPTS) --lockfile $(LOCKFILE) --platform linux-64 --file environment.linux-64.yml
+	@$(CONDA_DEVENV) --name $(NAME) --file $(DEVENV) --env-manager $(CONDA) --env-var PLATFORM=linux-64 --print > environment.devenv.linux-64.yml
+	@$(CONDA_LOCK) $(CONDA_LOCK_OPTS) --lockfile $(LOCKFILE) --platform linux-64 --file environment.devenv.linux-64.yml
 
 lock-osx:
-	@$(CONDA_DEVENV) --name $(NAME) --file $(DEVENV) --env-manager $(CONDA) --env-var PLATFORM=osx-64 --print > environment.osx-64.yml
-	@$(CONDA_LOCK) $(CONDA_LOCK_OPTS) --lockfile $(LOCKFILE) --platform osx-64 --file environment.osx-64.yml
+	@$(CONDA_DEVENV) --name $(NAME) --file $(DEVENV) --env-manager $(CONDA) --env-var PLATFORM=osx-64 --print > environment.devenv.osx-64.yml
+	@$(CONDA_LOCK) $(CONDA_LOCK_OPTS) --lockfile $(LOCKFILE) --platform osx-64 --file environment.devenv.osx-64.yml
 
 lock-win:
-	@$(CONDA_DEVENV) --name $(NAME) --file $(DEVENV) --env-manager $(CONDA) --env-var PLATFORM=win-64 --print > environment.win-64.yml
-	@$(CONDA_LOCK) $(CONDA_LOCK_OPTS) --lockfile $(LOCKFILE) --platform win-64 --file environment.win-64.yml
+	@$(CONDA_DEVENV) --name $(NAME) --file $(DEVENV) --env-manager $(CONDA) --env-var PLATFORM=win-64 --print > environment.devenv.win-64.yml
+	@$(CONDA_LOCK) $(CONDA_LOCK_OPTS) --lockfile $(LOCKFILE) --platform win-64 --file environment.devenv.win-64.yml
 
 render:
+	@$(CONDA_LOCK) render $(LOCKFILE) --kind env --filename-template environment.{platform}
 	@$(CONDA_LOCK) render $(LOCKFILE) --kind explicit --filename-template environment.{platform}.lock
 	@if ! grep -e 'pytorch.*cuda' environment.linux-64.lock > /dev/null 2> /dev/null; then \
 		echo "Expected PyTorch with CUDA support for PLATFORM=linux-64. Check conda configuration."; \
