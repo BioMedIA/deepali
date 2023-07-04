@@ -5,8 +5,9 @@ PROJECT_DIR="$(cd "$DOCKER_DIR/.." && pwd)"
 
 tag=
 base_image=
-conda_yaml=
+conda_version=
 python_version=
+version=
 
 user_name=$(id -u -n)
 user_id=$(id -u)
@@ -17,28 +18,40 @@ while [ $# -gt 0 ]; do
   case "$1" in
     -t|--tag) tag="$2"; shift; ;;
     -b|--base|--base-image|--from) base_image="$2"; shift; ;;
-    -e|--env|--conda-yaml) conda_yaml="$2"; shift; ;;
     --user) user_name="$2"; shift; ;;
     --uid) user_id="$2"; shift; ;;
     --group) group_name="$2"; shift; ;;
     --gid) group_id="$2"; shift; ;;
+    --version) version="$2"; shift; ;;
     --python|--python-version) python_version="$2"; shift; ;;
+    --conda|--conda-version) conda_version="$2"; shift; ;;
     *) error "invalid argument $1"
   esac
   shift
 done
 
 [ -n "$tag" ] || tag="deepali:$USER"
-[ -n "$base_image" ] || base_image="pytorch/pytorch:1.9.0-cuda11.1-cudnn8-runtime"
-[ -n "$conda_yaml" ] || conda_yaml="conda.yaml"
-[ -n "$python_version" ] || python_version="3.7.10"
+[ -n "$base_image" ] || base_image="ubuntu:22.04"
+[ -n "$conda_version" ] || conda_version="22.9.0-3"
+[ -n "$python_version" ] || python_version="3.10.8"
+
+if [ -z "$version" ]; then
+  version=$(cd "$PROJECT_DIR" && python -m setuptools_scm)
+  if [ $? -ne 0 ]; then
+    echo "setuptools_scm must be installed in Python environment used to build this Docker image. Alternatively, use --version to specify a deepali version string." 1>&2
+    exit 1
+  fi
+fi
+
+export DOCKER_BUILDKIT=${DOCKER_BUILDKIT:-1}
 
 exec docker build "$PROJECT_DIR" \
   --file "$DOCKER_DIR/Dockerfile" \
   --tag "$tag" \
   --build-arg "BASE_IMAGE=$base_image" \
-  --build-arg "CONDA_YAML=$conda_yaml" \
+  --build-arg "CONDA_VERSION=$conda_version" \
   --build-arg "PYTHON_VERSION=$python_version" \
+  --build-arg "VERSION=$version" \
   --build-arg "USER=$user_name" \
   --build-arg "GROUP=$group_name" \
   --build-arg "UID=$user_id" \
