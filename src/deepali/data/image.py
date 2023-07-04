@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, Optional, Sequence, Tuple, Type, TypeVar, Union, overload
 
+import numpy as np
 import torch
 from torch import Tensor
 from torch.nn import functional as F
@@ -84,7 +85,7 @@ class ImageBatch(DataTensor):
         kwargs["grid"] = self._grid if grid is None else grid
         return super()._make_instance(data, **kwargs)
 
-    def _make_image(self, data: Tensor, grid: Grid) -> Image:
+    def _make_subitem(self, data: Tensor, grid: Grid) -> Image:
         r"""Create Image in __getitem__. Can be overridden by subclasses to return a subtype."""
         return Image(data, grid)
 
@@ -298,7 +299,11 @@ class ImageBatch(DataTensor):
         ...
 
     @overload
-    def __getitem__(self: TImageBatch, index: Union[EllipsisType, slice]) -> TImageBatch:
+    def __getitem__(self: TImageBatch, index: EllipsisType) -> TImageBatch:
+        ...
+
+    @overload
+    def __getitem__(self: TImageBatch, index: Union[list, slice, Tensor]) -> TImageBatch:
         ...
 
     def __getitem__(
@@ -308,7 +313,7 @@ class ImageBatch(DataTensor):
         r"""Get image at specified batch index, get a sub-batch, or a region of interest tensor."""
         if index is ...:
             return self._make_instance(self.tensor(), self.grid())
-        if isinstance(index, Sequence):
+        if type(index) is tuple:
             # Resolve additional ellipses
             index = [j for i, j in enumerate(index) if j is not ... or ... not in index[:i]]
             # Discard trailing ellipsis
@@ -321,14 +326,26 @@ class ImageBatch(DataTensor):
                 index = index[:i] + [slice(None)] * (self.ndim - i - j) + index[-j:]
             except ValueError:
                 pass
-            # Channel dimension is always a slice
-            if len(index) > 1 and isinstance(index[1], int):
-                index[1] = slice(index[1], index[1] + 1)
             index = tuple(index)
+            is_multi_index = True
+        elif isinstance(index, (np.ndarray, slice, Sequence, Tensor)):
+            # - batch[[0, 2, 4]]
+            # - batch[np.array([0, 2, 4])]
+            # - batch[torch.tensor([0, 2, 4])]
+            index = (index,)
+            is_multi_index = True
+        else:
+            index = int(index)
+            is_multi_index = False
         data = self.tensor()[index]
-        grid_index = index[0] if isinstance(index, Sequence) else index
-        grid = self._grid[grid_index]
-        if isinstance(index, Sequence) and len(index) > 2:
+        if is_multi_index and len(index) > 1 and isinstance(index[1], int):
+            return data  # cannot be an ImageBatch or Image without a channel dimension
+        grid_index = index[0] if is_multi_index else index
+        if isinstance(grid_index, (np.ndarray, Sequence, Tensor)):
+            grid = tuple(self._grid[i] for i in grid_index)
+        else:
+            grid = self._grid[grid_index]
+        if is_multi_index and len(index) > 2:
             same_grid = True
             for i, n in zip(index[2:], self.shape[2:]):
                 if isinstance(i, int) or not isinstance(i, slice):
@@ -342,7 +359,7 @@ class ImageBatch(DataTensor):
         if isinstance(grid, Grid):
             if data.ndim < 3:
                 return data
-            return self._make_image(data, grid)
+            return self._make_subitem(data, grid)
         elif data.ndim < 4:
             return data
         return self._make_instance(data, grid)
