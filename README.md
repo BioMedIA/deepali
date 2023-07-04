@@ -50,7 +50,7 @@ The following lists the main dependencies of this project. For a complete list, 
 
 ## Installation
 
-This Python package can be installed with [pip]:
+This library is available as [Python package on PyPI](https://pypi.org/project/hf-deepali/) and can be installed with [pip]:
 
 ```
 pip install hf-deepali
