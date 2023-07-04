@@ -88,14 +88,18 @@ class FlowFields(ImageBatch):
         grid: Optional[Sequence[Grid]] = None,
         axes: Optional[Axes] = None,
         **kwargs,
-    ) -> TFlowFields:
+    ) -> Union[TFlowFields, ImageBatch]:
         r"""Create a new instance while preserving subclass meta-data."""
+        if data.shape[1] != data.ndim - 2:
+            return ImageBatch(data, grid)
         kwargs["axes"] = axes or self._axes
         return super()._make_instance(data, grid, **kwargs)
 
-    def _make_flowfield(self, data: Tensor, grid: Grid, axes: Axes) -> FlowField:
+    def _make_subitem(self, data: Tensor, grid: Grid) -> Union[FlowField, Image]:
         r"""Create FlowField in __getitem__. Can be overridden by subclasses to return a subtype."""
-        return FlowField(data, grid, axes)
+        if data.shape[0] == data.ndim - 1:
+            return FlowField(data, grid, self._axes)
+        return super()._make_subitem(data, grid)
 
     @staticmethod
     def _torch_function_axes(args) -> Optional[Axes]:
@@ -161,54 +165,19 @@ class FlowFields(ImageBatch):
         ...
 
     @overload
-    def __getitem__(self: TFlowFields, index: Union[EllipsisType, slice]) -> TFlowFields:
+    def __getitem__(self: TFlowFields, index: EllipsisType) -> TFlowFields:
+        ...
+
+    @overload
+    def __getitem__(self: TFlowFields, index: Union[list, slice, Tensor]) -> TFlowFields:
         ...
 
     def __getitem__(
         self: TFlowFields,
         index: Union[EllipsisType, int, slice, Sequence[Union[EllipsisType, int, slice]]],
-    ) -> Union[FlowField, TFlowFields, Tensor]:
+    ) -> Union[FlowField, Image, TFlowFields, ImageBatch, Tensor]:
         r"""Get flow field at specified batch index, get a sub-batch, or extract region of interest tensor."""
-        if index is ...:
-            return self._make_instance(self.tensor(), self._grid, self._axes)
-        if isinstance(index, Sequence):
-            # Resolve additional ellipses
-            index = [j for i, j in enumerate(index) if j is not ... or ... not in index[:i]]
-            # Discard trailing ellipsis
-            if index[-1] is ...:
-                index = index[:-1]
-            # Substitute remaining ellipsis with full slices
-            try:
-                i = index.index(...)
-                j = len(index) - i - 1
-                index = index[:i] + [slice(None)] * (self.ndim - i - j) + index[-j:]
-            except ValueError:
-                pass
-            # Channel dimension is always a slice
-            if len(index) > 1 and isinstance(index[1], int):
-                index[1] = slice(index[1], index[1] + 1)
-            index = tuple(index)
-        data = self.tensor()[index]
-        grid_index = index[0] if isinstance(index, Sequence) else index
-        grid = self._grid[grid_index]
-        if isinstance(index, Sequence) and len(index) > 2:
-            same_grid = True
-            for i, n in zip(index[2:], self.shape[2:]):
-                if isinstance(i, int) or not isinstance(i, slice):
-                    same_grid = False
-                    break
-                if i.start not in (None, 0) or i.stop not in (None, n) or i.step not in (None, 1):
-                    same_grid = False
-                    break
-            if not same_grid:
-                return data
-        if isinstance(grid, Grid):
-            if data.ndim < 3:
-                return data
-            return self._make_flowfield(data, grid, self._axes)
-        elif data.ndim < 4:
-            return data
-        return self._make_instance(data, grid, self._axes)
+        return super().__getitem__(index)
 
     @overload
     def axes(self: TFlowFields) -> Axes:

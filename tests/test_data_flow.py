@@ -1,5 +1,7 @@
+from copy import deepcopy
 from typing import Tuple
 
+import numpy as np
 import pytest
 import torch
 from torch import Tensor
@@ -170,3 +172,92 @@ def test_flowfields_torch_function(zeros: Tensor, grid: Grid) -> None:
     with pytest.raises(ValueError):
         # Cannot batch together flow fields with mismatching Axes
         torch.cat([batch, batch.axes(Axes.CUBE_CORNERS)], dim=0)
+
+
+@pytest.mark.parametrize("zeros,grid", [(d, d) for d in (3,)], indirect=True)
+def test_flowfields_getitem(zeros: Tensor, grid: Grid) -> None:
+    grids = [deepcopy(grid) for _ in range(5)]  # make grids distinguishable
+    batch = FlowFields(zeros.unsqueeze(0).expand((5,) + zeros.shape), grids, axes=Axes.GRID)
+    for i in range(len(batch)):
+        batch.tensor()[i] = i
+
+    for i in range(len(batch)):
+        item = batch[i]
+        assert type(item) is FlowField
+        assert item.axes() is batch.axes()
+        assert item.grid() is batch.grid(i)
+        assert torch.allclose(item, batch.tensor()[i])
+
+    item = batch[1:-1:2]
+    assert type(item) is FlowFields
+    assert item.axes() is batch.axes()
+    assert torch.allclose(item.tensor(), batch.tensor()[1:-1:2])
+
+    item = batch[...]
+    assert type(item) is FlowFields
+    assert item.axes() is batch.axes()
+    assert torch.allclose(item.tensor(), batch.tensor()[...])
+
+    item = batch[:, ...]
+    assert type(item) is FlowFields
+    assert item.axes() is batch.axes()
+    assert torch.allclose(item.tensor(), batch.tensor()[:, ...])
+
+    item = batch[[4]]
+    assert type(item) is FlowFields
+    assert len(item) == 1
+    assert item.axes() is batch.axes()
+    assert item.grid(0) is batch.grid(4)
+    assert torch.allclose(item.tensor(), batch.tensor()[[0]])
+
+    index = [3, 2]
+    item = batch[index]
+    assert type(item) is FlowFields
+    assert len(item) == 2
+    assert item.axes() is batch.axes()
+    assert item.grid(0) is batch.grid(3)
+    assert item.grid(1) is batch.grid(2)
+    assert torch.allclose(item.tensor(), batch.tensor()[index])
+
+    index = (0, 2)
+    item = batch[index]
+    assert type(item) is Tensor
+    assert torch.allclose(item, batch.tensor()[index])
+
+    index = np.array([1, 3])
+    item = batch[index]
+    assert type(item) is FlowFields
+    assert len(item) == 2
+    assert item.axes() is batch.axes()
+    assert item.grid(0) is batch.grid(1)
+    assert item.grid(1) is batch.grid(3)
+    assert torch.allclose(item.tensor(), batch.tensor()[index])
+
+    index = torch.tensor([0, 2])
+    item = batch[index]
+    assert type(item) is FlowFields
+    assert len(item) == 2
+    assert item.axes() is batch.axes()
+    assert item.grid(0) is batch.grid(0)
+    assert item.grid(1) is batch.grid(2)
+    assert torch.allclose(item.tensor(), batch.tensor()[index])
+
+    item = batch[:, 0]
+    assert type(item) is Tensor
+    assert torch.allclose(item, batch.tensor()[:, 0])
+
+    item = batch[:, 1:2]
+    assert type(item) is ImageBatch
+    assert all(a is b for a, b in zip(item.grids(), batch.grids()))
+    assert torch.allclose(item, batch.tensor()[:, 1:2])
+
+    if batch.ndim == 5:
+        item = batch[:, :2, 0]
+        assert type(item) is Tensor
+        assert item.shape[1] == item.ndim - 2
+        assert torch.allclose(item, batch.tensor()[:, :2, 0])
+
+    item = batch[3, 1:2]
+    assert type(item) is Image
+    assert item.grid() is batch.grid(3)
+    assert torch.allclose(item, batch.tensor()[3, 1:2])
