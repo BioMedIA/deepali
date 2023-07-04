@@ -7,50 +7,17 @@ import os
 from pathlib import Path
 import re
 import shutil
-from typing import Generator, Optional, TypeVar, Union
+from typing import Any, Generator, Optional, TypeVar, Union
 from urllib.parse import urlsplit
 
 PathStr = Union[Path, str]
+PathUri = Union[Path, str]
 
 
 # See https://mypy.readthedocs.io/en/latest/generics.html#generic-methods-and-generic-self for the use
 # of `T` to annotate `self`. Many methods of `Resource` return `self` and we want those return values
 # to be the type of the subclass, not the looser type of `Resource`.
 T = TypeVar("T", bound="Resource")
-
-
-def to_uri(arg: PathStr) -> str:
-    r"""Create valid URI from resource path.
-
-    Args:
-        arg: Local path or a valid URI.
-
-    Returns:
-        Valid URI.
-
-    """
-    # Path
-    if isinstance(arg, Path):
-        return arg.absolute().as_uri()
-    # Windows path with drive letter
-    if os.name == "nt":
-        match = re.match(r"([a-zA-Z]):[/\\](.*)", arg)
-        if match:
-            return Path(match.group(1) + ":/" + match.group(2)).as_uri()
-    # URI with scheme prefix
-    match = re.match(r"([a-zA-Z0-9]+)://(.*)", arg)
-    if match:
-        scheme = match.group(1).lower()
-        # Local file URI
-        if scheme == "file":
-            return Path("/" + match.group(2)).absolute().as_uri()
-        # AWS S3 object URI
-        if scheme == "s3":
-            return "s3://" + re.sub("^/+", "", re.sub(r"[/\\]{1,}", "/", match.group(2)))
-        # Other URI
-        return urlsplit(arg, scheme="file").geturl()
-    # Unix path or relative path
-    return Path(arg).absolute().as_uri()
 
 
 class Resource(object):
@@ -143,6 +110,20 @@ class Resource(object):
         self._depth = max(0, self._depth - 1)
         if self._depth == 0:
             self.release()
+
+    @staticmethod
+    def from_path(*args: Optional[PathStr]) -> Resource:
+        r"""Create storage object from path or URI.
+
+        Args:
+            args: Path or URI components. The last absolute path or URI is the base to which
+                subsequent arguments are appended. Any ``None`` value is ignored. See also ``to_uri()``.
+
+        Returns:
+            obj (Resource): Instance of concrete type representing the referenced storage object.
+
+        """
+        return Resource.from_uri(to_uri(args))
 
     @staticmethod
     def from_uri(uri: str) -> Resource:
@@ -367,3 +348,102 @@ class Resource(object):
     def __repr__(self: T) -> str:
         r"""Get human-readable string representation of storage object reference."""
         return type(self).__name__ + "(path='{}')".format(self.path)
+
+
+def is_absolute(path: Union[Path, str]) -> bool:
+    r"""Check whether given path string or URI is absolute."""
+    if is_uri(path):
+        return True
+    return Path(path).is_absolute()
+
+
+def is_uri(arg: Any) -> bool:
+    r"""Check whether a given argument is a URI."""
+    if isinstance(arg, Path):
+        return False
+    if isinstance(arg, str):
+        # Windows path with drive letter
+        if os.name == "nt" and re.match(r"([a-zA-Z]):[/\\](.*)", arg):
+            return False
+        return re.match(r"([a-zA-Z0-9]+)://(.*)", arg) is not None
+    return False
+
+
+def to_uri(*args: Optional[PathStr]) -> str:
+    r"""Create valid URI from resource paths.
+
+    Args:
+        args: Local path components or an already valid URI. The last absolute path or URI in this
+            list of arguments is the base path or URI prefix for subsequent relative paths which
+            are appended to this base to construct the URI. Any ``None`` values are ignored.
+
+    Returns:
+        Valid URI.
+
+    """
+    args = [arg for arg in args if arg is not None]
+    for i, arg in enumerate(reversed(args)):
+        if is_uri(arg):
+            base = str(arg)
+            args = args[len(args) - i :]
+            break
+        elif Path(arg).is_absolute():
+            base = Path(arg)
+            args = args[len(args) - i :]
+            break
+    else:
+        base = Path.cwd()
+    if isinstance(base, Path):
+        uri = local_path_uri(base.joinpath(*args))
+    else:
+        uri = norm_uri(f"{base}/{'/'.join(args)}" if args else base)
+    return uri
+
+
+def norm_uri(uri: str) -> str:
+    r"""Normalize URI.
+
+    Args:
+        uri: A valid URI string.
+
+    Returns:
+        Normalized URI string.
+
+    """
+    match = re.match(r"(?P<scheme>[a-zA-Z0-9]+)://(?P<path>.*)", uri)
+    if not match:
+        raise ValueError(f"norm_uri() 'uri' is not a valid URI: {uri}")
+    scheme = match["scheme"].lower()
+    path = re.sub("^/+", "", re.sub(r"[/\\]{1,}", "/", match["path"]))
+    # Local file URI
+    if scheme == "file":
+        if os.name != "nt" or re.match(r"(?P<drive>[a-zA-Z]):[/\\]", path) is None:
+            path = "/" + path
+        return "file://" + path
+    # AWS S3 object URI
+    if scheme == "s3":
+        return "s3://" + path
+    # Other URI
+    return urlsplit(uri, scheme="file").geturl()
+
+
+def local_path_uri(arg: PathStr) -> str:
+    r"""Create valid URI from local path.
+
+    Unlike Path.as_uri(), this function does not escape special characters as used in format template strings.
+
+    Args:
+        arg: Local path.
+
+    Returns:
+        Valid URI.
+
+    """
+    uri = norm_uri(f"file://{Path(arg).absolute()}")
+    if uri.endswith("/"):
+        # Trailing forward slashes are removed by Path already, but trailing backward slashes are
+        # only converted to a single forward slash by norm_uri(), not removed by Path. To produce
+        # a consistent result regardless of whether forward or backward slashes are used, remove
+        # any remaining trailing slash even if it could signify a directory.
+        uri = uri[:-1]
+    return uri
