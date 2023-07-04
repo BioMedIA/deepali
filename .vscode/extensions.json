@@ -3,6 +3,7 @@
         // Python
         "ms-python.python",
         "ms-python.vscode-pylance",
+        "ms-toolsai.jupyter",
         // Remote SSH
         "ms-vscode-remote.remote-ssh",
         "ms-vscode-remote.remote-ssh-edit",
