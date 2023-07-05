@@ -49,6 +49,7 @@ dependencies:
   - vtk =9.2
   # Examples / Tutorials
   - pytorch-lightning =2.0
+  - torchvision =0.15
   # Tests
   - torchinfo =1.8
 name: deepali
