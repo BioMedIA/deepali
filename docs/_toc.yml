@@ -10,8 +10,7 @@ parts:
   - file: basics/example-page
 - caption: Tutorials
   chapters:
-  - file: tutorials/example-notebook
-  - file: tutorials/example-myst-notebook
+  - file: tutorials/pairwise-registration-intro
 - caption: Reference
   chapters:
   - file: reference/core/index
@@ -45,3 +44,7 @@ parts:
   - file: reference/api/deepali/networks/index
   - file: reference/api/deepali/spatial/index
   - file: reference/api/deepali/utils/index
+- caption: Contributing
+  chapters:
+  - file: tutorials/example-notebook
+  - file: tutorials/example-myst-notebook
