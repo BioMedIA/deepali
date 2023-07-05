@@ -5,9 +5,12 @@ ARG DEBIAN_FRONTEND=noninteractive
 ENV TZ=Etc/UTC
 
 # Packages
+#
+# libgl1-mesa-glx is required by VTK
 RUN apt-get update \
     && apt-get install -y \
         git \
+        libgl1-mesa-glx \
         make \
         openssh-server \
         sudo \
