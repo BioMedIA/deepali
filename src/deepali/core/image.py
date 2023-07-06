@@ -1781,6 +1781,9 @@ def cshape_image(
     size = _image_size("cshape_image", size, shape, ndim=2)
     if dtype is None:
         dtype = torch.uint8
+    if radius is None:
+        center = tuple(float(x) for x in center)
+        radius = max(0, (min(center) - 1) - math.ceil(2 * sigma))
     if width is None:
         width = radius // 2
     outer = circle_image(size, center=center, radius=radius, x_max=x_max, sigma=0)
