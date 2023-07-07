@@ -149,14 +149,16 @@ class ImageTransformer(SpatialTransformer):
             raise ValueError(
                 f"{type(self).__name__}() 'target' and 'transform' grid must define the same domain"
             )
-        self._sample = SampleImage(
+        device = transform.device
+        sampler = SampleImage(
             target=target,
             source=source,
             sampling=sampling,
             padding=padding,
             align_centers=align_centers,
         )
-        grid_coords = target.coords(flip=flip_coords).unsqueeze(0)
+        self._sample = sampler.to(device)
+        grid_coords = target.coords(flip=flip_coords, device=device).unsqueeze(0)
         self.register_buffer("grid_coords", grid_coords, persistent=False)
         self.flip_coords = bool(flip_coords)
 
