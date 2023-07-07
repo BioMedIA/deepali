@@ -36,6 +36,10 @@ html:
   use_issues_button: true
   use_repository_button: true
 
+# Add a Launch on Google Colab button
+launch_buttons:
+  colab_url: "https://colab.research.google.com"
+
 # By default MathJax version 2 is currently used. If you are using a lot of math,
 # you may want to try using version 3, which claims to improve load speeds by 60 - 80%.
 sphinx:
