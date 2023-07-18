@@ -124,7 +124,7 @@ class ImageTransformer(SpatialTransformer):
 
         Args:
             transform: Spatial coordinate transformation which is applied to ``target`` grid points.
-            target: Sampling grid of output images. If ``None``, use ``transform.axes()``.
+            target: Sampling grid of output images. If ``None``, use ``transform.grid()``.
             source: Sampling grid of input images. If ``None``, use ``target``.
             sampling: Image interpolation mode.
             padding: Image extrapolation mode or scalar out-of-domain value.
