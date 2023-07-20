@@ -6,7 +6,7 @@
 [![docs](https://github.com/BioMedIA/deepali/actions/workflows/docs.yml/badge.svg)](https://github.com/BioMedIA/deepali/actions/workflows/docs.yml)
 [![tests](https://github.com/BioMedIA/deepali/actions/workflows/tests.yml/badge.svg)](https://github.com/BioMedIA/deepali/actions/workflows/tests.yml)
 [![release](https://github.com/BioMedIA/deepali/actions/workflows/release.yml/badge.svg)](https://github.com/BioMedIA/deepali/actions/workflows/release.yml)
-[![doi](https://zenodo.org/badge/DOI/10.5281/zenodo.8170162.svg)](https://doi.org/10.5281/zenodo.8170162)
+[![doi](https://zenodo.org/badge/DOI/10.5281/zenodo.8170161.svg)](https://doi.org/10.5281/zenodo.8170161)
 
 An [open source](https://github.com/BioMedIA/deepali/tree/main/LICENSE) research library for image, point set, and surface registration in [PyTorch], which is developed and maintained by the [HeartFlow-Imperial College London] research lab at the [Biomedical Image Analysis Group].
 
@@ -87,7 +87,7 @@ pip install hf-deepali[utils]
 
 ## Citation
 
-Schuh, A., Qiu, H., and HeartFlow Research. *deepali: Image, point set, and surface registration in PyTorch* (2023). [doi:10.5281/zenodo.8170162](https://doi.org/10.5281/zenodo.8170162)
+Schuh, A., Qiu, H., and HeartFlow Research. *deepali: Image, point set, and surface registration in PyTorch* (2023). [doi:10.5281/zenodo.8170161](https://doi.org/10.5281/zenodo.8170161)
 
 ## Contributing
 
