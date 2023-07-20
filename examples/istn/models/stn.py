@@ -12,7 +12,8 @@ import torch
 from torch import Tensor, Size
 from torch.nn import Module, ModuleList, ReLU, Sequential, Upsample
 
-from deepali.core import Device, PathStr, ScalarOrTuple, functional as U, unlink_or_mkdir
+from deepali.core import Device, PathStr, ScalarOrTuple, functional as U
+from deepali.core.pathlib import unlink_or_mkdir
 from deepali.networks.layers import Conv2d, Conv3d, ConvLayer, Linear, convolution, pooling
 from deepali.networks.utils import module_output_size
 from deepali.spatial import TransformConfig, has_affine_component, has_nonrigid_component

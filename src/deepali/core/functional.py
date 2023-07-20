@@ -118,6 +118,8 @@ from .pointset import polyline_tangents
 from .pointset import transform_grid
 from .pointset import transform_points
 
+from .random import multinomial
+
 
 __all__ = (
     # Basic tensor functions
@@ -134,6 +136,8 @@ __all__ = (
     "threshold",
     "unravel_coords",
     "unravel_index",
+    # Random sampling
+    "multinomial",
     # Linear algebra/geometry
     "affine_flow",
     "affine_rotation_matrix",

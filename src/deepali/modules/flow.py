@@ -8,8 +8,8 @@ from typing import Optional
 from torch import Tensor
 from torch.nn import Module
 
-from ..core import functional as U
-from ..core import ALIGN_CORNERS
+from deepali.core import ALIGN_CORNERS
+from deepali.core import functional as U
 
 
 class ExpFlow(Module):

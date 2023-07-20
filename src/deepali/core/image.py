@@ -14,7 +14,7 @@ from .kernels import gaussian1d, gaussian1d_I
 from .nnutils import same_padding, stride_minus_kernel_padding
 from .random import multinomial
 from .tensor import as_tensor, cat_scalars, move_dim
-from .types import Array, Device, Scalar, ScalarOrTuple, Size, Shape, is_float_dtype
+from .typing import Array, Device, DType, Scalar, ScalarOrTuple, Size, Shape, is_float_dtype
 
 
 def avg_pool(
@@ -302,7 +302,7 @@ def conv1d(
     padding: Union[PaddingMode, str, int] = None,
     output_padding: Optional[int] = None,
     transpose: bool = False,
-    dtype: Optional[torch.dtype] = None,
+    dtype: Optional[DType] = None,
 ) -> Tensor:
     r"""Convolve data with 1-dimensional kernel along specified dimension."""
     if not isinstance(data, Tensor):
@@ -1352,7 +1352,7 @@ def rescale(
     max: Optional[Scalar] = None,
     data_min: Optional[Scalar] = None,
     data_max: Optional[Scalar] = None,
-    dtype: Optional[torch.dtype] = None,
+    dtype: Optional[DType] = None,
 ) -> Tensor:
     r"""Linearly rescale values to specified output interval.
 
@@ -1691,7 +1691,7 @@ def circle_image(
     radius: Optional[float] = None,
     sigma: float = 0,
     x_max: Optional[Union[float, Sequence[float]]] = None,
-    dtype: Optional[torch.dtype] = None,
+    dtype: Optional[DType] = None,
     device: Optional[Device] = None,
 ) -> Tensor:
     r"""Synthetic image of a circle.
@@ -1754,7 +1754,7 @@ def cshape_image(
     width: Optional[float] = None,
     sigma: float = 0,
     x_max: Union[float, Sequence[float]] = 5,
-    dtype: Optional[torch.dtype] = None,
+    dtype: Optional[DType] = None,
     device: Optional[Device] = None,
 ) -> Tensor:
     r"""Synthetic C-shaped image.
@@ -1808,7 +1808,7 @@ def empty_image(
     shape: Optional[Shape] = None,
     num: Optional[int] = None,
     channels: Optional[int] = None,
-    dtype: Optional[torch.dtype] = None,
+    dtype: Optional[DType] = None,
     device: Optional[Device] = None,
 ) -> Tensor:
     """Create new batch of uninitalized image data.
@@ -1836,7 +1836,7 @@ def grid_image(
     num: Optional[int] = None,
     stride: Optional[Union[int, Sequence[int]]] = None,
     inverted: bool = False,
-    dtype: Optional[torch.dtype] = None,
+    dtype: Optional[DType] = None,
     device: Optional[Device] = None,
 ) -> Tensor:
     """Create batch of regularly spaced grid images.
@@ -1882,7 +1882,7 @@ def ones_image(
     shape: Optional[Shape] = None,
     num: Optional[int] = None,
     channels: Optional[int] = None,
-    dtype: Optional[torch.dtype] = None,
+    dtype: Optional[DType] = None,
     device: Optional[Device] = None,
 ) -> Tensor:
     """Create new batch of image data filled with ones.
@@ -1909,7 +1909,7 @@ def zeros_image(
     shape: Optional[Shape] = None,
     num: Optional[int] = None,
     channels: Optional[int] = None,
-    dtype: Optional[torch.dtype] = None,
+    dtype: Optional[DType] = None,
     device: Optional[Device] = None,
 ) -> Tensor:
     """Create new batch of image data filled with zeros.

@@ -1,4 +1,4 @@
-r"""Representation of objects stored in AWS Simple Storage Service (S3)."""
+r"""Reference objects stored in AWS Simple Storage Service (S3)."""
 
 from __future__ import annotations
 
@@ -9,11 +9,13 @@ from pathlib import Path
 from tempfile import gettempdir
 from typing import Generator, Optional
 
+from deepali.core.pathlib import PathStr, to_uri
+from deepali.utils.storage import StorageObject
+
 from .client import S3Client
-from ..resource import PathStr, Resource
 
 
-class S3Object(Resource):
+class S3Object(StorageObject):
     r"""Object stored in AWS Simple Storage Service (S3)."""
 
     def __init__(self, bucket: str, key: str, path: PathStr = None) -> None:
@@ -78,7 +80,7 @@ class S3Object(Resource):
         key = S3Object.normkey(key)
         if key.startswith("/"):
             key = key[1:]
-        return Path(gettempdir()).joinpath("deepali", "cache", "s3", bucket, key)
+        return Path(gettempdir()).joinpath("deepali", "data", "s3", bucket, key)
 
     def reset_path(self) -> S3Object:
         r"""Reset ``path`` to ``default_path`` for given ``bucket`` and ``key``.
@@ -89,6 +91,20 @@ class S3Object(Resource):
         """
         self._path = self.default_path(bucket=self.bucket, key=self.key)
         return self
+
+    @staticmethod
+    def from_path(*args: Optional[PathStr]) -> S3Object:
+        r"""Create storage object from path or URI.
+
+        Args:
+            args: Path or URI components. The last absolute path or URI is the base to which
+                subsequent arguments are appended. Any ``None`` value is ignored. See also ``to_uri()``.
+
+        Returns:
+            obj (Resource): Instance of concrete type representing the referenced storage object.
+
+        """
+        return S3Object.from_uri(to_uri(*args))
 
     @classmethod
     def from_uri(cls, uri: str) -> S3Object:
@@ -179,7 +195,7 @@ class S3Object(Resource):
         r"""Whether AWS S3 object exists and represents a directory."""
         return self.key.endswith("/") and self.exists()
 
-    def iterdir(self, prefix: str = None) -> Generator[Resource, None, None]:
+    def iterdir(self, prefix: str = None) -> Generator[S3Object, None, None]:
         r"""List S3 objects within directory, excluding subfolder contents.
 
         Args:
@@ -235,7 +251,12 @@ class S3Object(Resource):
                 bucket=self.bucket, prefix=self.key, path=self.path, overwrite=force
             )
         else:
-            self.s3.upload_file(bucket=self.bucket, key=self.key, path=self.path, overwrite=force)
+            try:
+                self.s3.upload_file(
+                    bucket=self.bucket, key=self.key, path=self.path, overwrite=force
+                )
+            except FileExistsError:
+                pass
         return self
 
     def read_bytes(self) -> bytes:

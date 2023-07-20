@@ -7,9 +7,10 @@ from ignite.engine import Engine
 import torch
 from torch import Tensor
 
-from ...core.image import grid_reshape
-from ...core.tensor import as_one_hot_tensor
-from ...core import ALIGN_CORNERS, TensorCollection, get_tensor
+from deepali.core import ALIGN_CORNERS
+from deepali.core.collections import TensorCollection, get_tensor
+from deepali.core.image import grid_reshape
+from deepali.core.tensor import as_one_hot_tensor
 
 
 def get_output_transform(key: str) -> Callable[[TensorCollection], Tensor]:
@@ -41,7 +42,6 @@ def cm_binary_output_transform(
     """
 
     def output_transform(output: TensorCollection) -> Tuple[Tensor, Tensor]:
-
         dtype = torch.int32
         y_pred_tensor = get_tensor(output, y_pred)
         y_tensor = get_tensor(output, y)

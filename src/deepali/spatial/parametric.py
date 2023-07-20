@@ -30,7 +30,7 @@ import torch
 from torch import Size, Tensor
 from torch.nn import Parameter, init
 
-from ..core.grid import Grid
+from deepali.core.grid import Grid
 
 from .base import ReadOnlyParameters, TSpatialTransform
 

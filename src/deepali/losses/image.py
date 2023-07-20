@@ -4,12 +4,12 @@ from typing import Optional, Union
 
 from torch import Tensor
 
-from ..core import functional as U
-from ..core.types import ScalarOrTuple
+from deepali.core import functional as U
+from deepali.core.typing import ScalarOrTuple
 
+from . import functional as L
 from .base import NormalizedPairwiseImageLoss
 from .base import PairwiseImageLoss
-from . import functional as L
 
 
 class Dice(PairwiseImageLoss):

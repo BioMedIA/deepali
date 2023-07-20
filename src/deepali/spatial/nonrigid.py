@@ -9,10 +9,10 @@ from typing import Callable, Optional, Sequence, TypeVar, Union, cast
 import torch
 from torch import Size, Tensor
 
-from ..core import functional as U
-from ..core.grid import Axes, Grid
-from ..data.flow import FlowFields
-from ..modules import ExpFlow
+from deepali.core import functional as U
+from deepali.core.grid import Axes, Grid
+from deepali.data.flow import FlowFields
+from deepali.modules import ExpFlow
 
 from .base import NonRigidTransform
 from .parametric import ParametricTransform

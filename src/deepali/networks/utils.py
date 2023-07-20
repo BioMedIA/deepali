@@ -2,13 +2,10 @@ import torch
 from torch import Tensor, nn
 from torch.nn import Module
 
-from ..core.nnutils import conv_output_size
-from ..core.nnutils import conv_transposed_output_size
-from ..core.nnutils import pad_output_size
-from ..core.nnutils import pool_output_size
-from ..core.nnutils import unpool_output_size
-from ..core.nnutils import upsample_output_size
-from ..core.types import ScalarOrTuple
+from deepali.core.nnutils import conv_output_size, conv_transposed_output_size
+from deepali.core.nnutils import pad_output_size, upsample_output_size
+from deepali.core.nnutils import pool_output_size, unpool_output_size
+from deepali.core.typing import ScalarOrTuple
 
 from .layers import Pad
 from .blocks import SkipConnection

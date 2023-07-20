@@ -10,15 +10,15 @@ from torch import Tensor
 from torch.nn.functional import binary_cross_entropy_with_logits, logsigmoid
 import torch.nn.functional as F
 
-from ..core.bspline import evaluate_cubic_bspline
-from ..core.enum import SpatialDerivativeKeys, SpatialDim
-from ..core.grid import Grid
-from ..core.image import avg_pool, dot_channels, rand_sample, spatial_derivatives
-from ..core.flow import denormalize_flow
-from ..core.pointset import transform_grid
-from ..core.pointset import transform_points
-from ..core.tensor import as_one_hot_tensor, move_dim
-from ..core.types import Array, ScalarOrTuple
+from deepali.core.bspline import evaluate_cubic_bspline
+from deepali.core.enum import SpatialDerivativeKeys, SpatialDim
+from deepali.core.grid import Grid
+from deepali.core.image import avg_pool, dot_channels, rand_sample, spatial_derivatives
+from deepali.core.flow import denormalize_flow
+from deepali.core.pointset import transform_grid
+from deepali.core.pointset import transform_points
+from deepali.core.tensor import as_one_hot_tensor, move_dim
+from deepali.core.typing import Array, ScalarOrTuple
 
 
 __all__ = (

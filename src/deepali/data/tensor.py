@@ -9,8 +9,8 @@ import torch
 import torch.utils.hooks
 from torch import Tensor
 
-from ..core.tensor import as_tensor
-from ..core.types import Array, Device, DType
+from deepali.core.tensor import as_tensor
+from deepali.core.typing import Array, Device, DType
 
 
 T = TypeVar("T", bound="DataTensor")

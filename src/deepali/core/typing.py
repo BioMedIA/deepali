@@ -2,20 +2,20 @@ r"""Type annotations for torch functions."""
 
 from dataclasses import Field
 from pathlib import Path
-import re
 from typing import Any, Dict, List, Mapping, NamedTuple
-from typing import Optional, Sequence, Tuple, TypeVar, Union
-from typing_extensions import Protocol
+from typing import Optional, Protocol, Sequence, Tuple, TypeVar, Union
 
 import torch
 
 from torch import Tensor
 
-RE_OUTPUT_KEY_INDEX = re.compile(r"\[([0-9]+)\]")
 
 EllipsisType = type(...)
 
 T = TypeVar("T")
+
+BoolStr = Union[bool, str]
+
 ScalarOrTuple = Union[T, Tuple[T, ...]]
 ScalarOrTuple1d = Union[T, Tuple[T]]
 ScalarOrTuple2d = Union[T, Tuple[T, T]]
@@ -27,8 +27,10 @@ ScalarOrTuple6d = Union[T, Tuple[T, T, T, T, T, T]]
 # Cannot use Sequence type annotation when using torch.jit.ScriptModule
 ListOrTuple = Union[List[T], Tuple[T, ...]]
 
-Device = torch.device  # Union[torch.device, str], PyTorch uses Optional[torch.device] annotation
+Device = torch.device
+DeviceStr = Union[torch.device, str]
 DType = torch.dtype
+DTypeStr = Union[torch.dtype, str]
 Name = Optional[str]  # Optional tensor dimension name
 Size = ScalarOrTuple[int]  # Order of spatial dimensions: (X, ...)
 Shape = ScalarOrTuple[int]  # Order of spatial dimensions: (..., X)
@@ -36,6 +38,7 @@ Scalar = Union[int, float, Tensor]
 Array = Union[Sequence[Scalar], Tensor]
 
 PathStr = Union[Path, str]
+PathUri = Union[Path, str]
 
 
 class Dataclass(Protocol):
@@ -58,29 +61,6 @@ TensorCollection = Union[
     Mapping[str, TensorMapOrSequence],
     Sequence[TensorMapOrSequence],
 ]
-
-
-def tensor_collection_entry(output: TensorCollection, key: str) -> Union[TensorCollection, Tensor]:
-    r"""Get specified output entry."""
-    key = RE_OUTPUT_KEY_INDEX.sub(r".\1", key)
-    for index in key.split("."):
-        if isinstance(output, (list, tuple)):
-            try:
-                index = int(index)
-            except TypeError:
-                raise KeyError(f"invalid output key {key}")
-        elif not index or not isinstance(output, dict):
-            raise KeyError(f"invalid output key {key}")
-        output = output[index]
-    return output
-
-
-def get_tensor(output: TensorCollection, key: str) -> Tensor:
-    r"""Get tensor at specified output entry."""
-    item = tensor_collection_entry(output, key)
-    if not isinstance(item, Tensor):
-        raise TypeError(f"get_output_tensor() entry {key} must be Tensor")
-    return item
 
 
 def is_bool_dtype(dtype: DType) -> bool:

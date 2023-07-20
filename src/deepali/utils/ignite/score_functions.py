@@ -6,7 +6,7 @@ from ignite.engine import Engine
 
 from torch import Tensor
 
-from ...core import get_tensor
+from deepali.core.collections import get_tensor
 
 
 def negative_loss_score_function(engine: Engine, key: str = "loss") -> Tensor:

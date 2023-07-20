@@ -4,8 +4,7 @@ from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
 from copy import copy as shallow_copy
-from typing import Optional, Tuple, TypeVar, Union, overload
-from typing_extensions import final
+from typing import Optional, Tuple, TypeVar, Union, final, overload
 
 import torch
 import torch.optim
@@ -13,12 +12,12 @@ from torch import Tensor
 from torch.nn import Module
 import torch.nn.functional as F
 
-from ..core import functional as U
-from ..core.grid import Axes, Grid
-from ..core.linalg import as_homogeneous_matrix
-from ..core.types import Device
-from ..data.flow import FlowFields
-from ..modules import DeviceProperty
+from deepali.core import functional as U
+from deepali.core.grid import Axes, Grid
+from deepali.core.linalg import as_homogeneous_matrix
+from deepali.core.typing import Device
+from deepali.data.flow import FlowFields
+from deepali.modules import DeviceProperty
 
 
 TSpatialTransform = TypeVar("TSpatialTransform", bound="SpatialTransform")

@@ -8,7 +8,7 @@ from typing import Any, List, Mapping, NamedTuple, Sequence, overload
 import torch
 from torch.utils.data.dataloader import default_collate
 
-from ..core.types import Batch, Dataclass, Sample, is_namedtuple
+from deepali.core.typing import Batch, Dataclass, Sample, is_namedtuple
 
 from .flow import FlowField, FlowFields
 from .image import Image, ImageBatch

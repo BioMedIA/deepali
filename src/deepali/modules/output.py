@@ -5,7 +5,7 @@ from typing import Mapping, Sequence, Union
 from torch import Tensor
 from torch.nn import Module
 
-from ..core.nnutils import as_immutable_container
+from deepali.core.nnutils import as_immutable_container
 
 
 class ToImmutableOutput(Module):

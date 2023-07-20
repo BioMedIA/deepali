@@ -1,10 +1,87 @@
-r"""Utility functions for creating argparse based command line interfaces."""
+r"""Utility functions for creating argparse based command-line interfaces.
+
+In order to implement a CLI module, first define an argument parser by implementing
+a ``parser()`` function within the module which instantiates an ``ArgumentParser``
+with the respective command-line arguments of the CLI module.
+
+.. code::
+
+    def parser(*args, **kwargs) -> ArgumentParser:
+        ...
+
+Next, implement the main function of the CLI module. To indicate that this function
+receives already parsed command-line arguments, and in accordance with the respective
+attribute of an argparse subparsers, this function must be named ``func()``. In addition,
+an ``init()`` function can optionally be defined. It can be used, for example, to
+configure the loggers and to set environment variables before ``func()`` is invoked.
+These initialization steps can also be done in ``func()``, but by splitting these out
+into ``init()`` it is possible to implement a CLI module which calls the ``func()`` of
+other CLI modules without repeating these initialization steps. The return value of
+``init()`` and ``func()`` must be the exit code of the program.
+
+.. code::
+
+    logger = logging.getLogger()
+
+    def init(args: ParsedArguments) -> int:
+        configure_logging(args, logger)
+        init_omp_num_threads(args.threads)
+
+    def func(args: ParsedArguments) -> int:
+        ...
+        return 0
+
+The above functions are sufficient to implement a CLI module. Finally, the description
+of the CLI module which is printed as part of the default help output should be given
+as docstring at the top of the module.
+
+Lastly, an actual ``main()`` function which invokes the CLI module has to be defined
+and either be called explicitly when ``__name__ == "__main__"``, or in a special module
+file named ``__main__.py`` which is executed by the Python interpreter when the package
+containing the CLI module is being executed using ``python -m``.
+
+The ``main_func()`` closure can be used to implement a script for a single CLI, i.e.,
+
+.. code::
+
+    main = main_func(parser, func, init=init)
+
+    if __name__ == "__main__":
+        sys.exit(main())
+
+The ``entry_point()`` closure can be used to implement a script which can invoke multiple CLIs.
+Which CLI is being executed depends on the subcommand name. Subcommands can further be nested.
+An example of such nested subcommands is given by ``conda``, e.g., ``conda env config vars set``.
+This can be implemented using the ``entry_point()`` defined by this module as follows.
+
+Implement the CLI module ``conda/env/config/vars/set.py`` which must define the ``parser()`` and
+``func()`` function as detailed above. Then copy the following code into ``conda/__main__.py``
+
+.. code::
+
+    import sys
+
+    from hfresearch.cli.argparse import entry_point
+
+    main = entry_point(
+        package=__name__,
+        path=__path__,
+        description="...",
+        subcommands=["env.config.vars.set"],
+    )
+
+    sys.exit(main())
+
+The ``subcommands`` keyword argument is optional. If not specified, ``entry_point()`` will
+auto-discover the available CLI modules when ``--help`` is requested. By specifying the
+available subcommands explicitly, the help output is generated faster.
+
+"""
 
 import argparse
 import inspect
 import os
 import sys
-import logging
 from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Union
 from typing_extensions import Protocol
 from collections import namedtuple
@@ -12,12 +89,21 @@ from importlib import import_module
 from pkgutil import walk_packages
 from pkg_resources import DistributionNotFound, get_distribution
 
+from .psutil import memory_limit
+from .typing import BoolStr
+
 
 ParsedArguments = argparse.Namespace  # for type annotations
 UnknownArguments = List[str]
 
+Args = ParsedArguments
+
 
 STANDARD_ARGUMENTS_GROUP_TITLE = "Standard arguments"
+
+# Valid values for arguments of type BoolStr
+TRUE = (True, "1", "yes", "on", "true", "True", "TRUE")
+FALSE = (False, "0", "no", "off", "false", "False", "FALSE")
 
 
 class HelpFormatter(argparse.ArgumentDefaultsHelpFormatter):
@@ -128,10 +214,6 @@ def entry_point(
         except DistributionNotFound:
             version = None
 
-        # Loggers
-        log = logging.getLogger(dist)
-        log.addHandler(logging.StreamHandler())
-
         # Main parser
         mainparser = ArgumentParser(
             prog=prog, description=description, add_help=True, version=version
@@ -155,10 +237,6 @@ def entry_point(
                 help="Show program version number and exit.",
             )
 
-        common_options_parser = ArgumentParser(add_help=False)
-        group = common_options_parser.add_argument_group(STANDARD_ARGUMENTS_GROUP_TITLE)
-        group.add_argument("--log-level", default="INFO", help="Set logging level.")
-
         # Discover CLIs
         CommandInfo = namedtuple("CommandInfo", ["module", "commands"])
 
@@ -175,8 +253,7 @@ def entry_point(
                 commands[command_name] = CommandInfo(
                     module=module_name,
                     commands=find_commands(
-                        name=module_name,
-                        path=[os.path.join(prefix, basename) for prefix in path],
+                        name=module_name, path=[os.path.join(prefix, basename) for prefix in path]
                     )
                     if ispkg
                     else None,
@@ -232,15 +309,13 @@ def entry_point(
                     func = _func_wrapper(func=func, init=getattr(module, "init", None))
                     subparsers.add_parser(
                         command_name,
-                        parents=[parser, default_options_parser, common_options_parser],
+                        parents=[parser, default_options_parser],
                         help=parser.description,
                     ).set_defaults(func=func)
                 else:
                     add_commands(
                         subparsers.add_parser(
-                            command_name,
-                            parents=[default_options_parser],
-                            help=module.__doc__,
+                            command_name, parents=[default_options_parser], help=module.__doc__
                         ).add_subparsers(),
                         command_info.commands,
                         argv[1:],
@@ -259,12 +334,10 @@ def entry_point(
         args, unknown = mainparser.parse_known_args(argv)
 
         if hasattr(args, "func"):
-            log.setLevel(args.log_level)
-            log.info("")  # Make the console output stand out
             try:
                 exit_code = args.func(args, unknown)
             except KeyboardInterrupt:
-                log.debug("Execution interrupted by user")
+                sys.stderr.write("Interrupted by user\n")
                 exit_code = 1
         else:
             mainparser.print_usage()
@@ -325,8 +398,7 @@ def main_func(
 
 
 def _func_wrapper(
-    func: Callable[[ParsedArguments], int],
-    init: Callable[[ParsedArguments], int] = None,
+    func: Callable[[ParsedArguments], int], init: Callable[[ParsedArguments], int] = None
 ) -> Callable[[ParsedArguments], int]:
     r"""Wrap command 'init' and 'func' callables."""
 
@@ -357,3 +429,39 @@ def _pypi_package_name(module: str) -> str:
             break
         parts.append(part)
     return ".".join(parts)
+
+
+def bool_from_arg(arg: BoolStr) -> bool:
+    r"""Convert string argument to boolean value."""
+    if arg in TRUE:
+        return True
+    if arg in FALSE:
+        return False
+    raise ValueError("bool_from_arg() 'arg' must be valid boolean string argument")
+
+
+def memory_from_arg(arg: Union[int, str, None]) -> int:
+    r"""Parse --memory option argument.
+
+    Args:
+        arg: Amount of memory. If None, returns the total available memory.
+
+    Returns:
+        Amount of memory in number of bytes.
+
+    """
+    if arg is None:
+        return memory_limit()
+    if isinstance(arg, int):
+        return arg
+    if not isinstance(arg, str):
+        raise TypeError("memory_from_arg() 'arg' must be int or str")
+    if arg.endswith("B"):
+        return int(arg[:-1])
+    if arg.endswith("K"):
+        return int(float(arg[:-1]) * 1024)
+    if arg.endswith("M"):
+        return int(float(arg[:-1]) * 1024**2)
+    if arg.endswith("G"):
+        return int(float(arg[:-1]) * 1024**3)
+    return int(arg)

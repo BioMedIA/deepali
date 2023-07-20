@@ -26,8 +26,8 @@ from .enum import SpatialDim, SpatialDimArg
 from .math import round_decimals
 from .linalg import homogeneous_transform, homogeneous_matrix, hmm
 from .tensor import as_tensor, cat_scalars
-from .types import Array, Device, PathStr, ScalarOrTuple, Shape, Size
-from .types import is_int_dtype
+from .typing import Array, Device, DType, PathStr, ScalarOrTuple, Shape, Size
+from .typing import is_int_dtype
 
 
 ALIGN_CORNERS = True
@@ -973,7 +973,7 @@ class Grid(object):
         align_corners: Optional[bool] = None,
         channels_last: bool = True,
         flip: bool = False,
-        dtype: Optional[torch.dtype] = None,
+        dtype: Optional[DType] = None,
         device: Optional[Device] = None,
     ) -> Tensor:
         r"""Get tensor of grid point coordinates.
@@ -1058,7 +1058,7 @@ class Grid(object):
     def points(
         self,
         axes: Axes = Axes.WORLD,
-        dtype: Optional[torch.dtype] = None,
+        dtype: Optional[DType] = None,
         device: Optional[Device] = None,
     ) -> Tensor:
         r"""Tensor of grid point coordinates with respect to specified coordinate axes."""

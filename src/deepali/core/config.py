@@ -8,10 +8,13 @@ from typing import Any, Dict, Mapping, Optional, Sequence, TypeVar, Type
 
 import dacite
 import json
-import yaml
 
-from .path import abspath_template
-from .types import PathStr, is_path_str_field
+# PyYAML does not support YAML 1.2, which is required by DVC for example
+# (cf. https://github.com/iterative/dvc/issues/8466#issuecomment-1290757564)
+from ruamel.yaml import YAML
+
+from .pathlib import PathStr, abspath_template
+from .typing import is_path_str_field
 
 
 T = TypeVar("T", bound="DataclassConfig")
@@ -42,15 +45,13 @@ class DataclassConfig(object):
     def from_path(cls: Type[T], path: PathStr, section: Optional[str] = None) -> T:
         r"""Load configuration from file."""
         path = Path(path).absolute()
-        text = path.read_text()
-        if path.suffix == ".json":
-            config = json.loads(text)
-        elif path.suffix in (".yml", ".yaml"):
-            config = yaml.load(text, Loader=yaml.SafeLoader)
-        else:
-            raise ValueError(
-                f"{cls.__name__}.from_path() 'path' has unsupported suffix {path.suffix}"
-            )
+        if path.suffix not in (".json", ".yaml", ".yml"):
+            raise ValueError(f"{cls.__name__}.write() 'path' has unsupported suffix {path.suffix}")
+        with path.open("rt") as fp:
+            if path.suffix == ".json":
+                config = json.load(fp)
+            else:
+                config = YAML(typ="safe").load(fp)
         if config is None:
             config = {}
         if section is None:
@@ -67,18 +68,18 @@ class DataclassConfig(object):
 
     def write(self, path: PathStr) -> None:
         r"""Write configuration to file."""
-        path = Path(path).absolute()
         config = self.asdict()
-        if path.suffix == ".json":
-            text = json.dumps(config)
-        elif path.suffix in (".yml", ".yaml"):
-            text = yaml.safe_dump(config)
-        else:
+        path = Path(path).absolute()
+        if path.suffix not in (".json", ".yaml", ".yml"):
             raise ValueError(
                 f"{type(self).__name__}.write() 'path' has unsupported suffix {path.suffix}"
             )
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(text)
+        with path.open("wt") as fp:
+            if path.suffix == ".json":
+                json.dump(config, fp)
+            else:
+                YAML(typ="safe").dump(config, fp)
 
     def asdict(self) -> Dict[str, Any]:
         r"""Get configuration dictionary."""

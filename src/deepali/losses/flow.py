@@ -7,10 +7,10 @@ from typing import Optional, Union
 import torch
 from torch import Tensor
 
-from ..core.types import Shape
+from deepali.core.typing import Shape
 
-from .base import DisplacementLoss
 from . import functional as L
+from .base import DisplacementLoss
 
 
 class _SpatialDerivativesLoss(DisplacementLoss):
@@ -174,7 +174,7 @@ class Elasticity(_SpatialDerivativesLoss):
         self.poissons_ratio = poissons_ratio
         self.youngs_modulus = youngs_modulus
         self.shear_modulus = shear_modulus
-    
+
     def forward(self, u: Tensor) -> Tensor:
         r"""Evaluate regularization loss for given transformation."""
         spacing = self._spacing(u.shape)

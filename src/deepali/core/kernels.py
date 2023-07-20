@@ -9,7 +9,7 @@ import torch.nn.functional as F
 
 from .linalg import tensordot
 from .tensor import as_tensor, cat_scalars
-from .types import Array, Device, Scalar
+from .typing import Array, Device, DType, Scalar
 
 
 def bspline1d(stride: int, order: int = 4) -> Tensor:
@@ -67,7 +67,7 @@ def cubic_bspline(
     stride: Union[int, Sequence[int]],
     *args: int,
     derivative: int = 0,
-    dtype: Optional[torch.dtype] = None,
+    dtype: Optional[DType] = None,
     device: Optional[Device] = None,
 ):
     r"""Get n-dimensional cubic B-spline kernel.
@@ -100,7 +100,7 @@ def cubic_bspline(
 def cubic_bspline1d(
     stride: Union[int, Sequence[int]],
     derivative: int = 0,
-    dtype: Optional[torch.dtype] = None,
+    dtype: Optional[DType] = None,
     device: Optional[Device] = None,
 ) -> Tensor:
     r"""Cubic B-spline kernel for specified control point spacing.
@@ -130,7 +130,7 @@ def cubic_bspline2d(
     stride: Union[int, Sequence[int]],
     *args: int,
     derivative: int = 0,
-    dtype: Optional[torch.dtype] = None,
+    dtype: Optional[DType] = None,
     device: Optional[Device] = None,
 ) -> Tensor:
     r"""Cubic B-spline kernel for specified control point spacing.
@@ -162,7 +162,7 @@ def cubic_bspline3d(
     stride: Union[int, Sequence[int]],
     *args: int,
     derivative: int = 0,
-    dtype: Optional[torch.dtype] = None,
+    dtype: Optional[DType] = None,
     device: Optional[Device] = None,
 ) -> Tensor:
     r"""Cubic B-spline kernel for specified control point spacing.
@@ -224,7 +224,7 @@ def gaussian(
     sigma: Union[Scalar, Array],
     *args: Scalar,
     normalize: bool = True,
-    dtype: Optional[torch.dtype] = None,
+    dtype: Optional[DType] = None,
     device: Optional[Device] = None,
 ):
     r"""Get n-dimensional Gaussian kernel."""
@@ -253,7 +253,7 @@ def gaussian1d(
     radius: Optional[Union[int, Tensor]] = None,
     scale: Optional[Scalar] = None,
     normalize: bool = True,
-    dtype: Optional[torch.dtype] = None,
+    dtype: Optional[DType] = None,
     device: Optional[Device] = None,
 ) -> Tensor:
     r"""Get 1-dimensional Gaussian kernel."""
@@ -289,7 +289,7 @@ def gaussian1d(
 def gaussian1d_I(
     sigma: Scalar,
     normalize: bool = True,
-    dtype: Optional[torch.dtype] = None,
+    dtype: Optional[DType] = None,
     device: Optional[Device] = None,
 ) -> Tensor:
     r"""Get 1st order derivative of 1-dimensional Gaussian kernel."""

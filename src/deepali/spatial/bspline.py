@@ -9,12 +9,12 @@ from typing import Callable, List, Optional, Sequence, Tuple, TypeVar, Union
 import torch
 from torch import Size, Tensor
 
-from ..core import kernels as K
-from ..core import functional as U
-from ..core.enum import SpatialDim
-from ..core.grid import Grid
-from ..core.types import ScalarOrTuple
-from ..modules import ExpFlow
+from deepali.core import kernels as K
+from deepali.core import functional as U
+from deepali.core.enum import SpatialDim
+from deepali.core.grid import Grid
+from deepali.core.typing import ScalarOrTuple
+from deepali.modules import ExpFlow
 
 from .base import NonRigidTransform
 from .parametric import ParametricTransform

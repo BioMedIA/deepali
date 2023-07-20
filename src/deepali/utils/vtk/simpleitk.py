@@ -17,9 +17,10 @@ from vtk import (
     VTK_DOUBLE,
 )
 
+from deepali.utils.simpleitk.grid import GridAttrs
+from deepali.utils.simpleitk.sample import interpolate_ndimage
+
 from .numpy import numpy_to_vtk_array, vtk_to_numpy_array, vtk_to_numpy_points
-from ..sitk.grid import Grid
-from ..sitk.sample import interpolate_ndimage
 
 
 VTK_DATA_TYPE_FROM_SITK_PIXEL_ID = {
@@ -104,10 +105,10 @@ def apply_warp_field_to_pointset(
     return output
 
 
-def image_data_grid(data: vtkImageData) -> Grid:
+def image_data_grid(data: vtkImageData) -> GridAttrs:
     r"""Create image grid from vtkImageData object."""
     extent = data.GetExtent()
-    return Grid(
+    return GridAttrs(
         size=(
             extent[1] - extent[0] + 1,
             extent[3] - extent[2] + 1,
@@ -161,7 +162,7 @@ def vtk_image_from_sitk_image(
     return output
 
 
-def sitk_image_from_vtk_image(image: vtkImageData, grid: Optional[Grid] = None) -> sitk.Image:
+def sitk_image_from_vtk_image(image: vtkImageData, grid: Optional[GridAttrs] = None) -> sitk.Image:
     r"""Create SimpleITK image from vtkImageData."""
     if image.GetNumberOfScalarComponents() != 1:
         raise NotImplementedError("sitk_image_from_vtk_image() only supports scalar 'image'")
