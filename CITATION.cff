@@ -1,0 +1,20 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it using these metadata."
+title: "deepali: Image, point set, and surface registration in PyTorch"
+type: software
+authors:
+  - given-names: Andreas
+    family-names: Schuh
+    affiliation: HeartFlow U.K. Ltd.
+    orcid: https://orcid.org/0000-0002-8214-116X
+  - given-names: Huaqi
+    family-names: Qiu
+    affiliation: Imperial College London
+  - name: HeartFlow Research
+url: https://biomedia.github.io/deepali/
+repository-code: https://github.com/BioMedIA/deepali
+keywords:
+  - medical-imaging
+  - image-registration
+  - spatial-transformer-networks
+license: Apache-2.0
