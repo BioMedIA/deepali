@@ -22,6 +22,7 @@ authors:
     family-names: Qiu
     affiliation: Imperial College London
   - name: HeartFlow Research
+doi: 10.5281/zenodo.8170162
 url: https://biomedia.github.io/deepali/
 repository-code: https://github.com/BioMedIA/deepali
 keywords:
