@@ -33,14 +33,15 @@ dependencies:
   # Main libraries
   - dacite =1.8
   - deprecation =2.1
+  - nibabel =5.1
   - numpy =1.25
   - pandas =1.5
   - pytorch =2.0,!=2.0.0  # ["osx" not in get_env("PLATFORM")]
   - pytorch-cuda =11.8  # ["osx" not in get_env("PLATFORM")]
   - pytorch::pytorch =2.0,!=2.0.0  # ["osx" in get_env("PLATFORM")]
   - pyyaml =6.0
+  - ruamel.yaml =0.17
   - SimpleITK =2.2
-  - typing-extensions =4.6
   # Utility libraries
   - boto3 =1.26
   - matplotlib =3.7

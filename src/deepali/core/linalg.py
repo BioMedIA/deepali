@@ -10,7 +10,7 @@ import torch.nn.functional as F
 from torch import Tensor
 
 from .tensor import as_tensor
-from .types import Device
+from .typing import Device, DType
 
 from ._kornia import (
     angle_axis_to_rotation_matrix,
@@ -57,7 +57,7 @@ class HomogeneousTensorType(Enum):
 
 
 def as_homogeneous_tensor(
-    tensor: Tensor, dtype: Optional[torch.dtype] = None, device: Optional[Device] = None
+    tensor: Tensor, dtype: Optional[DType] = None, device: Optional[Device] = None
 ) -> Tuple[Tensor, HomogeneousTensorType]:
     r"""Convert tensor to homogeneous coordinate transformation."""
     tensor_ = as_tensor(tensor, dtype=dtype, device=device)
@@ -77,7 +77,7 @@ def as_homogeneous_tensor(
 
 
 def as_homogeneous_matrix(
-    tensor: Tensor, dtype: Optional[torch.dtype] = None, device: Optional[Device] = None
+    tensor: Tensor, dtype: Optional[DType] = None, device: Optional[Device] = None
 ) -> Tensor:
     r"""Convert tensor to homogeneous coordinate transformation matrix.
 
@@ -342,7 +342,7 @@ def homogeneous_matmul(*args: Tensor) -> Tensor:
 def homogeneous_matrix(
     tensor: Tensor,
     offset: Optional[Tensor] = None,
-    dtype: Optional[torch.dtype] = None,
+    dtype: Optional[DType] = None,
     device: Optional[Device] = None,
 ) -> Tensor:
     r"""Convert square matrix or vector to homogeneous coordinate transformation matrix.

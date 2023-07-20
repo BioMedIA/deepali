@@ -10,12 +10,12 @@ import torch
 from torch import Size, Tensor
 from torch.nn import init
 
-from ..core import affine as U
-from ..core.grid import Grid
-from ..core.linalg import normalize_quaternion
-from ..core.linalg import quaternion_to_rotation_matrix
-from ..core.linalg import rotation_matrix_to_quaternion
-from ..core.tensor import as_float_tensor
+from deepali.core import affine as U
+from deepali.core.grid import Grid
+from deepali.core.linalg import normalize_quaternion
+from deepali.core.linalg import quaternion_to_rotation_matrix
+from deepali.core.linalg import rotation_matrix_to_quaternion
+from deepali.core.tensor import as_float_tensor
 
 from .base import LinearTransform
 from .composite import SequentialTransform

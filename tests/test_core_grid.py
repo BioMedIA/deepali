@@ -4,8 +4,8 @@ import numpy as np
 import torch
 from torch import Tensor
 
-from deepali.core.grid import Grid
 from deepali.core import affine as A
+from deepali.core.grid import Grid
 
 
 @pytest.fixture

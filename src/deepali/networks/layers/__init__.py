@@ -1,8 +1,8 @@
 r"""Basic network modules, usually with learnable parameters."""
 
-from ...modules import Pad
-from ...modules import Reshape
-from ...modules import View
+from deepali.modules import Pad
+from deepali.modules import Reshape
+from deepali.modules import View
 
 from .acti import Activation
 from .acti import ActivationArg

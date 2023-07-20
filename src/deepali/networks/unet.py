@@ -11,13 +11,13 @@ from typing import Dict, List
 from torch import Tensor
 from torch.nn import Identity, Module, ModuleDict, Sequential
 
-from ..core.config import DataclassConfig
-from ..core.enum import PaddingMode
-from ..core.image import crop
-from ..core.itertools import repeat_last
-from ..core.nnutils import as_immutable_container
-from ..core.types import ListOrTuple, ScalarOrTuple
-from ..modules import GetItem, ReprWithCrossReferences
+from deepali.core.config import DataclassConfig
+from deepali.core.enum import PaddingMode
+from deepali.core.image import crop
+from deepali.core.itertools import repeat_last
+from deepali.core.nnutils import as_immutable_container
+from deepali.core.typing import ListOrTuple, ScalarOrTuple
+from deepali.modules import GetItem, ReprWithCrossReferences
 
 from .blocks import ResidualUnit
 from .layers import ActivationArg, ConvLayer, JoinLayer, NormArg, PoolLayer

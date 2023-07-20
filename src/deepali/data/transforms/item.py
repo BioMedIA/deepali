@@ -7,7 +7,8 @@ from typing import Any, Callable, Iterable, Mapping, Optional, Union
 
 from torch.nn import Module
 
-from ...core.types import RE_OUTPUT_KEY_INDEX, is_namedtuple
+from deepali.core.collections import re_output_key_index
+from deepali.core.typing import is_namedtuple
 
 
 __all__ = ("ItemTransform", "ItemwiseTransform")
@@ -74,7 +75,7 @@ class ItemTransform(Module):
             if isinstance(key, int):
                 data = self._apply_index(data, key)
             elif isinstance(key, str):
-                key = RE_OUTPUT_KEY_INDEX.sub(r".\1", key)
+                key = re_output_key_index.sub(r".\1", key)
                 data = self._apply_key(data, key)
             else:
                 raise TypeError(f"{type(self).__name__}() 'key' must be None, int, or str")

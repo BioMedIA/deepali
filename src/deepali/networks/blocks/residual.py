@@ -7,8 +7,8 @@ from typing import Any, Mapping, Optional, Union
 import torch
 from torch.nn import Identity, Module, Sequential, init
 
-from ...core.enum import PaddingMode
-from ...core.types import ScalarOrTuple
+from deepali.core.enum import PaddingMode
+from deepali.core.typing import ScalarOrTuple
 
 from ..layers.acti import ActivationArg, activation
 from ..layers.conv import ConvLayer, convolution, same_padding

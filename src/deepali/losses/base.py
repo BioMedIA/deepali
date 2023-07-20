@@ -7,8 +7,8 @@ from typing import Any, Dict, Mapping, Optional, Sequence, Union
 from torch import Tensor
 from torch.nn import Module, ModuleDict, ModuleList
 
-from ..core.math import max_difference
-from ..core.types import ScalarOrTuple
+from deepali.core.math import max_difference
+from deepali.core.typing import ScalarOrTuple
 
 
 RegistrationResult = Dict[str, Any]

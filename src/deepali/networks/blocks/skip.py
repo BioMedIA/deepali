@@ -5,7 +5,8 @@ from typing import Any, Callable, Mapping, Union, overload
 from torch import Tensor
 from torch.nn import Identity, Module, ModuleDict, Sequential
 
-from ...modules.mixins import ReprWithCrossReferences
+from deepali.modules.mixins import ReprWithCrossReferences
+
 from ..layers.join import JoinFunc, join_func
 
 

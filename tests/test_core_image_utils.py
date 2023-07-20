@@ -4,8 +4,8 @@ import pytest
 import torch
 from torch import Tensor
 
-from deepali.core import Grid
 from deepali.core import functional as U
+from deepali.core import Grid
 
 
 def test_fill_border():

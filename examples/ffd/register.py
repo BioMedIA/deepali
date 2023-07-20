@@ -13,12 +13,13 @@ import torch
 import torch.cuda
 from torch import Tensor
 
-from deepali.core import Grid, PathStr, unlink_or_mkdir
+from deepali.core.argparse import ArgumentParser, Args, main_func
+from deepali.core.environ import cuda_visible_devices
+from deepali.core.grid import Grid
+from deepali.core.logging import configure_logging
+from deepali.core.pathlib import PathStr, unlink_or_mkdir
 from deepali.data import Image
 from deepali.modules import TransformImage
-from deepali.utils.cli import ArgumentParser, Args, main_func
-from deepali.utils.cli import configure_logging, cuda_visible_devices
-from deepali.utils.cli import filter_warning_of_experimental_named_tensors_feature
 
 from .pairwise import register_pairwise
 
@@ -97,7 +98,6 @@ def init(args: Args) -> int:
         if len(gpu_ids) != 1:
             log.error("CUDA_VISIBLE_DEVICES must be set to one GPU")
             return 1
-    filter_warning_of_experimental_named_tensors_feature()
     return 0
 
 

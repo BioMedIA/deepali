@@ -1,47 +1,54 @@
 r"""Auxiliary functions for working with vtkPolyData."""
 
 from io import StringIO
-from pathlib import Path
-from typing import List, Tuple, Union
+from typing import List, Tuple
 
 import numpy as np
 
 from vtk import vtkCellArray, vtkPoints, vtkPolyData
+from vtk import vtkOBJReader, vtkOBJWriter
 from vtk import vtkPLYReader, vtkPLYWriter
 from vtk import vtkXMLPolyDataReader, vtkXMLPolyDataWriter
 from vtk import vtkPolyDataReader, vtkPolyDataWriter
 
+from deepali.core.pathlib import PathUri
+from deepali.utils.storage import StorageObject
+
 from .numpy import vtk_to_numpy_array, vtk_to_numpy_points
 
-PathStr = Union[Path, str]
 
-
-def read_polydata(path: PathStr) -> vtkPolyData:
+def read_polydata(path: PathUri) -> vtkPolyData:
     r"""Read vtkPolyData from specified file."""
-    path = Path(path).absolute()
-    if not path.is_file():
-        raise FileNotFoundError(str(path))
-    suffix = path.suffix.lower()
-    if suffix == ".off":
-        return read_polydata_off(path)
-    elif suffix == ".ply":
-        reader = vtkPLYReader()
-    elif suffix == ".vtp":
-        reader = vtkXMLPolyDataReader()
-    elif suffix == ".vtk":
-        reader = vtkPolyDataReader()
-    else:
-        raise ValueError("Unsupported file name extension: {}".format(suffix))
-    reader.SetFileName(str(path))
-    reader.Update()
-    polydata = vtkPolyData()
-    polydata.DeepCopy(reader.GetOutput())
+    with StorageObject.from_path(path) as obj:
+        if not obj.is_file():
+            raise FileNotFoundError(f"File not found: {obj.uri}")
+        obj = obj.pull()
+        if not obj.path.is_file():
+            raise FileNotFoundError(f"File not found: {obj.path}")
+        suffix = obj.path.suffix.lower()
+        if suffix == ".off":
+            return read_polydata_off(obj.path)
+        if suffix == ".obj":
+            reader = vtkOBJReader()
+        elif suffix == ".ply":
+            reader = vtkPLYReader()
+        elif suffix == ".vtp":
+            reader = vtkXMLPolyDataReader()
+        elif suffix == ".vtk":
+            reader = vtkPolyDataReader()
+        else:
+            raise ValueError("Unsupported file name extension: {}".format(suffix))
+        reader.SetFileName(str(obj.path))
+        reader.Update()
+        polydata = vtkPolyData()
+        polydata.DeepCopy(reader.GetOutput())
     return polydata
 
 
-def read_off(path: PathStr) -> Tuple[List[List[float]], List[List[int]]]:
+def read_off(path: PathUri) -> Tuple[List[List[float]], List[List[int]]]:
     r"""Read values from .off file."""
-    data = Path(path).read_text()
+    with StorageObject.from_path(path) as obj:
+        data = obj.read_text()
     stream = StringIO(data)
     magic = stream.readline().strip()
     if magic not in ("OFF", "CNOFF"):
@@ -55,7 +62,7 @@ def read_off(path: PathStr) -> Tuple[List[List[float]], List[List[int]]]:
     return verts, faces
 
 
-def read_polydata_off(path: PathStr) -> vtkPolyData:
+def read_polydata_off(path: PathUri) -> vtkPolyData:
     r"""Read vtkPolyData from .off file."""
     verts, faces = read_off(path)
     points = vtkPoints()
@@ -70,40 +77,36 @@ def read_polydata_off(path: PathStr) -> vtkPolyData:
     return output
 
 
-def write_polydata(polydata: vtkPolyData, path: PathStr):
+def write_polydata(polydata: vtkPolyData, path: PathUri):
     r"""Write vtkPolyData to specified file in XML format."""
-    path = Path(path).absolute()
-    suffix = path.suffix.lower()
-    if suffix == ".off":
-        write_polydata_off(polydata, path)
-        return
-    if suffix == ".ply":
-        writer = vtkPLYWriter()
-        writer.SetFileTypeToBinary()
-    elif suffix == ".vtp":
-        writer = vtkXMLPolyDataWriter()
-    elif suffix == ".vtk":
-        writer = vtkPolyDataWriter()
-    else:
-        raise ValueError("Unsupported file name extension: {}".format(suffix))
-    try:
-        path.unlink()  # in case of protected symlink to DVC cache
-    except FileNotFoundError:
-        path.parent.mkdir(parents=True, exist_ok=True)
-    writer.SetFileName(str(path))
-    writer.SetInputData(polydata)
-    writer.Update()
+    with StorageObject.from_path(path) as obj:
+        suffix = obj.path.suffix.lower()
+        if suffix == ".off":
+            write_polydata_off(polydata, obj.path)
+            return
+        if suffix == ".obj":
+            writer = vtkOBJWriter()
+        elif suffix == ".ply":
+            writer = vtkPLYWriter()
+            writer.SetFileTypeToBinary()
+        elif suffix == ".vtp":
+            writer = vtkXMLPolyDataWriter()
+        elif suffix == ".vtk":
+            writer = vtkPolyDataWriter()
+        else:
+            raise ValueError("Unsupported file name extension: {}".format(suffix))
+        try:
+            obj.path.unlink()  # in case of protected symlink to DVC cache
+        except FileNotFoundError:
+            obj.path.parent.mkdir(parents=True, exist_ok=True)
+        writer.SetFileName(str(obj.path))
+        writer.SetInputData(polydata)
+        writer.Update()
+        obj.push(force=True)
 
 
-def write_polydata_off(polydata: vtkPolyData, path: PathStr):
+def write_polydata_off(polydata: vtkPolyData, path: PathUri):
     r"""Write vtkPolyData to specified file in OFF format."""
-    path = Path(path).absolute()
-
-    try:
-        path.unlink()  # in case of protected symlink to DVC cache
-    except FileNotFoundError:
-        path.parent.mkdir(parents=True, exist_ok=True)
-
     verts = vtk_to_numpy_points(polydata)
 
     F = polydata.GetPolys().GetNumberOfCells()
@@ -113,8 +116,11 @@ def write_polydata_off(polydata: vtkPolyData, path: PathStr):
         raise ValueError("write_polydata_off() only supports triangulated surface meshes")
     faces = faces.reshape(-1, 4)
 
-    with path.open(mode="wt") as fp:
-        fp.write("OFF\n")
-        fp.write(f"{len(verts)} {len(faces)} 0\n")
-        np.savetxt(fp, verts, delimiter=" ", newline="\n", header="", footer="")
-        np.savetxt(fp, faces, delimiter=" ", newline="\n", header="", footer="", fmt="%d")
+    stream = StringIO()
+    stream.write("OFF\n")
+    stream.write(f"{len(verts)} {len(faces)} 0\n")
+    np.savetxt(stream, verts, delimiter=" ", newline="\n", header="", footer="")
+    np.savetxt(stream, faces, delimiter=" ", newline="\n", header="", footer="", fmt="%d")
+
+    with StorageObject.from_path(path) as obj:
+        obj.write_text(stream.getvalue())

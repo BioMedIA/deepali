@@ -7,10 +7,10 @@ import torch
 from torch import Tensor
 from torch.nn import Module
 
-from ...core.enum import PaddingMode, Sampling
-from ...core.types import PathStr, ScalarOrTuple
-from ..image import Image
+from deepali.core.enum import PaddingMode, Sampling
+from deepali.core.typing import DeviceStr, DTypeStr, PathUri, ScalarOrTuple
 
+from ..image import Image
 from .item import ItemTransform, ItemwiseTransform
 
 
@@ -78,7 +78,7 @@ class AvgPoolImage(ItemwiseTransform, Module):
 class CastImage(ItemwiseTransform, Module):
     r"""Cast image data to specified type."""
 
-    def __init__(self, dtype: Union[torch.dtype, str]) -> None:
+    def __init__(self, dtype: DTypeStr) -> None:
         super().__init__()
         if isinstance(dtype, str):
             attr = dtype
@@ -243,8 +243,8 @@ class ReadImage(ItemwiseTransform, Module):
 
     def __init__(
         self,
-        dtype: Optional[Union[torch.dtype, str]] = None,
-        device: Optional[Union[str, torch.device]] = None,
+        dtype: Optional[DTypeStr] = None,
+        device: Optional[DeviceStr] = None,
     ) -> None:
         super().__init__()
         if isinstance(dtype, str):
@@ -257,7 +257,7 @@ class ReadImage(ItemwiseTransform, Module):
         self.dtype = dtype
         self.device = torch.device(device or "cpu")
 
-    def forward(self, path: PathStr) -> Image:
+    def forward(self, path: PathUri) -> Image:
         if not isinstance(path, (str, Path)):
             raise TypeError(f"{type(self).__name__}() 'path' must be Path or str")
         image = Image.read(path, dtype=self.dtype, device=self.device)

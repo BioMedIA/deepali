@@ -8,11 +8,11 @@ import torch
 from torch import Tensor
 from torch.nn import functional as F
 
-from ..core.enum import PaddingMode, Sampling
-from ..core import flow as U
-from ..core.grid import Axes, Grid, grid_transform_vectors
-from ..core.tensor import move_dim
-from ..core.types import Array, Device, DType, EllipsisType, PathStr, Scalar
+from deepali.core import flow as U
+from deepali.core.enum import PaddingMode, Sampling
+from deepali.core.grid import ALIGN_CORNERS, Axes, Grid, grid_transform_vectors
+from deepali.core.tensor import move_dim
+from deepali.core.typing import Array, Device, DType, EllipsisType, PathStr, Scalar
 
 from .image import Image, ImageBatch
 
@@ -493,23 +493,41 @@ class FlowField(Image):
 
     @classmethod
     def from_sitk(
-        cls: Type[TFlowField], image: "sitk.Image", axes: Optional[Axes] = None
+        cls: Type[TFlowField],
+        image: "sitk.Image",
+        axes: Optional[Axes] = None,
+        align_corners: bool = ALIGN_CORNERS,
+        dtype: Optional[DType] = None,
+        device: Optional[Device] = None,
     ) -> TFlowField:
         r"""Create vector field from ``SimpleITK.Image``."""
-        image = super().from_sitk(image)
+        image = Image.from_sitk(image, align_corners=align_corners, dtype=dtype, device=device)
         return cls.from_image(image, axes=axes or Axes.WORLD)
 
     def sitk(self: TFlowField, axes: Optional[Axes] = None) -> "sitk.Image":
         r"""Create ``SimpleITK.Image`` from this vector field."""
-        disp: TFlowField = self.detach()
+        disp: FlowField = self.detach()
         disp = disp.axes(axes or Axes.WORLD)
         return Image.sitk(disp)
 
     @classmethod
-    def read(cls: Type[TFlowField], path: PathStr, axes: Optional[Axes] = None) -> TFlowField:
+    def read(
+        cls: Type[TFlowField],
+        path: PathStr,
+        axes: Optional[Axes] = None,
+        align_corners: bool = ALIGN_CORNERS,
+        dtype: Optional[DType] = None,
+        device: Optional[Device] = None,
+    ) -> TFlowField:
         r"""Read image data from file."""
-        image = cls._read_sitk(path)
-        return cls.from_sitk(image, axes)
+        image = Image.read(path, align_corners=align_corners, dtype=dtype, device=device)
+        return cls.from_image(image, axes=axes or Axes.WORLD)
+
+    def write(self, path: PathStr, axes: Optional[Axes] = None, compress: bool = True) -> None:
+        r"""Write flow field data to file."""
+        disp: FlowField = self.detach()
+        disp = disp.axes(axes or Axes.WORLD)
+        Image.write(disp, path, compress=compress)
 
     def curl(self: TFlowField, mode: str = "central") -> Image:
         r"""Compute curl of vector field."""

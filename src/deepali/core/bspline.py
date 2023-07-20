@@ -13,7 +13,7 @@ from .image import conv, conv1d
 from .itertools import is_even_permutation
 from .kernels import cubic_bspline1d
 from .tensor import move_dim
-from .types import ScalarOrTuple
+from .typing import DType, ScalarOrTuple
 
 
 @overload
@@ -89,7 +89,7 @@ def cubic_bspline_control_point_grid(grid: Grid, stride: ScalarOrTuple[int]) -> 
 def bspline_interpolation_weights(
     degree: int,
     stride: int,
-    dtype: Optional[torch.dtype] = None,
+    dtype: Optional[DType] = None,
     device: Optional[torch.device] = None,
 ) -> Tensor:
     ...
@@ -99,7 +99,7 @@ def bspline_interpolation_weights(
 def bspline_interpolation_weights(
     degree: int,
     stride: Sequence[int],
-    dtype: Optional[torch.dtype] = None,
+    dtype: Optional[DType] = None,
     device: Optional[torch.device] = None,
 ) -> Tuple[Tensor, ...]:
     ...
@@ -108,7 +108,7 @@ def bspline_interpolation_weights(
 def bspline_interpolation_weights(
     degree: int,
     stride: ScalarOrTuple[int],
-    dtype: Optional[torch.dtype] = None,
+    dtype: Optional[DType] = None,
     device: Optional[torch.device] = None,
 ) -> Union[Tensor, Tuple[Tensor, ...]]:
     r"""Compute B-spline interpolation weights."""
@@ -176,7 +176,7 @@ def bspline_interpolation_weights(
 def cubic_bspline_interpolation_weights(
     stride: int,
     derivative: int = 0,
-    dtype: Optional[torch.dtype] = None,
+    dtype: Optional[DType] = None,
     device: Optional[torch.device] = None,
 ) -> Tensor:
     ...
@@ -186,7 +186,7 @@ def cubic_bspline_interpolation_weights(
 def cubic_bspline_interpolation_weights(
     stride: int,
     derivative: Sequence[int],
-    dtype: Optional[torch.dtype] = None,
+    dtype: Optional[DType] = None,
     device: Optional[torch.device] = None,
 ) -> Tuple[Tensor, ...]:
     ...
@@ -196,7 +196,7 @@ def cubic_bspline_interpolation_weights(
 def cubic_bspline_interpolation_weights(
     stride: Sequence[int],
     derivative: ScalarOrTuple[int] = 0,
-    dtype: Optional[torch.dtype] = None,
+    dtype: Optional[DType] = None,
     device: Optional[torch.device] = None,
 ) -> Tuple[Tensor, ...]:
     ...
@@ -205,7 +205,7 @@ def cubic_bspline_interpolation_weights(
 def cubic_bspline_interpolation_weights(
     stride: ScalarOrTuple[int],
     derivative: ScalarOrTuple[int] = 0,
-    dtype: Optional[torch.dtype] = None,
+    dtype: Optional[DType] = None,
     device: Optional[torch.device] = None,
 ) -> Union[Tensor, Tuple[Tensor, ...]]:
     r"""Compute cubic B-spline interpolation weights."""

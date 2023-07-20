@@ -1,6 +1,6 @@
 from deprecation import deprecated
 
-from ..core import __version__
+from deepali.core import __version__
 from .transformer import ImageTransformer
 
 

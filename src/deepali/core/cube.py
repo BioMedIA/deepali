@@ -13,7 +13,7 @@ from torch import Tensor
 from .grid import ALIGN_CORNERS, Axes, Grid
 from .linalg import hmm, homogeneous_matrix, homogeneous_transform
 from .tensor import as_tensor, cat_scalars
-from .types import Array, Device, DType, Shape, Size
+from .typing import Array, Device, Shape, Size
 
 
 class Cube(object):
@@ -195,7 +195,7 @@ class Cube(object):
         return len(self._extent)
 
     @property
-    def dtype(self) -> DType:
+    def dtype(self) -> torch.dtype:
         r"""Get data type of cube attribute tensors."""
         return self._extent.dtype
 

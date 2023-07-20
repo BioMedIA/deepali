@@ -6,11 +6,11 @@ from typing import Callable, Optional, Tuple, Union
 import torch
 from torch import Tensor
 
-from .types import Array, Device, Scalar
+from .typing import Array, Device, DType, Scalar
 
 
 def as_tensor(
-    arg: Union[Scalar, Array], dtype: Optional[torch.dtype] = None, device: Optional[Device] = None
+    arg: Union[Scalar, Array], dtype: Optional[DType] = None, device: Optional[Device] = None
 ) -> Tensor:
     r"""Create tensor from array if argument is not of type torch.Tensor.
 
@@ -34,7 +34,7 @@ def as_one_hot_tensor(
     tensor: Tensor,
     num_classes: int,
     ignore_index: Optional[int] = None,
-    dtype: Optional[torch.dtype] = None,
+    dtype: Optional[DType] = None,
 ) -> Tensor:
     r"""Converts label image to one-hot encoding of multi-class segmentation.
 
@@ -87,7 +87,7 @@ def as_one_hot_tensor(
 
 
 def atleast_1d(
-    arr: Array, dtype: Optional[torch.dtype] = None, device: Optional[Device] = None
+    arr: Array, dtype: Optional[DType] = None, device: Optional[Device] = None
 ) -> Tensor:
     r"""Convert array-like argument to 1- or more-dimensional PyTorch tensor."""
     arr_ = as_tensor(arr, dtype=dtype, device=device)
@@ -98,7 +98,7 @@ def cat_scalars(
     arg: Union[Scalar, Array],
     *args: Scalar,
     num: int = 0,
-    dtype: Optional[torch.dtype] = None,
+    dtype: Optional[DType] = None,
     device: Optional[Device] = None,
 ) -> Tensor:
     r"""Join arguments into single 1-dimensional tensor.

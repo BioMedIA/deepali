@@ -13,10 +13,10 @@ from typing import Dict, Optional, Tuple, TypeVar, Union, cast, overload
 from torch import Tensor
 from torch.nn import Module
 
-from ..core.enum import PaddingMode, Sampling
-from ..core.grid import Axes, Grid
-from ..core.types import Scalar
-from ..modules import SampleImage
+from deepali.core.enum import PaddingMode, Sampling
+from deepali.core.grid import Axes, Grid
+from deepali.core.typing import Scalar
+from deepali.modules import SampleImage
 
 from .base import SpatialTransform
 

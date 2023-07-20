@@ -5,9 +5,9 @@ from typing import Any, Mapping, Optional, Sequence, Union
 from torch import Tensor
 from torch.nn import Module
 
-from ..core import functional as U
-from ..core.enum import PaddingMode
-from ..core.types import ScalarOrTuple
+from deepali.core import functional as U
+from deepali.core.enum import PaddingMode
+from deepali.core.typing import ScalarOrTuple
 
 
 class GetItem(Module):

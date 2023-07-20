@@ -42,7 +42,7 @@ dependencies = [
     "deprecation",
     "pandas",
     "pyyaml",
-    "SimpleITK>=2.0",
+    "ruamel.yaml",
     "torch>=1.9",
     "typing-extensions",
 ]
@@ -53,6 +53,7 @@ all = [
 ]
 utils = [
     "boto3",
+    "nibabel",
     "numpy",
     "scipy",
     "SimpleITK>=2.0",

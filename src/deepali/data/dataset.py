@@ -14,8 +14,8 @@ import pandas as pd
 from torch.nn import Sequential
 from torch.utils.data import Dataset as TorchDataset, Subset
 
-from ..core.config import DataclassConfig
-from ..core.types import PathStr, Sample, is_namedtuple, is_path_str
+from deepali.core.config import DataclassConfig
+from deepali.core.typing import PathStr, Sample, is_namedtuple, is_path_str
 
 from .transforms import Transform
 from .transforms.image import ImageTransformConfig

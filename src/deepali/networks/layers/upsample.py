@@ -20,11 +20,11 @@ import torch
 from torch import Tensor, nn
 from torch.nn import Module, Sequential, Identity
 
-from ...core.enum import PaddingMode, Sampling
-from ...core.grid import ALIGN_CORNERS
-from ...core.nnutils import upsample_padding, upsample_output_padding
-from ...core.types import ScalarOrTuple
-from ...modules import Pad
+from deepali.core.enum import PaddingMode, Sampling
+from deepali.core.grid import ALIGN_CORNERS
+from deepali.core.nnutils import upsample_padding, upsample_output_padding
+from deepali.core.typing import ScalarOrTuple
+from deepali.modules import Pad
 
 from .conv import convolution
 from .pool import pooling
@@ -100,7 +100,6 @@ class Upsample(Sequential):
         padding_mode = PaddingMode(padding_mode).conv_mode(spatial_dims)
 
         if upsample_mode == UpsampleMode.DECONV:
-
             if not in_channels:
                 raise ValueError(
                     f"{type(self).__name__}() 'in_channels' required in {upsample_mode.value!r} mode"
@@ -153,7 +152,6 @@ class Upsample(Sequential):
             self.add_module("deconv", deconv)
 
         elif upsample_mode == UpsampleMode.INTERPOLATE:
-
             if pre_conv == "default":
                 if in_channels is None or in_channels == out_channels:
                     pre_conv = None
@@ -204,7 +202,6 @@ class Upsample(Sequential):
             self.add_module("interpolate", upsample)
 
         elif upsample_mode == UpsampleMode.PIXELSHUFFLE:
-
             try:
                 scale_factor_ = int(scale_factor)
             except TypeError:

@@ -14,11 +14,11 @@ from typing import Any, Callable, Mapping, Optional, Sequence, Type, Union
 
 from torch.nn import Flatten, Module, Sequential, init
 
-from ..core.config import DataclassConfig
-from ..core.enum import PaddingMode
-from ..core.itertools import zip_longest_repeat_last
-from ..core.types import ScalarOrTuple
-from ..modules import ReprWithCrossReferences
+from deepali.core.config import DataclassConfig
+from deepali.core.enum import PaddingMode
+from deepali.core.itertools import zip_longest_repeat_last
+from deepali.core.typing import ScalarOrTuple
+from deepali.modules import ReprWithCrossReferences
 
 from .blocks import ResidualUnit
 from .layers import ActivationArg, NormArg, ConvLayer, Linear, Upsample, pooling

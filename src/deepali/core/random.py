@@ -1,11 +1,57 @@
 r"""Auxiliary functions for random sampling."""
 
-from typing import Optional
+import random
+from typing import Optional, Union
 
 from pkg_resources import parse_version
 
 import torch
 from torch import Generator, LongTensor, Tensor
+
+
+def manual_seed(seed: int):
+    r"""Seed all pseudo-random number generators."""
+    random.seed(seed)
+    try:
+        import torch
+
+        torch.manual_seed(seed)
+    except ImportError:
+        ...
+    try:
+        import numpy as np
+
+        np.random.seed(seed)
+    except ImportError:
+        ...
+
+
+def str_to_seed(seed: Union[int, str]) -> int:
+    r"""Convert string argument to integer seed.
+
+    Args:
+        seed: Can be int, string of hexadecimal number, or other string.
+            A hexadecimal number can optionally contain dashes. For example,
+            can be data UUID (process ID) or MD5 image hash. When the input
+            is neither an int nor hexadecimal number, the builtin ``hash``
+            function is used to derive a seed from the given string.
+
+    Returns:
+        Seed value for random number generator.
+
+    """
+    if isinstance(seed, int):
+        return seed
+    if not isinstance(seed, str):
+        raise TypeError("str_to_seed() 'seed' must be int or hexadecimal string")
+    try:
+        seed = int(seed, 0)
+    except ValueError:
+        try:
+            seed = int(seed.replace("-", ""), 16)
+        except ValueError:
+            seed = abs(hash(seed))
+    return seed
 
 
 def multinomial(

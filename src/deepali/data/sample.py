@@ -5,7 +5,7 @@ from collections import OrderedDict
 from dataclasses import fields, is_dataclass
 from typing import Any, Mapping, Sequence, Tuple
 
-from ..core.types import Sample, is_namedtuple
+from deepali.core.typing import Sample, is_namedtuple
 
 
 __all__ = (

@@ -10,8 +10,8 @@ from torch.optim.optimizer import Optimizer
 from torch.utils.data import BatchSampler, DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
-from ...core import RE_OUTPUT_KEY_INDEX
-from ..tensorboard import escape_channel_index_format_string, add_summary_images
+from deepali.core.collections import re_output_key_index
+from deepali.utils.tensorboard import escape_channel_index_format_string, add_summary_images
 
 
 def clamp_learning_rate(
@@ -234,10 +234,10 @@ def write_summary_images(
     # Format tag strings
     prefix = format_tag(prefix or "")
     if isinstance(names, dict):
-        names = {RE_OUTPUT_KEY_INDEX.sub(r".\1", name): tag for name, tag in names.items()}
+        names = {re_output_key_index.sub(r".\1", name): tag for name, tag in names.items()}
         names = {name: format_tag(tag) for name, tag in names.items()}
     elif names is not None:
-        names = {RE_OUTPUT_KEY_INDEX.sub(r".\1", name) for name in names}
+        names = {re_output_key_index.sub(r".\1", name) for name in names}
         names = {format_tag(name) for name in names}
     # Input batch
     batch = engine.state.batch

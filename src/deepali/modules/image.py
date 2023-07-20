@@ -10,10 +10,10 @@ import torch
 from torch import Tensor
 from torch.nn import Module, functional as F
 
-from ..core import functional as U
-from ..core.enum import PaddingMode
-from ..core.kernels import gaussian1d
-from ..core.types import ScalarOrTuple
+from deepali.core import functional as U
+from deepali.core.enum import PaddingMode
+from deepali.core.kernels import gaussian1d
+from deepali.core.typing import ScalarOrTuple
 
 
 class FilterImage(Module):

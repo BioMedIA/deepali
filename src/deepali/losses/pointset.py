@@ -4,7 +4,7 @@ import torch
 import torch.linalg
 from torch import Tensor
 
-from ..core import functional as U
+from deepali.core import functional as U
 
 from .base import PointSetDistance
 

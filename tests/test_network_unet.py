@@ -5,7 +5,7 @@ import pytest
 import torch
 from torch import Tensor
 
-from deepali.core.types import is_namedtuple
+from deepali.core.typing import is_namedtuple
 from deepali.networks.layers import convolution
 from deepali.networks.unet import UNet, UNetConfig, last_num_channels
 

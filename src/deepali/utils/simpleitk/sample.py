@@ -8,12 +8,12 @@ import scipy.ndimage
 import scipy.spatial
 import SimpleITK as sitk
 
-from .grid import Grid
+from .grid import GridAttrs, image_grid_attributes
 
 
 def resample_image(
     image: sitk.Image,
-    reference: Union[Grid, sitk.Image],
+    reference: Union[GridAttrs, sitk.Image],
     interpolator: int = sitk.sitkLinear,
     padding_value: float = 0,
 ) -> sitk.Image:
@@ -93,7 +93,7 @@ def interpolate_ndimage(
     image: sitk.Image, points: np.ndarray, padding_value: float = 0, order: int = 1
 ) -> np.ndarray:
     r"""Use ``scipy.ndimage.map_coordinates`` to interpolate image."""
-    grid = Grid.from_image(image)
+    grid = image_grid_attributes(image)
     idxs = np.moveaxis(grid.physical_space_to_continuous_index(points), -1, 0)
     idxs = np.flip(idxs, axis=0)
     vals = sitk.GetArrayViewFromImage(image)
@@ -116,7 +116,7 @@ def interpolate_regular_grid(
 ) -> np.ndarray:
     r"""Use ``scipy.interpolate.RegularGridInterpolator`` to interpolate image data."""
     size = points.shape[0:-1]
-    grid = Grid.from_image(image)
+    grid = image_grid_attributes(image)
     vals = sitk.GetArrayViewFromImage(image)
     nval = image.GetNumberOfComponentsPerPixel()
     idxs = grid.physical_space_to_continuous_index(points.reshape(-1, grid.ndim))
@@ -147,7 +147,7 @@ def interpolate_griddata(image: sitk.Image, points: np.ndarray) -> np.ndarray:
     Use ``warp_image`` (for regularly spaced ``points``) or ``interpolate_image``.
     """
     size = points.shape[0:-1]
-    grid = Grid.from_image(image)
+    grid = image_grid_attributes(image)
     tess = scipy.spatial.qhull.Delaunay(grid.points.reshape(-1, grid.ndim))
     vals = sitk.GetArrayViewFromImage(image)
     nval = image.GetNumberOfComponentsPerPixel()

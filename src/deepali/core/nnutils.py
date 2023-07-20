@@ -4,7 +4,7 @@ from typing import Any, Iterable, Mapping, NamedTuple, Optional, Sequence, Tuple
 import torch
 from torch import Size, Tensor
 
-from .types import ScalarOrTuple
+from .typing import ScalarOrTuple
 
 
 def get_namedtuple_item(self: NamedTuple, arg: Union[int, str]) -> Any:

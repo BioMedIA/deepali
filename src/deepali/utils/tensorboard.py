@@ -7,7 +7,7 @@ from torch import Tensor
 from torch.utils.tensorboard import SummaryWriter
 
 from ..core.image import normalize_image
-from ..core.types import TensorCollection
+from ..core.typing import TensorCollection
 
 
 RE_CHANNEL_INDEX = re.compile(r"\{c(:[^}]+)?\}")

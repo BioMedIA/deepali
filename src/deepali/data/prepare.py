@@ -7,7 +7,7 @@ from typing import Any, Mapping, NamedTuple, Optional, Sequence, Union, overload
 import torch
 from torch import Tensor
 
-from ..core.types import Batch, Dataclass, Device, is_namedtuple
+from deepali.core.typing import Batch, Dataclass, Device, is_namedtuple
 
 from .sample import sample_field_names, sample_field_value
 from .sample import replace_all_sample_field_values

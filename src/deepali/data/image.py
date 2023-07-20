@@ -2,28 +2,22 @@ r"""Image tensors."""
 
 from __future__ import annotations
 
-from typing import Any, Dict, Optional, Sequence, Tuple, Type, TypeVar, Union, overload
+from typing import Any, Dict, Generator, Optional, Sequence, Tuple, Type, TypeVar, Union, overload
 
 import numpy as np
 import torch
 from torch import Tensor
 from torch.nn import functional as F
 
-try:
-    import SimpleITK as sitk
-    from ..utils.sitk.torch import image_from_tensor, tensor_from_image
-    from ..utils.sitk.imageio import read_image
-except ImportError:
-    sitk = None
-
-from ..core.cube import Cube
-from ..core.enum import PaddingMode, Sampling, SpatialDimArg
-from ..core.grid import ALIGN_CORNERS, Axes, Grid, grid_transform_points
-from ..core import image as U
-from ..core.itertools import zip_longest_repeat_last
-from ..core.path import unlink_or_mkdir
-from ..core.tensor import cat_scalars
-from ..core.types import Array, Device, DType, EllipsisType, PathStr, Scalar, ScalarOrTuple, Size
+from deepali.core.cube import Cube
+from deepali.core.enum import PaddingMode, Sampling, SpatialDimArg
+from deepali.core.grid import ALIGN_CORNERS, Axes, Grid, grid_transform_points
+from deepali.core import image as U
+from deepali.core.itertools import zip_longest_repeat_last
+from deepali.core.tensor import cat_scalars
+from deepali.core.typing import Array, Device, DType, EllipsisType
+from deepali.core.typing import PathUri, Scalar, ScalarOrTuple, Size
+from deepali.utils.imageio import read_image, write_image
 
 from .tensor import DataTensor
 
@@ -203,6 +197,23 @@ class ImageBatch(DataTensor):
             return tuple(cls._torch_function_result(func, d, g) for d, g in zip(data, grid))
         return cls._torch_function_result(func, data, grid)
 
+    @classmethod
+    def from_images(cls: Type[TImageBatch], images: Sequence[Image]) -> TImageBatch:
+        r"""Create image batch from sequence of images."""
+        if not all(isinstance(image, DataTensor) for image in images):
+            raise TypeError(f"{cls.__name__}.from_images() 'images' must be Image sequence")
+        data = torch.cat([image.tensor().unsqueeze(0) for image in images], dim=0)
+        grid = [image.grid() for image in images]
+        return cls(data, grid)
+
+    def append(self: TImageBatch, other: ImageBatch) -> TImageBatch:
+        r"""Append data from another image batch to data of this batch."""
+        if not isinstance(other, ImageBatch):
+            raise TypeError(f"{type(self).__name__}.append() 'other' must be ImageBatch")
+        data = torch.cat([self.tensor(), other.tensor()], dim=0)
+        grid = self.grids() + other.grids()
+        return self._make_instance(data, grid)
+
     def cube(self: TImageBatch, n: int = 0) -> Cube:
         r"""Get cube of n-th image in batch defining its normalized coordinates space with respect to the world."""
         return self._grid[n].cube()
@@ -363,6 +374,12 @@ class ImageBatch(DataTensor):
         elif data.ndim < 4:
             return data
         return self._make_instance(data, grid)
+
+    def __iter__(self) -> Generator[Image, None, None]:
+        r"""Generator to iterate over images in batch."""
+        for index in range(len(self)):
+            data = self.tensor().narrow(0, index, 1).squeeze_(0)
+            yield self._make_subitem(data, self._grid[index])
 
     @property
     def sdim(self: TImageBatch) -> int:
@@ -1115,11 +1132,13 @@ class Image(DataTensor):
         cls: Type[TImage],
         image: "sitk.Image",
         align_corners: bool = ALIGN_CORNERS,
-        dtype: Optional[torch.dtype] = None,
+        dtype: Optional[DType] = None,
         device: Optional[Device] = None,
     ) -> TImage:
         r"""Create image from ``SimpleITK.Image`` instance."""
-        if sitk is None:
+        try:
+            from deepali.utils.simpleitk.torch import tensor_from_image
+        except ImportError:
             raise RuntimeError(f"{cls.__name__}.from_sitk() requires SimpleITK")
         data = tensor_from_image(image, dtype=dtype, device=device)
         grid = Grid.from_sitk(image, align_corners=align_corners)
@@ -1127,7 +1146,9 @@ class Image(DataTensor):
 
     def sitk(self: TImage) -> "sitk.Image":
         r"""Create ``SimpleITK.Image`` from this image."""
-        if sitk is None:
+        try:
+            from deepali.utils.simpleitk.torch import image_from_tensor
+        except ImportError:
             raise RuntimeError(f"{type(self).__name__}.sitk() requires SimpleITK")
         grid = self._grid
         origin = grid.origin().tolist()
@@ -1136,31 +1157,40 @@ class Image(DataTensor):
         return image_from_tensor(self, origin=origin, spacing=spacing, direction=direction)
 
     @classmethod
+    def from_uri(
+        cls: Type[TImage],
+        uri: str,
+        align_corners: bool = ALIGN_CORNERS,
+        dtype: Optional[DType] = None,
+        device: Optional[Device] = None,
+    ) -> TImage:
+        r"""Create image from data stored at a given URI."""
+        return cls.read(uri, align_corners=align_corners, dtype=dtype, device=device)
+
+    def to_uri(
+        self: TImage,
+        uri: str,
+        compress: bool = True,
+    ) -> TImage:
+        r"""Save image data to file object at given URI."""
+        self.write(uri, compress=compress)
+
+    @classmethod
     def read(
         cls: Type[TImage],
-        path: PathStr,
+        path: PathUri,
         align_corners: bool = ALIGN_CORNERS,
-        dtype: Optional[torch.dtype] = None,
+        dtype: Optional[DType] = None,
         device: Optional[Device] = None,
     ) -> TImage:
         r"""Read image data from file."""
-        image = cls._read_sitk(path)
-        return cls.from_sitk(image, align_corners=align_corners, dtype=dtype, device=device)
+        data, grid = read_image(path)
+        grid = grid.align_corners_(align_corners)
+        return cls(data, grid, dtype=dtype, device=device)
 
-    @classmethod
-    def _read_sitk(cls, path: PathStr) -> "sitk.Image":
-        r"""Read SimpleITK.Image from file path."""
-        if sitk is None:
-            raise RuntimeError(f"{cls.__name__}.read() requires SimpleITK")
-        return read_image(path)
-
-    def write(self: TImage, path: PathStr, compress: bool = True) -> None:
+    def write(self: TImage, path: PathUri, compress: bool = True) -> None:
         r"""Write image data to file."""
-        if sitk is None:
-            raise RuntimeError(f"{type(self).__name__}.write() requires SimpleITK")
-        image = self.sitk()
-        path = unlink_or_mkdir(path)
-        sitk.WriteImage(image, str(path), compress)
+        write_image(self.tensor(), self.grid(), path, compress=compress)
 
     def normalize(
         self: TImage,

@@ -5,17 +5,6 @@
     :noindex:
 ```
 
-## Command-line interfaces
-
-```{eval-rst}
-.. automodule:: deepali.utils.cli
-    :noindex:
-```
-
-```{admonition} Under construction
-In the meantime, please refer to {mod}`deepali.utils.cli`.
-```
-
 ## TensorBoard
 
 ```{eval-rst}
@@ -30,12 +19,12 @@ In the meantime, please refer to {mod}`deepali.utils.tensorboard`.
 ## SimpleITK interfaces
 
 ```{eval-rst}
-.. automodule:: deepali.utils.sitk
+.. automodule:: deepali.utils.simpleitk
     :noindex:
 ```
 
 ```{admonition} Under construction
-In the meantime, please refer to {mod}`deepali.utils.sitk`.
+In the meantime, please refer to {mod}`deepali.utils.simpleitk`.
 ```
 
 ## VTK interfaces

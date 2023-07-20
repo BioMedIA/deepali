@@ -5,11 +5,11 @@ from typing import Dict, Mapping, Optional, Tuple, Union, cast, overload
 from torch import Tensor
 from torch.nn import Module
 
-from ..core import functional as U
-from ..core.enum import PaddingMode, Sampling
-from ..core.grid import Axes, Grid, grid_points_transform
-from ..core.linalg import homogeneous_matmul, homogeneous_transform
-from ..core.types import Scalar
+from deepali.core import functional as U
+from deepali.core.enum import PaddingMode, Sampling
+from deepali.core.grid import Axes, Grid, grid_points_transform
+from deepali.core.linalg import homogeneous_matmul, homogeneous_transform
+from deepali.core.typing import Scalar
 
 
 class SampleImage(Module):

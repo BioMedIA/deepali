@@ -13,7 +13,7 @@ from .image import check_sample_grid, grid_reshape, grid_sample
 from .image import spatial_derivatives
 from .image import _image_size, zeros_image
 from .tensor import move_dim
-from .types import Array, Device, Scalar, Shape, Size
+from .typing import Array, Device, DType, Scalar, Shape, Size
 
 
 def affine_flow(matrix: Tensor, grid: Union[Grid, Tensor], channels_last: bool = False) -> Tensor:
@@ -431,7 +431,7 @@ def zeros_flow(
     shape: Optional[Shape] = None,
     num: int = 1,
     named: bool = False,
-    dtype: Optional[torch.dtype] = None,
+    dtype: Optional[DType] = None,
     device: Optional[Device] = None,
 ) -> Tensor:
     r"""Create batch of flow fields filled with zeros for given image batch size or grid."""

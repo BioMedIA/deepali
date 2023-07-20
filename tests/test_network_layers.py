@@ -5,7 +5,7 @@ import pytest
 import torch
 from torch import Tensor, nn
 
-from deepali.core.enum import PaddingMode
+from deepali.core import PaddingMode
 from deepali.networks.layers import Activation, activation
 from deepali.networks.layers import Conv2d, Conv3d, ConvLayer, convolution, conv_module
 from deepali.networks.layers import JoinLayer, join_func

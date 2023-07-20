@@ -5,7 +5,7 @@ from typing import Optional, Union
 import torch
 from torch import Tensor
 
-from .types import Scalar
+from .typing import Scalar
 
 
 def abspow(x: Tensor, exponent: Union[int, float]) -> Tensor:

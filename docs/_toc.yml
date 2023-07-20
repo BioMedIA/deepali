@@ -7,7 +7,6 @@ parts:
 - caption: Basics
   chapters:
   - file: basics/installation
-  - file: basics/example-page
 - caption: Tutorials
   chapters:
   - file: tutorials/pairwise-registration-intro
@@ -46,5 +45,6 @@ parts:
   - file: reference/api/deepali/utils/index
 - caption: Contributing
   chapters:
+  - file: basics/example-page
   - file: tutorials/example-notebook
   - file: tutorials/example-myst-notebook

@@ -33,7 +33,7 @@ and :attr:`.Axes.CUBE` otherwise.
 import sys
 from typing import Any, Optional
 
-from ..core.grid import Grid
+from deepali.core.grid import Grid
 
 # Base classes for type comparison and annotation
 from .base import LinearTransform  # noqa

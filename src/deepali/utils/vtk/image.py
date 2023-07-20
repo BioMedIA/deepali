@@ -14,7 +14,8 @@ from vtk import (
     vtkTransformPolyDataFilter,
 )
 
-from ..sitk.grid import Grid  # TODO: Make Grid independent of SimpleITK
+from deepali.core.grid import Grid
+
 from .numpy import numpy_to_vtk_matrix4x4
 
 
@@ -42,6 +43,8 @@ def surface_mesh_grid(*mesh: vtkPolyData, resolution: Optional[float] = None) ->
 
 def surface_image_stencil(mesh: vtkPolyData, grid: Grid) -> vtkImageStencilData:
     r"""Convert vtkPolyData surface mesh to image stencil."""
+    max_index = [n - 1 for n in grid.size().tolist()]
+
     rot = np.eye(4, dtype=np.float)
     rot[:3, :3] = np.array(grid.direction).reshape(3, 3)
     rot = numpy_to_vtk_matrix4x4(rot)
@@ -55,9 +58,9 @@ def surface_image_stencil(mesh: vtkPolyData, grid: Grid) -> vtkImageStencilData:
 
     converter = vtkPolyDataToImageStencil()
     converter.SetInputConnection(transformer.GetOutputPort())
-    converter.SetOutputOrigin(grid.origin)
-    converter.SetOutputSpacing(grid.spacing)
-    converter.SetOutputWholeExtent([0, grid.size[0] - 1, 0, grid.size[1] - 1, 0, grid.size[2] - 1])
+    converter.SetOutputOrigin(grid.origin().tolist())
+    converter.SetOutputSpacing(grid.spacing().tolist())
+    converter.SetOutputWholeExtent([0, max_index[0], 0, max_index[1], 0, max_index[2]])
     converter.Update()
 
     stencil = vtkImageStencilData()

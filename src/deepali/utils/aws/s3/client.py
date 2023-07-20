@@ -9,9 +9,11 @@ from pathlib import Path
 from typing import Any, Callable, Dict, Generator, List, Optional, Set, Tuple, Union
 
 import boto3
+from botocore.exceptions import ClientError
 
 from .config import S3Config
 
+S3ClientError = ClientError
 PathStr = Union[Path, str]
 
 
@@ -98,11 +100,21 @@ class S3Client(object):
             **kwargs: Individual client configuration settings.
 
         """
-        super().__init__()
         if config is None:
             config = S3Config()
         self._config = config._replace(**kwargs)
         self._client = None
+        self._depth = 0
+
+    @property
+    def exceptions(self):
+        r"""Get boto3 exceptions for connected client."""
+        if self._client is None:
+            raise AssertionError(
+                f"{type(self).__name__} must be connected to access exceptions."
+                " Mabye use botocore.exceptions module instead."
+            )
+        return self._client.exceptions
 
     @classmethod
     def from_arg(cls, arg: Union[S3Config, S3Client, Dict[str, Any], None]) -> S3Client:
@@ -125,16 +137,6 @@ class S3Client(object):
         if isinstance(arg, dict):
             return cls(**arg)
         return cls.default()
-
-    @property
-    def exceptions(self):
-        r"""Get boto3 exceptions for connected client."""
-        if self._client is None:
-            raise AssertionError(
-                f"{type(self).__name__} must be connected to access exceptions."
-                " Mabye use botocore.exceptions module instead."
-            )
-        return self._client.exceptions
 
     @property
     def config(self) -> S3Config:
@@ -323,7 +325,8 @@ class S3Client(object):
         if S3Client.Operation.READ not in self.ops:
             raise PermissionError("S3 client has no read permissions")
         buffer = io.BytesIO()
-        self._client.download_fileobj(Bucket=bucket, Key=key, Fileobj=buffer)
+        config = self._config.transfer_config()
+        self._client.download_fileobj(Bucket=bucket, Key=key, Fileobj=buffer, Config=config)
         return buffer.getvalue()
 
     def write_bytes(self, bucket: str, key: str, data: bytes) -> None:
@@ -344,7 +347,8 @@ class S3Client(object):
         if S3Client.Operation.WRITE not in self.ops:
             raise PermissionError("S3 client has no write permissions")
         buffer = io.BytesIO(data)
-        self._client.upload_fileobj(Fileobj=buffer, Bucket=bucket, Key=key)
+        config = self._config.transfer_config()
+        self._client.upload_fileobj(Fileobj=buffer, Bucket=bucket, Key=key, Config=config)
 
     def read_text(self, bucket: str, key: str, encoding: Optional[str] = None) -> str:
         r"""Download text file content.
@@ -498,11 +502,7 @@ class S3Client(object):
         self.write_bytes(bucket=bucket, key=key, data=path.read_bytes())
 
     def upload_files(
-        self,
-        path: PathStr,
-        bucket: str,
-        prefix: Optional[str] = None,
-        overwrite: bool = True,
+        self, path: PathStr, bucket: str, prefix: Optional[str] = None, overwrite: bool = True
     ) -> Tuple[int, int]:
         r"""Upload local directory to S3.
 
@@ -588,18 +588,17 @@ class S3Client(object):
         if S3Client.Operation.DELETE not in self.ops:
             raise PermissionError("S3 client has no permission to delete objects")
         count = 0
-        token = None
+        list_kwargs = {"Bucket": bucket, "Prefix": prefix}
+        del_kwargs = {"Bucket": bucket, "Delete": {"Objects": []}}
         while True:
-            resp = self._client.list_objects_v2(
-                Bucket=bucket, Prefix=prefix, ContinuationToken=token
-            )
-            count += len(
-                self._client.delete_objects(Bucket=bucket, Delete=dict(Objects=resp["Contents"]))[
-                    "Deleted"
-                ]
-            )
+            list_resp = self._client.list_objects_v2(**list_kwargs)
+            del_kwargs["Delete"]["Objects"] = [
+                {"Key": obj["Key"]} for obj in list_resp.get("Contents", [])
+            ]
+            if del_kwargs["Delete"]["Objects"]:
+                count += len(self._client.delete_objects(**del_kwargs)["Deleted"])
             try:
-                token = resp["NextContinuationToken"]
+                list_resp["ContinuationToken"] = list_resp["NextContinuationToken"]
             except KeyError:
                 break
         return count

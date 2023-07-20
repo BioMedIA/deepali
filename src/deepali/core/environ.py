@@ -1,4 +1,4 @@
-r"""Auxiliary functions relating to parsing or setting up environment variables."""
+r"""Utilities for parsing and setting up of common environment variables."""
 
 import os
 import re
@@ -36,7 +36,28 @@ def check_cuda_visible_devices(num: Optional[int] = None) -> int:
     return len(gpu_ids)
 
 
+def init_num_threads(threads: int) -> None:
+    r"""Set environment variables used to limit number of process threads."""
+    if threads < 0:
+        raise ValueError("init_num_threads() 'threads' must not be negative")
+    threads = max(1, int(threads))
+    for env in (
+        "ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS",
+        "MKL_NUM_THREADS",
+        "NUMEXPR_NUM_THREADS",
+        "OMP_NUM_THREADS",
+    ):
+        os.environ[env] = str(threads)
+    try:
+        import SimpleITK as sitk
+
+        sitk.ProcessObject.SetGlobalDefaultNumberOfThreads(threads)
+    except ImportError:
+        pass
+
+
 def init_omp_num_threads(threads: Optional[int] = None, default: int = 1) -> int:
+    r"""Set environment variable OMP_NUM_THREADS to limit number of process threads."""
     if threads is None or threads < 0:
         threads = os.environ.get("OMP_NUM_THREADS", default)
     threads = max(1, int(threads))

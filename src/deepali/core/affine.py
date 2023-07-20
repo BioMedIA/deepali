@@ -8,7 +8,7 @@ from torch import Tensor
 
 from .linalg import homogeneous_transform
 from .tensor import as_float_tensor, atleast_1d, cat_scalars
-from .types import Array, Device, Scalar, Shape
+from .typing import Array, Device, DType, Scalar, Shape
 
 
 __all__ = (
@@ -88,7 +88,7 @@ def identity_transform(
     shape: Union[int, Shape],
     *args,
     homogeneous: bool = False,
-    dtype: Optional[torch.dtype] = None,
+    dtype: Optional[DType] = None,
     device: Optional[Device] = None,
 ) -> Tensor:
     r"""Create homogeneous coordinate transformation matrix of identity mapping.
@@ -122,7 +122,7 @@ def euler_rotation_matrix(
     angles: Union[Scalar, Array],
     order: Optional[str] = None,
     homogeneous: bool = False,
-    dtype: Optional[torch.dtype] = None,
+    dtype: Optional[DType] = None,
     device: Optional[Device] = None,
 ) -> Tensor:
     r"""Euler rotation matrices.
@@ -339,7 +339,7 @@ def euler_rotation_order(arg: Optional[str] = None, ndim: int = 3) -> str:
 def scaling_transform(
     scales: Union[Scalar, Array],
     homogeneous: bool = False,
-    dtype: Optional[torch.dtype] = None,
+    dtype: Optional[DType] = None,
     device: Optional[Device] = None,
 ) -> Tensor:
     r"""Scaling matrices.
@@ -368,7 +368,7 @@ def scaling_transform(
 def shear_matrix(
     angles: Union[Scalar, Array],
     homogeneous: bool = False,
-    dtype: Optional[torch.dtype] = None,
+    dtype: Optional[DType] = None,
     device: Optional[Device] = None,
 ) -> Tensor:
     r"""Shear matrices.
@@ -410,7 +410,7 @@ def shear_matrix(
 def translation(
     offset: Union[Scalar, Array],
     homogeneous: bool = False,
-    dtype: Optional[torch.dtype] = None,
+    dtype: Optional[DType] = None,
     device: Optional[Device] = None,
 ) -> Tensor:
     r"""Translation offsets / matrices.
