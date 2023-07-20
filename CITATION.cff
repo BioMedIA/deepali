@@ -1,6 +1,17 @@
 cff-version: 1.2.0
 message: "If you use this software, please cite it using these metadata."
 title: "deepali: Image, point set, and surface registration in PyTorch"
+abstract: An open source research library for image, point set, and surface registration in PyTorch,
+  which is developed and maintained by the HeartFlow-Imperial College London research lab at the Biomedical Image Analysis Group.
+
+
+  Deepali is a Hindu/Sanskrit Indian given name, which means "joy" as in the gratification one may feel
+  working with code built on a modern tensor library with support for automatic differentiation, and
+  "chain of lamps" alluding to the application of the chain rule by torch.autograd, the concatenation
+  of spatial coordinate transformations, and furthermore the (sequential) composition of PyTorch modules.
+  In addition, the English words "deep" and "ali(-gnment)" partially contained in this name should highlight
+  that this project is not only suitable for traditional non-learning based registration, but in particular
+  facilitates deep learning based approaches to image alignment.
 type: software
 authors:
   - given-names: Andreas
