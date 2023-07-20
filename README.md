@@ -46,6 +46,7 @@ The following lists the main dependencies of this project. For a complete list, 
 
 - [PyTorch]: The automatic differentiation and deep learning framework powering this project.
 - [SimpleITK] (optional): Used by [deepali.data] to read and write images in file formats supported by ITK.
+- [nibabel] (optional): Used by [deepali.data] to read and write images in NIfTI file formats if available.
 - [NumPy] (optional): Used by [deepali.utils]. Other components use pure PyTorch.
 - [VTK] (optional): May be used to read and write point sets and surface meshes.
 
@@ -122,6 +123,7 @@ Below we list a few projects which are either similar to *deepali* or complement
 [Mermaid]: https://github.com/uncbiag/mermaid
 [MONAI]: https://github.com/Project-MONAI/MONAI
 [Neurite]: https://github.com/adalca/neurite
+[nibabel]: https://nipy.org/nibabel/
 [NITorch]: https://github.com/balbasty/nitorch
 [NumPy]: https://numpy.org/
 [PyTorch]: https://pytorch.org/
