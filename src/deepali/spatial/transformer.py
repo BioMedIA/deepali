@@ -8,7 +8,7 @@ and maps these to new spatial locations, to a given input data tensor.
 from __future__ import annotations
 
 from copy import copy as shallow_copy
-from typing import Dict, Optional, Tuple, TypeVar, Union, cast, overload
+from typing import Dict, Optional, Tuple, TypeVar, Union, overload
 
 from torch import Tensor
 from torch.nn import Module
@@ -124,8 +124,15 @@ class ImageTransformer(SpatialTransformer):
 
         Args:
             transform: Spatial coordinate transformation which is applied to ``target`` grid points.
-            target: Sampling grid of output images. If ``None``, use ``transform.grid()``.
-            source: Sampling grid of input images. If ``None``, use ``target``.
+            target: Sampling grid of output images. Use ``transform.grid()`` if ``None``.
+            source: Sampling grid of input images. The attributes of this sampling grid are used
+                to map the transformed normalized coordinates defined with respect to ``transform.grid()``
+                to normalized coordinates with respect to the moving ``source`` image grid. These
+                normalized coordinates are used to sample the image tensor passed to the forward
+                method of the image transformer. If ``None``, it is assumed that the sampling grid
+                of the moving source image is identical to the ``target`` image grid. In order to
+                avoid having to re-normalize coordinates between image domains, the ``source`` grid
+                domain should be the same as the ``transform.grid()`` (cf. :meth:`Grid.same_domain_as`).
             sampling: Image interpolation mode.
             padding: Image extrapolation mode or scalar out-of-domain value.
             align_centers: Whether to implicitly align the ``target`` and ``source`` centers.
@@ -145,22 +152,20 @@ class ImageTransformer(SpatialTransformer):
             raise TypeError(f"{type(self).__name__}() 'target' must be of type Grid")
         if not isinstance(source, Grid):
             raise TypeError(f"{type(self).__name__}() 'source' must be of type Grid")
-        if not transform.grid().same_domain_as(target):
-            raise ValueError(
-                f"{type(self).__name__}() 'target' and 'transform' grid must define the same domain"
-            )
         device = transform.device
         sampler = SampleImage(
-            target=target,
+            target=transform.grid(),
             source=source,
             sampling=sampling,
             padding=padding,
             align_centers=align_centers,
         )
         self._sample = sampler.to(device)
-        grid_coords = target.coords(flip=flip_coords, device=device).unsqueeze(0)
-        self.register_buffer("grid_coords", grid_coords, persistent=False)
-        self.flip_coords = bool(flip_coords)
+        self._target_grid = target
+        self._flip_coords = bool(flip_coords)
+        x = target.coords(align_corners=transform.align_corners(), flip=flip_coords, device=device)
+        x = target.transform_points(x, axes=transform.axes(), to_grid=transform.grid())
+        self.register_buffer("grid_coords", x.unsqueeze(0), persistent=False)
 
     @property
     def sample(self) -> SampleImage:
@@ -169,7 +174,7 @@ class ImageTransformer(SpatialTransformer):
 
     def target_grid(self) -> Grid:
         r"""Sampling grid of output images."""
-        return self._sample.target_grid()
+        return self._target_grid
 
     def source_grid(self) -> Grid:
         r"""Sampling grid of input images."""
@@ -200,9 +205,9 @@ class ImageTransformer(SpatialTransformer):
         mask: Optional[Tensor] = None,
     ) -> Union[Tensor, Tuple[Tensor, Tensor], Dict[str, Union[Tensor, Grid]]]:
         r"""Sample batch of images at spatially transformed target grid points."""
-        grid: Tensor = cast(Tensor, self.grid_coords)
+        grid: Tensor = self.grid_coords
         grid = self._transform(grid, grid=True)
-        if self.flip_coords:
+        if self._flip_coords:
             grid = grid.flip((-1,))
         return self._sample(grid, data, mask)
 
