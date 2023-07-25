@@ -1726,9 +1726,9 @@ def circle_image(
     _device = torch.device("cpu")
     c = as_tensor(center, dtype=_dtype, device=_device)
     x = grid.coords(normalize=False, dtype=_dtype, device=_device)
-    x = x.reshape(num or 1, 1, *x.shape) - c
+    x = x.reshape(1, 1, *grid.shape, grid.ndim).sub_(c)
     data = torch.norm(x, dim=-1) <= radius
-    if x_max:
+    if x_max is not None:
         x_threshold = as_tensor(x_max, dtype=_dtype, device=_device)
         if x_threshold.ndim == 0:
             data &= x[..., 0] <= x_threshold
@@ -1741,8 +1741,14 @@ def circle_image(
     if dtype is None:
         dtype = torch.uint8
     if not dtype.is_floating_point:
-        data = 255 * data / data.max()
-    return data.to(dtype=dtype, device=device)
+        data = data.mul_(255).div_(data.max())
+    data = data.to(dtype=dtype, device=device)
+    if num is not None:
+        if num == 0:
+            data = data.squeeze_(0)
+        elif num > 1:
+            data = data.expand(num, *data.shape[1:])
+    return data
 
 
 def cshape_image(
@@ -1753,7 +1759,7 @@ def cshape_image(
     radius: Optional[float] = None,
     width: Optional[float] = None,
     sigma: float = 0,
-    x_max: Union[float, Sequence[float]] = 5,
+    x_max: Optional[Union[float, Sequence[float]]] = None,
     dtype: Optional[DType] = None,
     device: Optional[Device] = None,
 ) -> Tensor:
@@ -1765,9 +1771,12 @@ def cshape_image(
         num: Number ``N`` of images in batch.
         center: Coordinates of center pixel in the order ``(y, x)``.
         radius: Radius of circle in pixel units.
+        width: Difference between outer and inner circle radius.
+            A default width of ``radius // 2`` is used if ``None``.
         sigma: Standard deviation of isotropic Gaussian blurring kernel in pixel units.
-        x_max: Maximum ``x`` pixel index at which to clamp image to zero.
-            This can be used to create partial circles such as a half circle.
+        x_max: Maximum ``x`` pixel index at which to clamp image to zero. This is used to create
+            partial circles with an opening for the "C" shape to the right. If ``None``, a default
+            value equal to 75% of the inner circle radius is chosen.
         dtype: Data type of output tensor. Use ``torch.uint8`` if ``None``.
             When the output data type is a floating point type, the output tensor
             values are in the interval ``[0, 1]``. Otherwise, the output values are
@@ -1786,9 +1795,11 @@ def cshape_image(
         radius = max(0, (min(center) - 1) - math.ceil(2 * sigma))
     if width is None:
         width = radius // 2
-    outer = circle_image(size, center=center, radius=radius, x_max=x_max, sigma=0)
-    inner = circle_image(size, center=center, radius=radius - width, sigma=0)
-    image = (outer - inner).type(torch.float32)
+    if x_max is None:
+        x_max = 0.75 * (radius - width)
+    outer = circle_image(size, num=1, x_max=x_max, sigma=0, center=center, radius=radius)
+    inner = circle_image(size, num=1, x_max=x_max, sigma=0, center=center, radius=radius - width)
+    image = outer.type(torch.float32).sub(inner)
     if sigma > 0:
         kernel = gaussian1d(sigma, dtype=torch.float32, device=image.device)
         image = conv(image, kernel)
@@ -1798,9 +1809,13 @@ def cshape_image(
         else:
             image *= 255 / image.max()
             image.clamp_(min=0, max=255)
-    if num and num > 1:
-        image = image.expand((1,) + image.shape[1:])
-    return image.to(dtype=dtype, device=device)
+    image = image.to(dtype=dtype, device=device)
+    if num is not None:
+        if num == 0:
+            image = image.squeeze_(0)
+        elif num > 1:
+            image = image.expand((1,) + image.shape[1:])
+    return image
 
 
 def empty_image(
