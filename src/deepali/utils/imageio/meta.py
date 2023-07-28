@@ -53,7 +53,7 @@ def read_meta_image(arg: Union[PathUri, bytes, io.BufferedReader]) -> Tuple[Tens
         data = np.expand_dims(data, 0)
     else:
         data = np.squeeze(np.swapaxes(np.expand_dims(data, 0), 0, -1), -1)
-    size = meta.get("DimSize", data.shape[:0:-1])
+    size = tuple(meta.get("DimSize", data.shape[:0:-1]))
     assert size[::-1] == data.shape[1:]
     origin = meta.get("Position", meta.get("Origin", meta.get("Offset")))
     matrix = meta.get("Rotation", meta.get("Orientation", meta.get("TransformMatrix")))
@@ -292,6 +292,7 @@ def read_meta_image_from_fileobj(f: io.BufferedReader) -> Tuple[np.ndarray, Meta
     image = np.frombuffer(buffer, dtype=meta["ElementType"]).reshape(shape)
     if meta.get("BinaryDataByteOrderMSB") or meta.get("ElementByteOrderMSB"):
         image.byteswap(inplace=True)
+    image = image.copy()
 
     # remove unused metadata
     meta["ElementDataFile"] = None
