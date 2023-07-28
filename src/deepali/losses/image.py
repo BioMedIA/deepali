@@ -30,6 +30,26 @@ class Dice(PairwiseImageLoss):
 DSC = Dice
 
 
+class NCC(PairwiseImageLoss):
+    r"""Normalized cross correlation."""
+
+    def __init__(self, epsilon: float = 1e-15) -> None:
+        super().__init__()
+        self.epsilon = epsilon
+
+    def forward(self, source: Tensor, target: Tensor, mask: Optional[Tensor] = None) -> Tensor:
+        r"""Evaluate image dissimilarity loss."""
+        return L.ncc_loss(
+            source,
+            target,
+            mask=mask,
+            epsilon=self.epsilon,
+        )
+
+    def extra_repr(self) -> str:
+        return f"epsilon={self.epsilon:.2e}"
+
+
 class LCC(PairwiseImageLoss):
     r"""Local normalized cross correlation."""
 
