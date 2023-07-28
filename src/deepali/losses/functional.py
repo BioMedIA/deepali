@@ -31,6 +31,7 @@ __all__ = (
     "lcc_loss",
     "mae_loss",
     "mse_loss",
+    "ncc_loss",
     "ssd_loss",
     "mi_loss",
     "grad_loss",
@@ -525,6 +526,55 @@ def kld_loss(mean: Tensor, logvar: Tensor, reduction: str = "mean") -> Tensor:
     loss = mean.square().add_(logvar.exp()).sub_(1).sub_(logvar)
     loss = reduce_loss(loss, reduction)
     loss = loss.mul_(0.5)
+    return loss
+
+
+def ncc_loss(
+    source: Tensor,
+    target: Tensor,
+    mask: Optional[Tensor] = None,
+    epsilon: float = 1e-15,
+    reduction: str = "mean",
+) -> Tensor:
+    r"""Normalized cross correlation.
+
+    Args:
+        source: Source image sampled on ``target`` grid.
+        target: Target image with same shape as ``source``.
+        mask: Multiplicative mask tensor with same shape as ``source``.
+        epsilon: Small constant added to denominator to avoid division by zero.
+        reduction: Whether to compute "mean" or "sum" of normalized cross correlation
+            of image pairs in batch. If "none", a 1-dimensional tensor is returned
+            with length equal the batch size.
+
+    Returns:
+        Negative squared normalized cross correlation plus one.
+
+    """
+
+    if not isinstance(source, Tensor):
+        raise TypeError("ncc_loss() 'source' must be tensor")
+    if not isinstance(target, Tensor):
+        raise TypeError("ncc_loss() 'target' must be tensor")
+    if source.shape != target.shape:
+        raise ValueError("ncc_loss() 'source' must have same shape as 'target'")
+
+    source = source.reshape(source.shape[0], -1).float()
+    target = target.reshape(source.shape[0], -1).float()
+
+    source_mean = source.mean(dim=1, keepdim=True)
+    target_mean = target.mean(dim=1, keepdim=True)
+
+    x = source.sub(source_mean)
+    y = target.sub(target_mean)
+
+    a = x.mul(y).sum(dim=1)
+    b = x.square().sum(dim=1)
+    c = y.square().sum(dim=1)
+
+    loss = a.square_().div_(b.mul_(c).add_(epsilon)).neg_().add_(1)
+    loss = masked_loss(loss, mask, "ncc_loss")
+    loss = reduce_loss(loss, reduction, mask)
     return loss
 
 

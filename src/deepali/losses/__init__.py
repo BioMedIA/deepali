@@ -38,6 +38,7 @@ from .flow import TotalVariation, TV
 
 from .image import PatchwiseImageLoss, PatchLoss
 from .image import Dice, DSC
+from .image import NCC
 from .image import LCC, LNCC
 from .image import SLCC, WLCC
 from .image import MI, NMI
@@ -99,6 +100,7 @@ __all__ = (
     "MAE",
     "MI",
     "MSE",
+    "NCC",
     "NMI",
     "SLCC",
     "SmoothL1ImageLoss",
