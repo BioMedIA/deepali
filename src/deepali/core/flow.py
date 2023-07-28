@@ -429,11 +429,10 @@ def warp_image(
 def zeros_flow(
     size: Optional[Union[int, Size, Grid]] = None,
     shape: Optional[Shape] = None,
-    num: int = 1,
-    named: bool = False,
+    num: Optional[int] = None,
     dtype: Optional[DType] = None,
     device: Optional[Device] = None,
 ) -> Tensor:
     r"""Create batch of flow fields filled with zeros for given image batch size or grid."""
     size = _image_size("zeros_flow", size, shape)
-    return zeros_image(size, num=num, channels=len(size), named=named, dtype=dtype, device=device)
+    return zeros_image(size, num=num, channels=len(size), dtype=dtype, device=device)
