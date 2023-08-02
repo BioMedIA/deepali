@@ -1005,7 +1005,7 @@ def mi_loss(
         normalized: Calculate Normalized Mutual Information instead of Mutual Information if True.
 
     Returns:
-        Negative mutual information. If ``normalized=True``, 2 is added such that the loss value is in [0, 1].
+        Negative mutual information. If ``normalized=True``, 2 is added such that the loss value is in [0, 2].
 
     """
 
