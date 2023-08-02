@@ -23,6 +23,6 @@ def write_sitk_image(data: Tensor, grid: Grid, path: PathUri, compress: bool = T
     r"""Write image file in any format supported by SimpleITK."""
     origin = grid.origin().tolist()
     spacing = grid.spacing().tolist()
-    direction = grid.direction().tolist()
+    direction = grid.direction().flatten().tolist()
     image = image_from_tensor(data, origin=origin, spacing=spacing, direction=direction)
     _write_image(image, path, compress=compress)
