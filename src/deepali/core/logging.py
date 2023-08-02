@@ -23,6 +23,39 @@ class LogLevel(str, Enum):
     ERROR = "ERROR"
     CRITICAL = "CRITICAL"
 
+    @classmethod
+    def from_arg(cls, value: Union[int, str, LogLevel, None]) -> LogLevel:
+        if value is None:
+            return LogLevel.NOTSET
+        if isinstance(value, LogLevel):
+            return value
+        if isinstance(value, int):
+            return cls.from_int(value)
+        if isinstance(value, str):
+            return cls.from_str(value)
+        raise TypeError(f"{cls.__name__}.from_arg() 'value' must be int, str, LogLevel, or None")
+
+    @classmethod
+    def from_int(cls, value: int) -> LogLevel:
+        if not isinstance(value, int):
+            raise TypeError(f"{cls.__name__}.from_int() 'value' must be int")
+        log_level = LogLevel.NOTSET
+        for level in cls:
+            if int(level) > value:
+                break
+            log_level = level
+        return log_level
+
+    @classmethod
+    def from_str(cls, value: str) -> LogLevel:
+        if not isinstance(value, str):
+            raise TypeError(f"{cls.__name__}.from_str() 'value' must be str")
+        return cls(value.upper())
+
+    @classmethod
+    def from_logger(cls, logger: Logger) -> LogLevel:
+        return cls.from_int(logger.level)
+
     def __str__(self) -> str:
         return self.value
 
@@ -58,13 +91,12 @@ def configure_logging(
 ):
     r"""Initialize logging."""
     logging.basicConfig(format=format or LOG_FORMAT)
-    if log_level is None:
-        log_level = logging.INFO
     if args is not None:
         log_level = getattr(args, "log_level", log_level)
-    if isinstance(log_level, str):
-        log_level = LogLevel(log_level)
-    logger.setLevel(int(log_level))
+    log_level = LogLevel.from_arg(log_level)
+    if log_level is LogLevel.NOTSET:
+        log_level = logging.INFO
+    logger.setLevel(log_level.value)
     logging.getLogger("botocore").setLevel(logging.ERROR)
     logging.getLogger("s3transfer").setLevel(logging.ERROR)
     logging.getLogger("urllib3").setLevel(logging.ERROR)
