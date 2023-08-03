@@ -64,6 +64,10 @@ def read_meta_image(arg: Union[PathUri, bytes, io.BufferedReader]) -> Tuple[Tens
         spacing=spacing,
         direction=matrix,
     )
+    if data.dtype == np.uint16:
+        data = data.astype(np.int32)
+    elif data.dtype == np.uint32:
+        data = data.astype(np.int64)
     return torch.from_numpy(data), grid
 
 
