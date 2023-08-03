@@ -213,6 +213,18 @@ class EulerRotation(InvertibleParametricTransform, LinearTransform):
         self.data_(params)
         return self
 
+    def matrix_(self: EulerRotation, arg: Tensor) -> EulerRotation:
+        r"""Set rotation angles from rotation matrix."""
+        if not isinstance(arg, Tensor):
+            raise TypeError("EulerRotation.matrix() 'arg' must be tensor")
+        if arg.ndim != 3:
+            raise ValueError("EulerRotation.matrix() 'arg' must be 3-dimensional tensor")
+        shape = (arg.shape[0], 3, 3)
+        if arg.shape != shape:
+            raise ValueError(f"Rotation matrix must have shape {shape!r}")
+        angles = U.euler_rotation_angles(arg, order=self.order)
+        return self.angles_(angles)
+
     def tensor(self: EulerRotation) -> Tensor:
         r"""Get tensor representation of this transformation
 
