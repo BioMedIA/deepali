@@ -95,7 +95,7 @@ def configure_logging(
         log_level = getattr(args, "log_level", log_level)
     log_level = LogLevel.from_arg(log_level)
     if log_level is LogLevel.NOTSET:
-        log_level = logging.INFO
+        log_level = LogLevel.INFO
     logger.setLevel(log_level.value)
     logging.getLogger("botocore").setLevel(logging.ERROR)
     logging.getLogger("s3transfer").setLevel(logging.ERROR)
