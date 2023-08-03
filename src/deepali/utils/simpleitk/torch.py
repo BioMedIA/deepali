@@ -48,7 +48,7 @@ def tensor_from_image(
     r"""Create image data tensor from ``SimpleITK.Image``."""
     if image.GetPixelID() == sitk.sitkUInt16:
         image = sitk.Cast(image, sitk.sitkInt32)
-    elif image.GetPixelID() == sitk.sitkUInt16:
+    elif image.GetPixelID() == sitk.sitkUInt32:
         image = sitk.Cast(image, sitk.sitkInt64)
     data = torch.from_numpy(sitk.GetArrayFromImage(image))
     data = data.unsqueeze(0)

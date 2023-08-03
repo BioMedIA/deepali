@@ -88,6 +88,10 @@ def read_nifti_image(path: PathUri) -> Tuple[Tensor, Grid]:
     grid = Grid(size=size, origin=origin, spacing=spacing, direction=direction)
     if data.ndim == grid.ndim:
         data = np.expand_dims(data, 0)
+    if data.dtype == np.uint16:
+        data = data.astype(np.int32)
+    elif data.dtype == np.uint32:
+        data = data.astype(np.int64)
     return torch.from_numpy(data), grid
 
 
