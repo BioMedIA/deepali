@@ -5,7 +5,7 @@ Conda environment configurations for `deepali` libraries.
 
 ## Create environment
 
-If not done before, install either [Miniconda](https://docs.conda.io/en/latest/miniconda.html) or [Anaconda](https://www.anaconda.com/).
+If not done before, install either [Anaconda], [Miniconda], or [Mambaforge].
 
 A conda environment for this project can be created using the `env` Makefile target, i.e.,
 
@@ -22,7 +22,7 @@ NAME=deepali
 PLATFORM=linux-64
 
 conda create --name $NAME --file environment.$PLATFORM.lock
-conda run --name $NAME pip install [--editable] ..
+conda run --name $NAME pip install ..[utils]
 ```
 
 where `PLATFORM` is one of the following values.
@@ -38,16 +38,21 @@ where `PLATFORM` is one of the following values.
 
 The following tools are required to update the generated dependency files.
 
-1. Install [Miniconda](https://docs.conda.io/en/latest/miniconda.html): Package dependency management tool.
-2. Install [mamba](https://mamba.readthedocs.io/en/latest/): Faster dependency resolution and more informative error messages.
-   - `conda install mamba=0.23 --name base --channel conda-forge`
-3. Install [conda-devenv](https://conda-devenv.readthedocs.io/en/latest/): Advanced conda environment configuration such as conditional dependencies.
-   - `conda install conda-devenv=2.3 --name base --channel conda-forge`
-4. Install [conda-lock](https://conda-incubator.github.io/conda-lock/): Lock versions of dependencies and generate explicit lockfiles.
-   - `conda install conda-lock=1.0 --name base --channel conda-forge`
+1. Install [Mambaforge]: Package dependency management tool.
+3. Install [conda-devenv]: Advanced conda environment configuration such as conditional dependencies.
+   - `mamba --no-banner install conda-devenv=2.3 --name base --channel conda-forge`
+4. Install [conda-lock]: Lock versions of dependencies and generate explicit lockfiles.
+   - `mamba --no-banner install conda-lock=1.0 --name base --channel conda-forge`
 
 After editing the `environment.devenv.yml` file to add, remove, or update required and optional dependencies, run the following command to re-generate the `environment.conda-lock.yml` and `environment.*.lock` files.
 
 ```
 make all
 ```
+
+
+[Anaconda]: https://www.anaconda.com/
+[Mambaforge]: https://mamba.readthedocs.io/en/latest/installation.html
+[Miniconda]: https://docs.conda.io/en/latest/miniconda.html
+[conda-devenv]: https://conda-devenv.readthedocs.io/en/latest/
+[conda-lock]: https://conda-incubator.github.io/conda-lock/

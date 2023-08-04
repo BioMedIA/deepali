@@ -10,7 +10,7 @@ from tempfile import gettempdir
 from typing import Generator, Optional
 
 from deepali.core.pathlib import PathStr, to_uri
-from deepali.utils.storage import StorageObject
+from deepali.core.storage import StorageObject
 
 from .client import S3Client
 

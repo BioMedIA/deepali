@@ -11,7 +11,7 @@ from torch import Tensor
 
 from deepali.core.grid import Grid
 from deepali.core.pathlib import PathUri, path_suffix
-from deepali.utils.storage import StorageObject
+from deepali.core.storage import StorageObject
 
 
 META_IMAGE_SUFFIXES = (".mha", ".mhd")

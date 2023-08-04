@@ -3,7 +3,7 @@ r"""Auxiliary functions and classes for dealing with configuration files."""
 from __future__ import annotations
 
 from dataclasses import asdict, fields
-from pathlib import Path
+from io import StringIO
 from typing import Any, Dict, Mapping, Optional, Sequence, TypeVar, Type
 
 import dacite
@@ -13,7 +13,8 @@ import json
 # (cf. https://github.com/iterative/dvc/issues/8466#issuecomment-1290757564)
 from ruamel.yaml import YAML
 
-from .pathlib import PathStr, abspath_template
+from .pathlib import Path, PathUri, abspath_template
+from .storage import StorageObject
 from .typing import is_path_str_field
 
 
@@ -42,18 +43,9 @@ class DataclassConfig(object):
         return config
 
     @classmethod
-    def from_path(cls: Type[T], path: PathStr, section: Optional[str] = None) -> T:
+    def from_path(cls: Type[T], path: PathUri, section: Optional[str] = None) -> T:
         r"""Load configuration from file."""
-        path = Path(path).absolute()
-        if path.suffix not in (".json", ".yaml", ".yml"):
-            raise ValueError(f"{cls.__name__}.write() 'path' has unsupported suffix {path.suffix}")
-        with path.open("rt") as fp:
-            if path.suffix == ".json":
-                config = json.load(fp)
-            else:
-                config = YAML(typ="safe").load(fp)
-        if config is None:
-            config = {}
+        config = read_config_dict(path)
         if section is None:
             section = cls.section()
         if section:
@@ -62,24 +54,14 @@ class DataclassConfig(object):
         return cls.from_dict(config, parent=path.parent)
 
     @classmethod
-    def read(cls: Type[T], path: PathStr, section: Optional[str] = None) -> T:
-        r"""Load configuration from file."""
+    def read(cls: Type[T], path: PathUri, section: Optional[str] = None) -> T:
+        r"""Load configuration from JSON or YAML file."""
         return cls.from_path(path, section=section)
 
-    def write(self, path: PathStr) -> None:
-        r"""Write configuration to file."""
+    def write(self, path: PathUri) -> None:
+        r"""Save configuration to JSON or YAML file."""
         config = self.asdict()
-        path = Path(path).absolute()
-        if path.suffix not in (".json", ".yaml", ".yml"):
-            raise ValueError(
-                f"{type(self).__name__}.write() 'path' has unsupported suffix {path.suffix}"
-            )
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with path.open("wt") as fp:
-            if path.suffix == ".json":
-                json.dump(config, fp)
-            else:
-                YAML(typ="safe").dump(config, fp)
+        write_config_dict(config, path)
 
     def asdict(self) -> Dict[str, Any]:
         r"""Get configuration dictionary."""
@@ -184,3 +166,34 @@ def join_kwargs_in_sequence(arg):
                     kwargs[name] = value
             arg = kwargs if start == 0 else (arg[0], kwargs)
     return arg
+
+
+def read_config_dict(path: PathUri) -> Dict[str, Any]:
+    r"""Read configuration from JSON or YAML file."""
+    with StorageObject.from_path(path) as config_object:
+        config_suffix = config_object.path.suffix
+        if config_suffix.lower() not in (".json", ".yaml", ".yml"):
+            raise ValueError(f"read_config_dict() 'path' has unsupported suffix {config_suffix}")
+        config_text = config_object.read_text()
+        if config_suffix == ".json":
+            config_dict = json.loads(config_text)
+        else:
+            config_dict = YAML(typ="safe").load(config_text)
+    if config_dict is None:
+        config_dict = {}
+    return config_dict
+
+
+def write_config_dict(config: Dict[str, Any], path: PathUri) -> None:
+    r"""Write configuration to JSON or YAML file."""
+    with StorageObject.from_path(path) as config_object:
+        config_suffix = config_object.path.suffix
+        if config_suffix.lower() not in (".json", ".yaml", ".yml"):
+            raise ValueError(f"write_config_dict() 'path' has unsupported suffix {config_suffix}")
+        if config_suffix == ".json":
+            config_text = json.dumps(config) + "\n"
+        else:
+            buffer = StringIO()
+            YAML(typ="safe").dump(config, buffer)
+            config_text = buffer.getvalue()
+        config_object.write_text(config_text)

@@ -4,20 +4,17 @@ import logging
 from pathlib import Path
 import sys
 from timeit import default_timer as timer
-from typing import Any, Dict
-
-import json
-import yaml
 
 import torch
 import torch.cuda
 from torch import Tensor
 
 from deepali.core.argparse import ArgumentParser, Args, main_func
+from deepali.core.config import read_config_dict
 from deepali.core.environ import cuda_visible_devices
 from deepali.core.grid import Grid
 from deepali.core.logging import configure_logging
-from deepali.core.pathlib import PathStr, unlink_or_mkdir
+from deepali.core.pathlib import unlink_or_mkdir
 from deepali.data import Image
 from deepali.modules import TransformImage
 
@@ -103,7 +100,7 @@ def init(args: Args) -> int:
 
 def func(args: Args) -> int:
     r"""Execute registration given parsed arguments."""
-    config = load_config(args.config)
+    config = read_config_dict(args.config)
     device = torch.device("cuda:0" if args.device == "cuda" else "cpu")
     start = timer()
     transform = register_pairwise(
@@ -151,16 +148,6 @@ def func(args: Args) -> int:
 
 
 main = main_func(parser, func, init=init)
-
-
-def load_config(path: PathStr) -> Dict[str, Any]:
-    r"""Load registration parameters from configuration file."""
-    config_path = Path(path).absolute()
-    log.info(f"Load configuration from {config_path}")
-    config_text = config_path.read_text()
-    if config_path.suffix == ".json":
-        return json.loads(config_text)
-    return yaml.safe_load(config_text)
 
 
 if __name__ == "__main__":

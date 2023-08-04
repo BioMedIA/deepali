@@ -161,7 +161,7 @@ class DisplacementFieldTransform(DenseVectorFieldTransform):
             grid = self.grid().resize(self.data_shape[:1:-1])
         flow = flow.to(self.device)
         flow = flow.sample(grid)
-        flow = flow.axes(Axes.from_grid(grid))
+        flow = flow.axes(grid.axes())
         if callable(params):
             self._fit(flow, **kwargs)
         else:

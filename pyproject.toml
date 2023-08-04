@@ -41,7 +41,6 @@ dependencies = [
     "dacite",
     "deprecation",
     "pandas",
-    "pyyaml",
     "ruamel.yaml",
     "torch>=1.9",
     "typing-extensions",

@@ -14,7 +14,7 @@ from torch import Tensor
 
 from deepali.core.grid import Grid
 from deepali.core.pathlib import PathUri, path_suffix, unlink_or_mkdir
-from deepali.utils.storage import StorageObject
+from deepali.core.storage import StorageObject
 
 
 NIFTI_IMAGE_SUFFIXES = (".nia", ".nii", ".nii.gz", ".hdr", ".hdr.gz", ".img", ".img.gz")

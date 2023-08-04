@@ -9,7 +9,7 @@ import shutil
 from typing import Generator, Optional, TypeVar, cast
 from urllib.parse import urlsplit
 
-from deepali.core.pathlib import PathStr, PathUri, to_uri, unlink_or_mkdir
+from .pathlib import PathStr, PathUri, to_uri, unlink_or_mkdir
 
 
 __all__ = (
@@ -145,8 +145,10 @@ class StorageObject(object):
             return LocalObject(Path("/" + res.netloc + "/" + path if res.netloc else path))
         if res.scheme == "s3":
             # DO NOT import at module level to avoid cyclical import!
-            from .aws.s3.object import S3Object
-
+            try:
+                from deepali.utils.aws.s3.object import S3Object
+            except ImportError:
+                raise ImportError("StorageObject.from_uri() requires AWS S3 deepali[utils]")
             return cast(StorageObject, S3Object.from_uri(uri))
         raise ValueError("Invalid or unsupported storage object URI: %s", uri)
 
