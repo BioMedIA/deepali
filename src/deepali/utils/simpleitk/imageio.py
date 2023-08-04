@@ -1,5 +1,5 @@
 from deepali.core.pathlib import PathUri, unlink_or_mkdir
-from deepali.utils.storage import StorageObject
+from deepali.core.storage import StorageObject
 
 import SimpleITK as sitk
 

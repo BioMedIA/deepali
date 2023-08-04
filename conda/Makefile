@@ -4,13 +4,6 @@ NAME = deepali
 # Relative path of repository root directory
 ROOT = ..
 
-# Commands
-CONDA = mamba
-CONDA_OPTS = --no-banner
-CONDA_DEVENV = conda devenv
-CONDA_LOCK = conda-lock
-CONDA_LOCK_OPTS = --mamba
-
 # Name of conda-devenv configuration file
 DEVENV = environment.devenv.yml
 
@@ -66,20 +59,20 @@ clear:
 	@rm -f $(LOCKFILE) environment.devenv.{linux-64,osx-64,win-64}.yml environment.{linux-64,osx-64,win-64}.{lock,yml}
 
 lock-linux:
-	@$(CONDA_DEVENV) --name $(NAME) --file $(DEVENV) --env-manager $(CONDA) --env-var PLATFORM=linux-64 --print > environment.devenv.linux-64.yml
-	@$(CONDA_LOCK) $(CONDA_LOCK_OPTS) --lockfile $(LOCKFILE) --platform linux-64 --file environment.devenv.linux-64.yml
+	conda devenv --name $(NAME) --file $(DEVENV) --env-manager conda --env-var PLATFORM=linux-64 --print > environment.devenv.linux-64.yml
+	conda lock --lockfile $(LOCKFILE) --platform linux-64 --file environment.devenv.linux-64.yml
 
 lock-osx:
-	@$(CONDA_DEVENV) --name $(NAME) --file $(DEVENV) --env-manager $(CONDA) --env-var PLATFORM=osx-64 --print > environment.devenv.osx-64.yml
-	@$(CONDA_LOCK) $(CONDA_LOCK_OPTS) --lockfile $(LOCKFILE) --platform osx-64 --file environment.devenv.osx-64.yml
+	conda devenv --name $(NAME) --file $(DEVENV) --env-manager conda --env-var PLATFORM=osx-64 --print > environment.devenv.osx-64.yml
+	conda lock --lockfile $(LOCKFILE) --platform osx-64 --file environment.devenv.osx-64.yml
 
 lock-win:
-	@$(CONDA_DEVENV) --name $(NAME) --file $(DEVENV) --env-manager $(CONDA) --env-var PLATFORM=win-64 --print > environment.devenv.win-64.yml
-	@$(CONDA_LOCK) $(CONDA_LOCK_OPTS) --lockfile $(LOCKFILE) --platform win-64 --file environment.devenv.win-64.yml
+	conda devenv --name $(NAME) --file $(DEVENV) --env-manager conda --env-var PLATFORM=win-64 --print > environment.devenv.win-64.yml
+	conda lock --lockfile $(LOCKFILE) --platform win-64 --file environment.devenv.win-64.yml
 
 render:
-	@$(CONDA_LOCK) render $(LOCKFILE) --kind env --filename-template environment.{platform}
-	@$(CONDA_LOCK) render $(LOCKFILE) --kind explicit --filename-template environment.{platform}.lock
+	conda lock render $(LOCKFILE) --kind env --filename-template environment.{platform}
+	conda lock render $(LOCKFILE) --kind explicit --filename-template environment.{platform}.lock
 	@if ! grep -e 'pytorch.*cuda' environment.linux-64.lock > /dev/null 2> /dev/null; then \
 		echo "Expected PyTorch with CUDA support for PLATFORM=linux-64. Check conda configuration."; \
 	fi
@@ -88,10 +81,10 @@ render:
 env: create-env install
 
 create-env:
-	@$(CONDA) $(CONDA_OPTS) create --name $(NAME) --file environment.$(PLATFORM).lock
+	conda create --name $(NAME) --file environment.$(PLATFORM).lock
 
 update-env:
-	@$(CONDA) $(CONDA_OPTS) update --name $(NAME) --file environment.$(PLATFORM).lock --prune
+	conda update --name $(NAME) --file environment.$(PLATFORM).lock --prune
 
 install:
-	@$(CONDA) $(CONDA_OPTS) run --name $(NAME) pip install $(PIP_INSTALL_OPTS) ./$(ROOT)[utils]
+	conda run --name $(NAME) pip install $(PIP_INSTALL_OPTS) ./$(ROOT)[utils]

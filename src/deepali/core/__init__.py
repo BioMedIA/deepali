@@ -30,6 +30,10 @@ from .grid import grid_vectors_transform
 from .grid import grid_transform_points
 from .grid import grid_transform_vectors
 
+from .pathlib import is_uri
+from .pathlib import to_uri
+from .storage import StorageObject
+
 from .typing import Array
 from .typing import Batch
 from .typing import Dataclass
@@ -86,6 +90,7 @@ __all__ = (
     "ScalarOrTuple3d",
     "Size",
     "Shape",
+    "StorageObject",
     "TensorCollection",
     "grid_points_transform",
     "grid_vectors_transform",
@@ -97,4 +102,6 @@ __all__ = (
     "is_uint_dtype",
     "is_namedtuple",
     "is_path_str",
+    "is_uri",
+    "to_uri",
 )

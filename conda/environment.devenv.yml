@@ -12,6 +12,8 @@ dependencies:
   - setuptools-scm =7.1
   # Developer tools
   - black =22.3
+  - conda-devenv=2.3
+  - conda-lock=1.0
   - docutils =0.17
   - flake8 =6.0
   - flake8-black =0.3.6
@@ -39,7 +41,6 @@ dependencies:
   - pytorch =2.0,!=2.0.0  # ["osx" not in get_env("PLATFORM")]
   - pytorch-cuda =11.8  # ["osx" not in get_env("PLATFORM")]
   - pytorch::pytorch =2.0,!=2.0.0  # ["osx" in get_env("PLATFORM")]
-  - pyyaml =6.0
   - ruamel.yaml =0.17
   - SimpleITK =2.2
   # Utility libraries

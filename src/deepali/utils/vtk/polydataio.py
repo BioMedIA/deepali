@@ -12,7 +12,7 @@ from vtk import vtkXMLPolyDataReader, vtkXMLPolyDataWriter
 from vtk import vtkPolyDataReader, vtkPolyDataWriter
 
 from deepali.core.pathlib import PathUri
-from deepali.utils.storage import StorageObject
+from deepali.core.storage import StorageObject
 
 from .numpy import vtk_to_numpy_array, vtk_to_numpy_points
 
