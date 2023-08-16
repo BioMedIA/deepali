@@ -13,7 +13,7 @@ import json
 # (cf. https://github.com/iterative/dvc/issues/8466#issuecomment-1290757564)
 from ruamel.yaml import YAML
 
-from .pathlib import Path, PathUri, abspath_template
+from .pathlib import Path, PathUri, abspath_template, is_uri
 from .storage import StorageObject
 from .typing import is_path_str_field
 
@@ -51,7 +51,14 @@ class DataclassConfig(object):
         if section:
             for key in section.split("."):
                 config = config.get(key, {})
-        return cls.from_dict(config, parent=path.parent)
+        if is_uri(path):
+            if path.startswith("file:///"):
+                parent = Path(path[7:]).parent
+            else:
+                parent = None
+        else:
+            parent = Path(path).absolute().parent
+        return cls.from_dict(config, parent=parent)
 
     @classmethod
     def read(cls: Type[T], path: PathUri, section: Optional[str] = None) -> T:
