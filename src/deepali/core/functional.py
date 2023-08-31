@@ -59,10 +59,6 @@ from .linalg import vector_rotation
 from .bspline import bspline_interpolation_weights
 from .bspline import cubic_bspline_control_point_grid
 from .bspline import cubic_bspline_control_point_grid_size
-from .bspline import cubic_bspline_jacobian_det
-from .bspline import cubic_bspline_jacobian_dict
-from .bspline import cubic_bspline_jacobian_matrix
-from .bspline import cubic_bspline_jacobian_triu
 from .bspline import evaluate_cubic_bspline
 from .bspline import subdivide_cubic_bspline
 
@@ -97,9 +93,16 @@ from .image import zeros_image
 
 from .flow import affine_flow
 from .flow import compose_flows
+from .flow import curl
 from .flow import denormalize_flow
+from .flow import divergence
+from .flow import divergence_free_flow
 from .flow import expv
+from .flow import flow_derivatives
 from .flow import jacobian_det
+from .flow import jacobian_dict
+from .flow import jacobian_matrix
+from .flow import jacobian_triu
 from .flow import normalize_flow
 from .flow import sample_flow
 from .flow import warp_grid
@@ -186,13 +189,12 @@ __all__ = (
     "cshape_image",
     "cubic_bspline_control_point_grid",
     "cubic_bspline_control_point_grid_size",
-    "cubic_bspline_jacobian_det",
-    "cubic_bspline_jacobian_dict",
-    "cubic_bspline_jacobian_matrix",
-    "cubic_bspline_jacobian_triu",
+    "curl",
     "denormalize_flow",
     "denormalize_grid",
     "distance_matrix",
+    "divergence",
+    "divergence_free_flow",
     "dot_batch",
     "dot_channels",
     "downsample",
@@ -201,6 +203,7 @@ __all__ = (
     "expv",
     "flatten_channels",
     "finite_differences",
+    "flow_derivatives",
     "gaussian_pyramid",
     "grid_image",
     "image_slice",
@@ -212,6 +215,9 @@ __all__ = (
     "grid_sample",
     "grid_sample_mask",
     "jacobian_det",
+    "jacobian_dict",
+    "jacobian_matrix",
+    "jacobian_triu",
     "max_pool",
     "min_pool",
     "normalize_flow",

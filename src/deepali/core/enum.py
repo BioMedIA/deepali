@@ -5,7 +5,7 @@ from __future__ import annotations
 from enum import Enum, IntEnum
 import itertools
 import re
-from typing import Sequence, Set, Tuple, Union
+from typing import Iterable, List, Optional, Sequence, Set, Tuple, Union, overload
 
 
 class Sampling(Enum):
@@ -142,6 +142,10 @@ class SpatialDim(IntEnum):
             return cls.T
         return cls(arg)
 
+    def symbol(self) -> str:
+        r"""Letter of spatial dimension."""
+        return ("x", "y", "z", "t")[self.value]
+
     def tensor_dim(self, ndim: int, channels_last: bool = False) -> int:
         r"""Map spatial dimension identifier to image data tensor dimension."""
         dim = ndim - (2 if channels_last else 1) - self.value
@@ -155,10 +159,12 @@ class SpatialDim(IntEnum):
 
     def __str__(self) -> str:
         r"""Letter of spatial dimension."""
-        return ("x", "y", "z", "t")[self.value]
+        return self.symbol()
 
 
 SpatialDimArg = Union[int, str, SpatialDim]
+
+SpatialDerivativeKey = str
 
 
 class SpatialDerivativeKeys(object):
@@ -173,7 +179,7 @@ class SpatialDerivativeKeys(object):
     """
 
     @staticmethod
-    def check(arg: Union[str, Sequence[str]]):
+    def check(arg: Union[str, Iterable[str]]):
         r"""Check if given derivatives key is valid."""
         if isinstance(arg, str):
             arg = (arg,)
@@ -186,7 +192,7 @@ class SpatialDerivativeKeys(object):
                 )
 
     @classmethod
-    def is_valid(cls, arg: Union[str, Sequence[str]]) -> bool:
+    def is_valid(cls, arg: Union[str, Iterable[str]]) -> bool:
         r"""Check if given derivatives key is valid."""
         try:
             cls.check(arg)
@@ -195,15 +201,15 @@ class SpatialDerivativeKeys(object):
         return True
 
     @staticmethod
-    def is_mixed(key: str) -> bool:
+    def is_mixed(key: SpatialDerivativeKey) -> bool:
         r"""Whether derivative contains mixed terms."""
         return len(set(key)) > 1
 
     @staticmethod
-    def all(ndim: int, order: Union[int, Sequence[int]]) -> Tuple[str, ...]:
+    def all(ndim: int, order: Union[int, Sequence[int]]) -> List[SpatialDerivativeKey]:
         r"""Unmixed spatial derivatives of specified order."""
         if isinstance(order, int):
-            order = (order,)
+            order = [order]
         keys = []
         dims = [str(SpatialDim(d)) for d in range(ndim)]
         for n in order:
@@ -215,39 +221,307 @@ class SpatialDerivativeKeys(object):
         return keys
 
     @staticmethod
-    def unmixed(ndim: int, order: int) -> Tuple[str, ...]:
+    def unmixed(ndim: int, order: int) -> List[SpatialDerivativeKey]:
         r"""Unmixed spatial derivatives of specified order."""
         if order <= 0:
-            return ()
-        return tuple((str(SpatialDim(d)) * order for d in range(ndim)))
+            return []
+        return [SpatialDim(d).symbol() * order for d in range(ndim)]
 
     @classmethod
-    def unique(cls, keys: Sequence[str]) -> Set[str]:
+    def unique(cls, keys: Iterable[SpatialDerivativeKey]) -> Set[SpatialDerivativeKey]:
         r"""Unique spatial derivatives."""
         return set((cls.sorted(key) for key in keys))
 
     @classmethod
-    def sorted(cls, key: str) -> str:
+    def sorted(cls, key: SpatialDerivativeKey) -> SpatialDerivativeKey:
         r"""Sort letters of spatial dimensions in spatial derivative key."""
         return cls.join(sorted(cls.split(key)))
 
     @staticmethod
-    def order(arg: str) -> int:
+    def order(arg: SpatialDerivativeKey) -> int:
         r"""Order of the spatial derivative."""
         return len(arg)
 
     @classmethod
-    def max_order(cls, keys: Sequence[str]) -> int:
-        if not keys:
-            return 0
-        return max((cls.order(key) for key in keys))
+    def max_order(cls, keys: Iterable[SpatialDerivativeKey]) -> int:
+        return max([0] + [cls.order(key) for key in keys])
 
     @staticmethod
-    def split(arg: str) -> Tuple[SpatialDim, ...]:
+    def split(arg: SpatialDerivativeKey) -> List[SpatialDim]:
         r"""Split spatial derivative key into spatial dimensions enum values."""
-        return tuple((SpatialDim.from_arg(letter) for letter in arg))
+        return [SpatialDim.from_arg(letter) for letter in arg]
 
     @staticmethod
-    def join(arg: Sequence[SpatialDim]) -> str:
+    def join(arg: Sequence[SpatialDim]) -> SpatialDerivativeKey:
         r"""Join spatial dimensions to spatial derivative key."""
-        return "".join(str(x) for x in arg)
+        return "".join(sdim.symbol() for sdim in arg)
+
+
+class FlowChannelIndex(IntEnum):
+    r"""Flow vector component index."""
+
+    U = 0
+    V = 1
+    W = 2
+
+    @classmethod
+    def from_arg(cls, arg: Union[int, str, FlowChannelIndex]) -> FlowChannelIndex:
+        r"""Get enumeration value from function argument."""
+        if arg in ("u", "U"):
+            return cls.U
+        if arg in ("v", "V"):
+            return cls.V
+        if arg in ("w", "W"):
+            return cls.W
+        return cls(arg)
+
+    def index(self) -> int:
+        r"""Map flow component identifier to tensor channel index."""
+        return self.value
+
+    def symbol(self) -> str:
+        r"""Single lowercase letter identifying this flow component."""
+        return ("u", "v", "w")[self.value]
+
+    def __str__(self) -> str:
+        return self.symbol()
+
+
+FlowChannelIndexArg = Union[int, str, FlowChannelIndex]
+
+FlowDerivativeKey = str
+
+
+class FlowDerivativeKeys(object):
+    r"""Auxiliary functions for identifying and enumerating spatial derivatives of a flow field.
+
+    The flow field components are denoted as "u" (c=0), "v"  (c=1), and "w"  (c=2), respectively,
+    where c is the channel index. The spatial dimensions along which to take derivatives are
+    identified by the letters "x", "y", and "z" (cf. :class:`SpatialDerivativeKeys`). The partial
+    derivative of a given vector field component along one or more spatial dimensions is denoted
+    by a quotient string such as "dv/dz" or "du/dxy". When multiple flow field components are
+    specified, the spatial derivative of each is computed, i.e., "duw/dx" is shorthand for
+    ["du/dx", "dw/dx"].
+
+    """
+
+    @classmethod
+    def from_arg(
+        cls,
+        spatial_dims: int,
+        which: Optional[Union[str, Sequence[str]]] = None,
+        order: Optional[int] = None,
+    ) -> List[FlowDerivativeKey]:
+        r"""Get flow derivative keys from function arguments.
+
+        See also ``which`` parameter of :func:`flow_derivatives()` function.
+
+        Args:
+            spatial_dims: Number of spatial dimensions.
+            which: String codes of spatial deriviatives to compute. When only a sequence of spatial
+                dimension keys is given (cf. :class:`SpatialDerivateKeys`), the respective spatial
+                derivative is computed for all vector field components, i.e., for ``spatial_dims=3``,
+                "x" is shorthand for "du/dx", "dv/dx", and "dw/dx".
+            order: Order of spatial derivatives. When both ``which`` and ``order`` are specified,
+                only the flow field derivatives listed in ``which`` and are of the given order
+                are returned.
+
+        Returns:
+            Flow derivative keys, one for each partial derivative scalar field.
+
+        """
+        if spatial_dims < 2 or spatial_dims > 3:
+            raise ValueError("Spatial flow field dimensions must be 2 or 3")
+        if which is None:
+            if order is None:
+                order = 1
+            keys = cls.all(spatial_dims=spatial_dims, order=order)
+        else:
+            keys = []
+            regex = re.compile(r"^(d(?P<channels>[uvw]+)/d)?(?P<derivs>[xyzt]+)$")
+            if isinstance(which, str):
+                which = [which]
+            for arg in which:
+                match = regex.match(arg)
+                if not match:
+                    raise ValueError(f"Invalid flow derivative specification: {arg}")
+                derivs = match["derivs"]
+                SpatialDerivativeKeys.check(derivs)
+                if order is None or SpatialDerivativeKeys.order(derivs) == order:
+                    if match["channels"] is None:
+                        channels = ["u", "v", "w"][:spatial_dims]
+                    else:
+                        channels = [str(c).lower() for c in match["channels"]]
+                    for channel in channels:
+                        keys.append(f"d{channel}/d{derivs}")
+        return keys
+
+    @overload
+    @classmethod
+    def unique(cls, arg: FlowDerivativeKey) -> FlowDerivativeKey:
+        r"""Unique spatial flow derivative key, where spatial dimension codes are sorted alphabetically."""
+        ...
+
+    @overload
+    @classmethod
+    def unique(cls, arg: Iterable[FlowDerivativeKey]) -> Set[FlowDerivativeKey]:
+        r"""Set of unique spatial flow derivative keys."""
+        ...
+
+    @classmethod
+    def unique(
+        cls, arg: Union[FlowDerivativeKey, Iterable[FlowDerivativeKey]]
+    ) -> Union[FlowDerivativeKey, Set[FlowDerivativeKey]]:
+        r"""Unique spatial flow derivative."""
+        unique_keys = set()
+        keys = [arg] if isinstance(arg, str) else arg
+        for channel, derivative_key in cls.split(keys):
+            derivative_key = SpatialDerivativeKeys.sorted(derivative_key)
+            unique_key = cls.symbol(channel, derivative_key)
+            unique_keys.add(unique_key)
+        if arg is not keys:
+            return next(iter(unique_keys))
+        return unique_keys
+
+    @classmethod
+    def sorted(cls, keys: Iterable[FlowDerivativeKey]) -> List[FlowDerivativeKey]:
+        r"""Ordered list of flow derivative keys."""
+        return sorted(keys)
+
+    @classmethod
+    def is_mixed(cls, arg: FlowDerivativeKey) -> bool:
+        r"""Whether flow derivative is taken along more than one spatial dimension."""
+        return SpatialDerivativeKeys.is_mixed(cls.split(arg)[1])
+
+    @classmethod
+    def order(cls, arg: FlowDerivativeKey) -> int:
+        r"""Order of the spatial flow derivative."""
+        return SpatialDerivativeKeys.order(cls.split(arg)[1])
+
+    @classmethod
+    def max_order(cls, keys: Iterable[SpatialDerivativeKey]) -> int:
+        return SpatialDerivativeKeys.max_order(derivs for _, derivs in cls.split(keys))
+
+    @overload
+    @staticmethod
+    def split(arg: FlowDerivativeKey) -> Tuple[FlowChannelIndex, SpatialDerivativeKey]:
+        ...
+
+    @overload
+    @staticmethod
+    def split(
+        arg: Iterable[FlowDerivativeKey],
+    ) -> List[Tuple[FlowChannelIndex, SpatialDerivativeKey]]:
+        ...
+
+    @staticmethod
+    def split(
+        arg: Union[FlowDerivativeKey, Iterable[FlowDerivativeKey]]
+    ) -> List[Tuple[FlowChannelIndex, SpatialDerivativeKey]]:
+        r"""Split flow derivative keys into flow channel index and spatial derivative key."""
+        keys = []
+        regex = re.compile(r"^d(?P<channel_key>[uvw])/d(?P<derivative_key>[xXyYzZtT]+)$")
+        args = [arg] if isinstance(arg, str) else arg
+        for key in args:
+            match = regex.match(key)
+            if not match:
+                raise ValueError(f"Invalid flow derivative key: {key}")
+            channel_key = match["channel_key"]
+            derivative_key = match["derivative_key"]
+            channel_index = FlowChannelIndex.from_arg(channel_key)
+            SpatialDerivativeKeys.check(derivative_key)
+            keys.append((channel_index, derivative_key))
+        if arg is not args:
+            return keys[0]
+        return keys
+
+    @staticmethod
+    def symbol(
+        channel: FlowChannelIndexArg,
+        *args: Union[str, int, SpatialDim],
+    ) -> FlowDerivativeKey:
+        channel = FlowChannelIndex.from_arg(channel)
+        derivs = []
+        for arg in args:
+            if isinstance(arg, str):
+                derivs.extend(SpatialDerivativeKeys.split(arg))
+            elif isinstance(arg, int):
+                derivs.append(SpatialDim(arg))
+            elif isinstance(arg, SpatialDim):
+                derivs.append(arg)
+            else:
+                raise TypeError("Spatial derivative identifier must be int, str, or SpatialDim")
+        return f"d{channel.symbol()}/d{SpatialDerivativeKeys.join(derivs)}"
+
+    @classmethod
+    def all(
+        cls,
+        spatial_dims: int,
+        channel: Optional[Union[FlowChannelIndexArg, Sequence[FlowChannelIndexArg]]] = None,
+        order: Union[int, Sequence[int]] = 1,
+    ) -> List[FlowDerivativeKey]:
+        r"""All spatial derivatives of specified order."""
+        if order < 0:
+            raise ValueError("Spatial derivatives order must be non-negative")
+        if order == 0:
+            return []
+        channels = cls._channels(spatial_dims, channel)
+        derivs = SpatialDerivativeKeys.all(spatial_dims, order=order)
+        return [cls.symbol(c, d) for c, d in itertools.product(channels, derivs)]
+
+    @classmethod
+    def unmixed(
+        cls,
+        spatial_dims: int,
+        channel: Optional[Union[FlowChannelIndexArg, Sequence[FlowChannelIndexArg]]] = None,
+        order: Union[int, Sequence[int]] = 1,
+    ) -> List[FlowDerivativeKey]:
+        r"""Unmixed spatial derivatives of specified order."""
+        if order < 0:
+            raise ValueError("Spatial derivatives order must be non-negative")
+        if order == 0:
+            return []
+        channels = cls._channels(spatial_dims, channel)
+        derivs = SpatialDerivativeKeys.unmixed(spatial_dims, order=order)
+        return [cls.symbol(c, d) for c, d in itertools.product(channels, derivs)]
+
+    @classmethod
+    def gradient(
+        cls,
+        spatial_dims: int,
+        channel: Optional[Union[FlowChannelIndexArg, Sequence[FlowChannelIndexArg]]] = None,
+    ) -> List[FlowDerivativeKey]:
+        return cls.all(spatial_dims=spatial_dims, channel=channel, order=1)
+
+    @classmethod
+    def jacobian(cls, spatial_dims: int) -> List[FlowDerivativeKey]:
+        return cls.all(spatial_dims=spatial_dims, order=1)
+
+    @classmethod
+    def divergence(cls, spatial_dims: int) -> List[FlowDerivativeKey]:
+        return [cls.symbol(i, i) for i in range(spatial_dims)]
+
+    @classmethod
+    def curvature(cls, spatial_dims: int) -> List[FlowDerivativeKey]:
+        channels = range(spatial_dims)
+        derivs = SpatialDerivativeKeys.unmixed(spatial_dims, order=2)
+        return [cls.symbol(c, d) for c, d in itertools.product(channels, derivs)]
+
+    @classmethod
+    def hessian(
+        cls,
+        spatial_dims: int,
+        channel: Optional[Union[FlowChannelIndexArg, Sequence[FlowChannelIndexArg]]] = None,
+    ) -> List[FlowDerivativeKey]:
+        return cls.all(spatial_dims=spatial_dims, channel=channel, order=2)
+
+    @staticmethod
+    def _channels(
+        spatial_dims: int,
+        channel: Optional[Union[FlowChannelIndexArg, Sequence[FlowChannelIndexArg]]] = None,
+    ) -> List[FlowChannelIndex]:
+        if channel is None:
+            channel = range(spatial_dims)
+        elif isinstance(channel, (int, str, FlowChannelIndex)):
+            channel = [channel]
+        return [FlowChannelIndex.from_arg(c) for c in channel]
