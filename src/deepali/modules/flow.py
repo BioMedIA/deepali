@@ -3,13 +3,46 @@ r"""Modules operating on flow vector fields."""
 from __future__ import annotations
 
 from copy import copy as shallow_copy
-from typing import Optional
+from typing import Optional, Union
 
 from torch import Tensor
 from torch.nn import Module
 
 from deepali.core import ALIGN_CORNERS
+from deepali.core import Array, Scalar, ScalarOrTuple
 from deepali.core import functional as U
+
+
+class Curl(Module):
+    r"""Layer which calculates the curl of a vector field."""
+
+    def __init__(
+        self,
+        mode: Optional[str] = None,
+        sigma: Optional[float] = None,
+        spacing: Optional[Union[Scalar, Array]] = None,
+        stride: Optional[ScalarOrTuple[int]] = None,
+    ) -> None:
+        super().__init__()
+        self.mode = mode
+        self.sigma = sigma
+        self.spacing = spacing
+        self.stride = stride
+
+    def forward(self, x: Tensor) -> Tensor:
+        return U.curl(x, mode=self.mode, sigma=self.sigma, spacing=self.spacing, stride=self.stride)
+
+    def extra_repr(self) -> str:
+        args = []
+        if self.mode is not None:
+            args.append(f"mode={self.mode!r}")
+        if self.sigma is not None:
+            args.append(f"sigma={self.sigma!r}")
+        if self.spacing is not None:
+            args.append(f"spacing={self.spacing!r}")
+        if self.stride is not None:
+            args.append(f"stride={self.stride!r}")
+        return ", ".join(args)
 
 
 class ExpFlow(Module):
