@@ -7,7 +7,7 @@ from typing import Optional, Union
 import torch
 from torch import Tensor
 
-from deepali.core.typing import Shape
+from deepali.core.typing import ScalarOrTuple, Shape
 
 from . import functional as L
 from .base import DisplacementLoss
@@ -18,21 +18,24 @@ class _SpatialDerivativesLoss(DisplacementLoss):
 
     def __init__(
         self,
-        mode: str = "central",
+        mode: Optional[str] = None,
         sigma: Optional[float] = None,
+        stride: Optional[ScalarOrTuple] = None,
         reduction: str = "mean",
     ):
         r"""Initialize regularization term.
 
         Args:
-            mode: Method used to approximate spatial derivatives. See ``spatial_derivatives()``.
-            sigma: Standard deviation of Gaussian in grid units. See ``spatial_derivatives()``.
+            mode: Method used to approximate :func:`flow_derivatives()`.
+            sigma: Standard deviation of Gaussian in grid units used to smooth vector field.
+            stride: Number of output grid points between control points plus one for ``mode='bspline'``.
             reduction: Operation to use for reducing spatially distributed loss values.
 
         """
         super().__init__()
         self.mode = mode
-        self.sigma = float(0 if sigma is None else sigma)
+        self.sigma = sigma
+        self.stride = stride
         self.reduction = reduction
 
     def _spacing(self, u_shape: Shape) -> Optional[Tensor]:
@@ -45,7 +48,15 @@ class _SpatialDerivativesLoss(DisplacementLoss):
         return 2 / (size - 1)
 
     def extra_repr(self) -> str:
-        return f"mode={self.mode!r}, sigma={self.sigma!r}, reduction={self.reduction!r}"
+        args = []
+        if self.mode:
+            args.append(f"mode={self.mode!r}")
+        if self.sigma:
+            args.append(f"sigma={self.sigma!r}")
+        if self.stride:
+            args.append(f"stride={self.stride!r}")
+        args.append(f"reduction={self.reduction!r}")
+        return ", ".join(args)
 
 
 class GradLoss(_SpatialDerivativesLoss):
@@ -55,21 +66,23 @@ class GradLoss(_SpatialDerivativesLoss):
         self,
         p: Union[int, float] = 2,
         q: Optional[Union[int, float]] = 1,
-        mode: str = "central",
+        mode: Optional[str] = None,
         sigma: Optional[float] = None,
+        stride: Optional[ScalarOrTuple] = None,
         reduction: str = "mean",
     ):
         r"""Initialize regularization term.
 
         Args:
-            mode: Method used to approximate spatial derivatives. See ``spatial_derivatives()``.
-            sigma: Standard deviation of Gaussian in grid units. See ``spatial_derivatives()``.
+            mode: Method used to approximate :func:`flow_derivatives()`.
+            sigma: Standard deviation of Gaussian in grid units used to smooth vector field.
+            stride: Number of output grid points between control points plus one for ``mode='bspline'``.
             reduction: Operation to use for reducing spatially distributed loss values.
 
         """
-        super().__init__(mode=mode, sigma=sigma, reduction=reduction)
+        super().__init__(mode=mode, sigma=sigma, stride=stride, reduction=reduction)
         self.p = p
-        self.q = q
+        self.q = 1 / p if q is None else q
 
     def forward(self, u: Tensor) -> Tensor:
         r"""Evaluate regularization loss for given transformation."""
@@ -78,9 +91,10 @@ class GradLoss(_SpatialDerivativesLoss):
             u,
             p=self.p,
             q=self.q,
-            spacing=spacing,
             mode=self.mode,
             sigma=self.sigma,
+            spacing=spacing,
+            stride=self.stride,
             reduction=self.reduction,
         )
 
@@ -96,9 +110,10 @@ class Bending(_SpatialDerivativesLoss):
         spacing = self._spacing(u.shape)
         return L.bending_loss(
             u,
-            spacing=spacing,
             mode=self.mode,
             sigma=self.sigma,
+            spacing=spacing,
+            stride=self.stride,
             reduction=self.reduction,
         )
 
@@ -115,9 +130,10 @@ class Curvature(_SpatialDerivativesLoss):
         spacing = self._spacing(u.shape)
         return L.curvature_loss(
             u,
-            spacing=spacing,
             mode=self.mode,
             sigma=self.sigma,
+            spacing=spacing,
+            stride=self.stride,
             reduction=self.reduction,
         )
 
@@ -130,9 +146,10 @@ class Diffusion(_SpatialDerivativesLoss):
         spacing = self._spacing(u.shape)
         return L.diffusion_loss(
             u,
-            spacing=spacing,
             mode=self.mode,
             sigma=self.sigma,
+            spacing=spacing,
+            stride=self.stride,
             reduction=self.reduction,
         )
 
@@ -145,9 +162,10 @@ class Divergence(_SpatialDerivativesLoss):
         spacing = self._spacing(u.shape)
         return L.divergence_loss(
             u,
-            spacing=spacing,
             mode=self.mode,
             sigma=self.sigma,
+            spacing=spacing,
+            stride=self.stride,
             reduction=self.reduction,
         )
 
@@ -163,8 +181,9 @@ class Elasticity(_SpatialDerivativesLoss):
         poissons_ratio: Optional[float] = None,
         youngs_modulus: Optional[float] = None,
         shear_modulus: Optional[float] = None,
-        mode: str = "central",
+        mode: Optional[str] = None,
         sigma: Optional[float] = None,
+        stride: Optional[ScalarOrTuple] = None,
         reduction: str = "mean",
     ):
         super().__init__(mode=mode, sigma=sigma, reduction=reduction)
@@ -180,17 +199,34 @@ class Elasticity(_SpatialDerivativesLoss):
         spacing = self._spacing(u.shape)
         return L.elasticity_loss(
             u,
-            spacing=spacing,
-            mode=self.mode,
-            sigma=self.sigma,
-            reduction=self.reduction,
             material_name=self.material_name,
             first_parameter=self.first_parameter,
             second_parameter=self.second_parameter,
             poissons_ratio=self.poissons_ratio,
             youngs_modulus=self.youngs_modulus,
             shear_modulus=self.shear_modulus,
+            mode=self.mode,
+            sigma=self.sigma,
+            spacing=spacing,
+            stride=self.stride,
+            reduction=self.reduction,
         )
+
+    def extra_repr(self) -> str:
+        args = []
+        if self.material_name:
+            args.append(f"material_name={self.material_name!r}")
+        if self.first_parameter is not None:
+            args.append(f"first_parameter={self.first_parameter!r}")
+        if self.second_parameter is not None:
+            args.append(f"second_parameter={self.second_parameter!r}")
+        if self.poissons_ratio is not None:
+            args.append(f"poissons_ratio={self.poissons_ratio!r}")
+        if self.youngs_modulus is not None:
+            args.append(f"youngs_modulus={self.youngs_modulus!r}")
+        if self.shear_modulus is not None:
+            args.append(f"shear_modulus={self.shear_modulus!r}")
+        return ", ".join(args) + ", " + super().extra_repr()
 
 
 class TotalVariation(_SpatialDerivativesLoss):
@@ -201,9 +237,10 @@ class TotalVariation(_SpatialDerivativesLoss):
         spacing = self._spacing(u.shape)
         return L.total_variation_loss(
             u,
-            spacing=spacing,
             mode=self.mode,
             sigma=self.sigma,
+            spacing=spacing,
+            stride=self.stride,
             reduction=self.reduction,
         )
 
