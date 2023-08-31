@@ -1,7 +1,7 @@
 r"""Loss functions, evaluation metrics, and related utilities."""
 
 import itertools
-from typing import Protocol, Optional, Sequence, Tuple, Union
+from typing import Protocol, Optional, Tuple, Union
 
 import math
 
@@ -10,15 +10,14 @@ from torch import Tensor
 from torch.nn.functional import binary_cross_entropy_with_logits, logsigmoid
 import torch.nn.functional as F
 
-from deepali.core.bspline import evaluate_cubic_bspline
-from deepali.core.enum import SpatialDerivativeKeys, SpatialDim
+from deepali.core.enum import FlowDerivativeKeys, SpatialDerivativeKeys
 from deepali.core.grid import Grid
-from deepali.core.image import avg_pool, dot_channels, rand_sample, spatial_derivatives
-from deepali.core.flow import denormalize_flow
+from deepali.core.image import avg_pool, dot_channels, rand_sample
+from deepali.core.flow import denormalize_flow, divergence, flow_derivatives, spatial_derivatives
 from deepali.core.pointset import transform_grid
 from deepali.core.pointset import transform_points
 from deepali.core.tensor import as_one_hot_tensor, move_dim
-from deepali.core.typing import Array, ScalarOrTuple
+from deepali.core.typing import Array, Scalar, ScalarOrTuple
 
 
 __all__ = (
@@ -1113,10 +1112,10 @@ def grad_loss(
     u: Tensor,
     p: Union[int, float] = 2,
     q: Optional[Union[int, float]] = 1,
-    spacing: Optional[Array] = None,
+    mode: Optional[str] = None,
     sigma: Optional[float] = None,
-    mode: str = "central",
-    which: Optional[Union[str, Sequence[str]]] = None,
+    spacing: Optional[Union[Scalar, Array]] = None,
+    stride: Optional[ScalarOrTuple] = None,
     reduction: str = "mean",
 ) -> Tensor:
     r"""Loss term based on p-norm of spatial gradient of vector fields.
@@ -1133,10 +1132,10 @@ def grad_loss(
         p: The order of the gradient norm. When ``p = 0``, the partial derivatives are summed up.
         q: Power parameter of gradient norm. If ``None``, then ``q = 1 / p``. If ``q == 0``, the
             absolute value of the sum of partial derivatives is computed at each grid point.
-        spacing: Sampling grid spacing.
-        sigma: Standard deviation of Gaussian in grid units.
-        mode: Method used to approximate spatial derivatives. See ``spatial_derivatives()``.
-        which: String codes of spatial deriviatives to compute. See ``SpatialDerivativeKeys``.
+        mode: Method used to approximate :func:`spatial_derivatives()`.
+        sigma: Standard deviation of Gaussian in grid units used to smooth vector field.
+        spacing: Step size to use when computing finite differences.
+        stride: Number of output grid points between control points plus one for ``mode='bspline'``.
         reduction: Specifies the reduction to apply to the output: 'none' | 'mean' | 'sum'.
 
     Returns:
@@ -1150,21 +1149,27 @@ def grad_loss(
                 "grad_loss() not implemented for linear transformation and 'reduction'='none'"
             )
         return torch.tensor(0, dtype=u.dtype, device=u.device)
+    N = u.shape[0]
     D = u.shape[1]
     if u.ndim - 2 != D:
-        raise ValueError(f"grad_loss() 'u' must be tensor of shape (N, {u.ndim - 2}, ..., X)")
+        raise ValueError("grad_loss() 'u' must be tensor of shape (N, D, ..., X)")
     if q is None:
         q = 1.0 / p
-    derivs = spatial_derivatives(u, mode=mode, which=which, order=1, sigma=sigma, spacing=spacing)
-    loss = torch.cat([deriv.unsqueeze(-1) for deriv in derivs.values()], dim=-1)
+    if spacing is None:
+        spacing = tuple(reversed([2 / (n - 1) for n in u.shape[2:]]))
+    kwargs = dict(mode=mode, sigma=sigma, spacing=spacing, stride=stride)
+    which = SpatialDerivativeKeys.all(spatial_dims=D, order=1)
+    deriv = spatial_derivatives(u, which=which, **kwargs)
     if p == 1:
-        loss = loss.abs()
+        deriv = {k: v.abs_() for k, v in deriv.items()}
     elif p != 0:
         if p % 2 == 0:
-            loss = loss.pow(p)
+            deriv = {k: v.pow_(p) for k, v in deriv.items()}
         else:
-            loss = loss.abs().pow_(p)
-    loss = loss.sum(dim=-1)
+            deriv = {k: v.abs_().pow_(p) for k, v in deriv.items()}
+    loss = torch.zeros((N, 1) + u.shape[2:], dtype=u.dtype, device=u.device)
+    for value in deriv.values():
+        loss = loss.add_(value.sum(dim=1, keepdim=True))
     if q == 0:
         loss.abs_()
     elif q != 1:
@@ -1175,9 +1180,10 @@ def grad_loss(
 
 def bending_loss(
     u: Tensor,
-    spacing: Optional[Array] = None,
+    mode: Optional[str] = None,
     sigma: Optional[float] = None,
-    mode: str = "sobel",
+    spacing: Optional[Union[Scalar, Array]] = None,
+    stride: Optional[ScalarOrTuple] = None,
     reduction: str = "mean",
 ) -> Tensor:
     r"""Bending energy of vector fields.
@@ -1185,9 +1191,10 @@ def bending_loss(
     Args:
         u: Batch of vector fields as tensor of shape ``(N, D, ..., X)``. When a tensor with less than
             four dimensions is given, it is assumed to be a linear transformation and zero is returned.
-        spacing: Sampling grid spacing.
-        sigma: Standard deviation of Gaussian in grid units (cf. ``spatial_derivatives()``).
-        mode: Method used to approximate spatial derivatives (cf. ``spatial_derivatives()``).
+        mode: Method used to approximate :func:`flow_derivatives()`.
+        sigma: Standard deviation of Gaussian in grid units used to smooth vector field.
+        spacing: Step size to use when computing finite differences.
+        stride: Number of output grid points between control points plus one for ``mode='bspline'``.
         reduction: Specifies the reduction to apply to the output: 'none' | 'mean' | 'sum'.
 
     Returns:
@@ -1203,15 +1210,18 @@ def bending_loss(
         return torch.tensor(0, dtype=u.dtype, device=u.device)
     D = u.shape[1]
     if u.ndim - 2 != D:
-        raise ValueError(f"bending_energy() 'u' must be tensor of shape (N, {u.ndim - 2}, ..., X)")
-    which = SpatialDerivativeKeys.unique(SpatialDerivativeKeys.all(ndim=D, order=2))
-    derivs = spatial_derivatives(u, mode=mode, which=which, sigma=sigma, spacing=spacing)
-    derivs = torch.cat([deriv.unsqueeze(-1) for deriv in derivs.values()], dim=-1)
-    derivs *= torch.tensor(
-        [2 if SpatialDerivativeKeys.is_mixed(key) else 1 for key in which],
-        device=u.device,
-    )
-    loss = derivs.pow(2).sum(-1)
+        raise ValueError("bending_energy() 'u' must be tensor of shape (N, D, ..., X)")
+    kwargs = dict(mode=mode or "sobel", sigma=sigma, spacing=spacing, stride=stride)
+    which = FlowDerivativeKeys.all(spatial_dims=D, order=2)
+    which = sorted(FlowDerivativeKeys.unique(which))
+    deriv = flow_derivatives(u, which=which, **kwargs)
+    loss: Optional[Tensor] = None
+    for key, value in deriv.items():
+        value = value.square_()
+        if FlowDerivativeKeys.is_mixed(key):
+            value = value.mul_(2)
+        loss = value if loss is None else loss.add_(value)
+    assert loss is not None
     loss = reduce_loss(loss, reduction)
     return loss
 
@@ -1224,6 +1234,8 @@ def bspline_bending_loss(
     data: Tensor, stride: ScalarOrTuple[int] = 1, reduction: str = "mean"
 ) -> Tensor:
     r"""Evaluate bending energy of cubic B-spline function, e.g., spatial free-form deformation.
+
+    Deprecated, use :func:`bending_loss()` with ``mode='bspline'`` instead.
 
     Args:
         data: Cubic B-spline interpolation coefficients as tensor of shape ``(N, C, ..., X)``.
@@ -1239,40 +1251,7 @@ def bspline_bending_loss(
         Bending energy of cubic B-spline.
 
     """
-    if not isinstance(data, Tensor):
-        raise TypeError("bspline_bending_loss() 'data' must be torch.Tensor")
-    if not torch.is_floating_point(data):
-        raise TypeError("bspline_bending_loss() 'data' must have floating point dtype")
-    if data.ndim < 3:
-        raise ValueError("bspline_bending_loss() 'data' must have shape (N, C, ..., X)")
-    D = data.ndim - 2
-    C = data.shape[1]
-    if C != D:
-        raise ValueError(
-            f"bspline_bending_loss() 'data' number of channels ({C})"
-            f" does not match number of spatial dimensions ({D})"
-        )
-    energy: Optional[Tensor] = None
-    derivs = SpatialDerivativeKeys.all(D, order=2)
-    derivs = SpatialDerivativeKeys.unique(derivs)
-    npoints = 0
-    for deriv in derivs:
-        derivative = [0] * D
-        for sdim in SpatialDerivativeKeys.split(deriv):
-            derivative[sdim] += 1
-        assert sum(derivative) == 2
-        values = evaluate_cubic_bspline(data, stride=stride, derivative=derivative).square()
-        if reduction != "none":
-            npoints = values.shape[2:].numel()
-            values = values.sum()
-        if not SpatialDerivativeKeys.is_mixed(deriv):
-            values = values.mul_(2)
-        energy = values if energy is None else energy.add_(values)
-    assert energy is not None
-    assert npoints > 0
-    if reduction == "mean" and npoints > 1:
-        energy = energy.div_(npoints)
-    return energy
+    return bending_loss(data, mode="bspline", stride=stride, reduction=reduction)
 
 
 bspline_be_loss = bspline_bending_loss
@@ -1281,9 +1260,10 @@ bspline_bending_energy = bspline_bending_loss
 
 def curvature_loss(
     u: Tensor,
-    spacing: Optional[Array] = None,
+    mode: Optional[str] = None,
     sigma: Optional[float] = None,
-    mode: str = "sobel",
+    spacing: Optional[Union[Scalar, Array]] = None,
+    stride: Optional[ScalarOrTuple] = None,
     reduction: str = "mean",
 ) -> Tensor:
     r"""Loss term based on unmixed 2nd order spatial derivatives of vector fields.
@@ -1295,9 +1275,10 @@ def curvature_loss(
     Args:
         u: Batch of vector fields as tensor of shape ``(N, D, ..., X)``. When a tensor with less than
             four dimensions is given, it is assumed to be a linear transformation and zero is returned.
-        spacing: Sampling grid spacing.
-        sigma: Standard deviation of Gaussian in grid units (cf. ``spatial_derivatives()``).
-        mode: Method used to approximate spatial derivatives (cf. ``spatial_derivatives()``).
+        mode: Method used to approximate :func:`flow_derivatives()`.
+        sigma: Standard deviation of Gaussian in grid units used to smooth vector field.
+        spacing: Step size to use when computing finite differences.
+        stride: Number of output grid points between control points plus one for ``mode='bspline'``.
         reduction: Specifies the reduction to apply to the output: 'none' | 'mean' | 'sum'.
 
     Returns:
@@ -1311,38 +1292,72 @@ def curvature_loss(
                 "curvature_loss() not implemented for linear transformation and reduction='none'"
             )
         return torch.tensor(0, dtype=u.dtype, device=u.device)
+    N = u.shape[0]
     D = u.shape[1]
     if u.ndim - 2 != D:
         raise ValueError(f"curvature_loss() 'u' must be tensor of shape (N, {u.ndim - 2}, ..., X)")
-    which = SpatialDerivativeKeys.unmixed(ndim=D, order=2)
-    derivs = spatial_derivatives(u, mode=mode, which=which, sigma=sigma, spacing=spacing)
-    derivs = torch.cat([deriv.unsqueeze(-1) for deriv in derivs.values()], dim=-1)
-    loss = 0.5 * derivs.sum(-1).pow(2)
+    kwargs = dict(mode=mode or "sobel", sigma=sigma, spacing=spacing, stride=stride)
+    which = FlowDerivativeKeys.curvature(spatial_dims=D)
+    deriv = flow_derivatives(u, which=which, **kwargs)
+    loss = torch.zeros((N, D) + u.shape[2:], dtype=u.dtype, device=u.device)
+    for i, j in itertools.product(range(D), repeat=2):
+        loss.narrow(1, i, 1).add_(deriv[FlowDerivativeKeys.symbol(i, j, j)])
+    loss = loss.square_().sum(dim=1, keepdim=True)
     loss = reduce_loss(loss, reduction)
-    return loss
+    return loss.mul_(0.5)
 
 
 def diffusion_loss(
     u: Tensor,
-    spacing: Optional[Tensor] = None,
+    mode: Optional[str] = None,
     sigma: Optional[float] = None,
-    mode: str = "central",
+    spacing: Optional[Union[Scalar, Array]] = None,
+    stride: Optional[ScalarOrTuple] = None,
     reduction: str = "mean",
 ) -> Tensor:
-    r"""Diffusion regularization loss."""
-    loss = grad_loss(u, p=2, q=1, spacing=spacing, sigma=sigma, mode=mode, reduction=reduction)
+    r"""Diffusion regularization loss.
+
+    Args:
+        u: Batch of vector fields as tensor of shape ``(N, D, ..., X)``. When a tensor with less than
+            four dimensions is given, it is assumed to be a linear transformation and zero is returned.
+        mode: Method used to approximate :func:`flow_derivatives()`.
+        sigma: Standard deviation of Gaussian in grid units used to smooth vector field.
+        spacing: Step size to use when computing finite differences.
+        stride: Number of output grid points between control points plus one for ``mode='bspline'``.
+        reduction: Specifies the reduction to apply to the output: 'none' | 'mean' | 'sum'.
+
+    Returns:
+        Diffusion regularization loss of vector fields.
+
+    """
+    kwargs = dict(mode=mode, sigma=sigma, spacing=spacing, stride=stride)
+    loss = grad_loss(u, p=2, q=1, reduction=reduction, **kwargs)
     return loss.mul_(0.5)
 
 
 def divergence_loss(
     u: Tensor,
-    q: Optional[Union[int, float]] = 1,
-    spacing: Optional[Array] = None,
+    mode: Optional[str] = None,
     sigma: Optional[float] = None,
-    mode: str = "central",
+    spacing: Optional[Union[Scalar, Array]] = None,
+    stride: Optional[ScalarOrTuple] = None,
     reduction: str = "mean",
 ) -> Tensor:
-    r"""Loss term encouraging divergence-free vector fields."""
+    r"""Loss term encouraging divergence-free vector fields.
+
+    Args:
+        u: Batch of vector fields as tensor of shape ``(N, D, ..., X)``. When a tensor with less than
+            four dimensions is given, it is assumed to be a linear transformation and zero is returned.
+        mode: Method used to approximate :func:`flow_derivatives()`.
+        sigma: Standard deviation of Gaussian in grid units used to smooth vector field.
+        spacing: Step size to use when computing finite differences.
+        stride: Number of output grid points between control points plus one for ``mode='bspline'``.
+        reduction: Specifies the reduction to apply to the output: 'none' | 'mean' | 'sum'.
+
+    Returns:
+        Divergence loss of vector fields.
+
+    """
     if u.ndim < 4:
         # No loss for homogeneous coordinate transformations
         if reduction == "none":
@@ -1350,15 +1365,10 @@ def divergence_loss(
                 "divergence_loss() not implemented for linear transformation and reduction='none'"
             )
         return torch.tensor(0, dtype=u.dtype, device=u.device)
-    D = u.shape[1]
-    if u.ndim - 2 != D:
-        raise ValueError(f"divergence_loss() 'u' must be tensor of shape (N, {u.ndim - 2}, ..., X)")
-    derivs = spatial_derivatives(u, mode=mode, order=1, sigma=sigma, spacing=spacing)
-    derivs = torch.cat([deriv.unsqueeze(-1) for deriv in derivs.values()], dim=-1)
-    loss = derivs.sum(dim=-1)
-    loss = loss.abs_() if q < 2 else loss.pow_(q)
+    kwargs = dict(mode=mode, sigma=sigma, spacing=spacing, stride=stride)
+    loss = divergence(u, **kwargs).square_()
     loss = reduce_loss(loss, reduction)
-    return loss
+    return loss.mul_(0.5)
 
 
 def lame_parameters(
@@ -1462,8 +1472,12 @@ def lame_parameters(
         )
     if first_parameter < 0:
         raise ValueError("lame_parameter() 'first_parameter' is negative")
+    elif first_parameter < 1e-9:
+        first_parameter = 0
     if second_parameter < 0:
         raise ValueError("lame_parameter() 'second_parameter' is negative")
+    elif second_parameter < 1e-9:
+        second_parameter = 0
     return first_parameter, second_parameter
 
 
@@ -1475,9 +1489,10 @@ def elasticity_loss(
     shear_modulus: Optional[float] = None,
     poissons_ratio: Optional[float] = None,
     youngs_modulus: Optional[float] = None,
-    spacing: Optional[Array] = None,
+    mode: Optional[str] = None,
     sigma: Optional[float] = None,
-    mode: str = "sobel",
+    spacing: Optional[Union[Scalar, Array]] = None,
+    stride: Optional[ScalarOrTuple] = None,
     reduction: str = "mean",
 ) -> Tensor:
     r"""Loss term based on Navier-Cauchy PDE of linear elasticity.
@@ -1495,9 +1510,10 @@ def elasticity_loss(
         shear_modulus: Shear modulus, i.e., Lame's second parameter.
         poissons_ratio: Poisson's ratio.
         youngs_modulus: Young's modulus.
-        spacing: Sampling grid spacing.
-        sigma: Standard deviation of Gaussian in grid units (cf. ``spatial_derivatives()``).
-        mode: Method used to approximate spatial derivatives (cf. ``spatial_derivatives()``).
+        mode: Method used to approximate :func:`flow_derivatives()`.
+        sigma: Standard deviation of Gaussian in grid units used to smooth vector field.
+        spacing: Step size to use when computing finite differences.
+        stride: Number of output grid points between control points plus one for ``mode='bspline'``.
         reduction: Specifies the reduction to apply to the output: 'none' | 'mean' | 'sum'.
 
     Returns:
@@ -1519,31 +1535,52 @@ def elasticity_loss(
                 "elasticity_loss() not implemented for linear transformation and reduction='none'"
             )
         return torch.tensor(0, dtype=u.dtype, device=u.device)
+    N = u.shape[0]
     D = u.shape[1]
     if u.ndim - 2 != D:
         raise ValueError(f"elasticity_loss() 'u' must be tensor of shape (N, {u.ndim - 2}, ..., X)")
-    derivs = spatial_derivatives(u, mode=mode, order=1, sigma=sigma, spacing=spacing)
-    derivs = [derivs[str(SpatialDim(i))] for i in range(D)]
-    loss = derivs[0].narrow(1, 0, 1).clone()
-    for i in range(1, D):
-        loss = loss.add_(derivs[i].narrow(1, i, 1))
-    loss = loss.square_().mul_(lambd / 2)
-    for j, k in itertools.product(range(D), repeat=2):
-        temp = derivs[j].narrow(1, k, 1).add(derivs[k].narrow(1, j, 1))
-        loss = loss.add_(temp.square_().mul_(mu / 4))
+    kwargs = dict(mode=mode, sigma=sigma, spacing=spacing, stride=stride)
+    which = FlowDerivativeKeys.jacobian(spatial_dims=D)
+    deriv = flow_derivatives(u, which=which, **kwargs)
+    loss = torch.zeros((N, 1) + u.shape[2:], dtype=u.dtype, device=u.device)
+    if lambd != 0:
+        for i in range(D):
+            loss = loss.add_(deriv[FlowDerivativeKeys.symbol(i, i)])
+        loss = loss.square_().mul_(lambd / 2)
+    if mu != 0:
+        for j, k in itertools.product(range(D), repeat=2):
+            djk = deriv[FlowDerivativeKeys.symbol(j, k)]
+            dkj = deriv[FlowDerivativeKeys.symbol(k, j)]
+            loss = loss.add_(djk.add(dkj).square_().mul_(mu / 4))
     loss = reduce_loss(loss, reduction)
     return loss
 
 
 def total_variation_loss(
     u: Tensor,
-    spacing: Optional[Tensor] = None,
+    mode: Optional[str] = None,
     sigma: Optional[float] = None,
-    mode: str = "central",
+    spacing: Optional[Union[Scalar, Array]] = None,
+    stride: Optional[ScalarOrTuple] = None,
     reduction: str = "mean",
 ) -> Tensor:
-    r"""Total variation regularization loss."""
-    return grad_loss(u, p=1, q=1, spacing=spacing, sigma=sigma, mode=mode, reduction=reduction)
+    r"""Total variation regularization loss.
+
+    Args:
+        u: Batch of vector fields as tensor of shape ``(N, D, ..., X)``. When a tensor with less than
+            four dimensions is given, it is assumed to be a linear transformation and zero is returned.
+        mode: Method used to approximate :func:`flow_derivatives()`.
+        sigma: Standard deviation of Gaussian in grid units used to smooth vector field.
+        spacing: Step size to use when computing finite differences.
+        stride: Number of output grid points between control points plus one for ``mode='bspline'``.
+        reduction: Specifies the reduction to apply to the output: 'none' | 'mean' | 'sum'.
+
+    Returns:
+        Total variation regularization loss of vector fields.
+
+    """
+    kwargs = dict(mode=mode, sigma=sigma, spacing=spacing, stride=stride)
+    return grad_loss(u, p=1, q=1, reduction=reduction, **kwargs)
 
 
 tv_loss = total_variation_loss

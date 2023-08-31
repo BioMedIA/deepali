@@ -11,7 +11,7 @@ class BSplineBending(BSplineLoss):
 
     def forward(self, params: Tensor) -> Tensor:
         r"""Evaluate loss term for given free form deformation parameters."""
-        return L.bspline_bending_loss(params, stride=self.stride, reduction=self.reduction)
+        return L.bending_loss(params, mode="bspline", stride=self.stride, reduction=self.reduction)
 
 
 BSplineBendingEnergy = BSplineBending
