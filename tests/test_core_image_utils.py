@@ -3,6 +3,7 @@ import os
 import pytest
 import torch
 from torch import Tensor
+import torch.nn.functional as F
 
 from deepali.core import functional as U
 from deepali.core import Grid
@@ -43,6 +44,68 @@ def test_fill_border():
     assert result[:, :, :, :, 8:].eq(1).all()
     assert result[:, :, 2:5, 1:4, 3:8].eq(0).all()
     assert result.sum() == 680
+
+
+def test_finite_differences() -> None:
+    image = torch.randn((3, 2, 8, 16, 24))
+
+    # Forward difference scheme
+    image.requires_grad = True
+    deriv = U.finite_differences(image, "x", mode="forward")
+    assert isinstance(deriv, Tensor)
+    assert deriv.requires_grad is True
+    deriv = deriv.detach()
+    assert deriv.requires_grad is False
+    assert deriv.dtype.is_floating_point
+    assert deriv.shape == image.shape
+
+    expected = F.pad(image, (0, 1, 0, 0, 0, 0), mode="replicate")
+    expected = expected[..., 1:].sub(expected[..., :-1])
+    assert torch.allclose(deriv, expected)
+
+    # Backward difference scheme
+    image.requires_grad = False
+    deriv = U.finite_differences(image, "y", mode="backward")
+    assert isinstance(deriv, Tensor)
+    assert deriv.requires_grad is False
+    assert deriv.dtype.is_floating_point
+    assert deriv.shape == image.shape
+
+    expected = F.pad(image, (0, 0, 1, 0, 0, 0), mode="replicate")
+    expected = expected[..., 1:, :].sub(expected[..., :-1, :])
+    assert torch.allclose(deriv, expected)
+
+    # Central difference scheme
+    image.requires_grad = False
+    deriv = U.finite_differences(image, "z", mode="central")
+    assert isinstance(deriv, Tensor)
+    assert deriv.requires_grad is False
+    assert deriv.dtype.is_floating_point
+    assert deriv.shape == image.shape
+
+    expected = F.pad(image, (0, 0, 0, 0, 1, 1), mode="replicate")
+    expected = expected[:, :, 2:, :, :].sub(expected[:, :, :-2, :, :]).div(2)
+    assert torch.allclose(deriv, expected)
+
+    # Forward-central-backward difference scheme
+    deriv = U.finite_differences(image, "z", mode="forward_central_backward")
+    assert isinstance(deriv, Tensor)
+    assert deriv.requires_grad is False
+    assert deriv.dtype.is_floating_point
+    assert deriv.shape == image.shape
+
+    expected = torch.cat(
+        [
+            image[:, :, 1:2, :, :].sub(image[:, :, :1, :, :]),
+            image[:, :, 2:, :, :].sub(image[:, :, :-2, :, :]).div(2),
+            image[:, :, -1:, :, :].sub(image[:, :, -2:-1, :, :]),
+        ],
+        dim=2,
+    )
+    assert torch.allclose(deriv, expected)
+
+    # Zero-th order
+    assert U.finite_differences(image, "x", mode="central", order=0) is image
 
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA not available")

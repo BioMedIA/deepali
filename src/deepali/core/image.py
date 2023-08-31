@@ -1,5 +1,6 @@
 r"""Functions relating to tensors representing images."""
 
+import itertools
 import math
 from typing import Dict, Optional, Sequence, Union
 
@@ -1455,24 +1456,33 @@ def sample_image(
 
 def spatial_derivatives(
     data: Tensor,
-    mode: str = "central",
     which: Optional[Union[str, Sequence[str]]] = None,
     order: Optional[int] = None,
+    mode: Optional[str] = None,
     sigma: Optional[float] = None,
     spacing: Optional[Union[Scalar, Array]] = None,
+    stride: Optional[ScalarOrTuple[int]] = None,
 ) -> Dict[str, Tensor]:
     r"""Calculate spatial image derivatives.
 
     Args:
         data: Image data tensor of shape ``(N, C, ..., X)``.
-        mode: Method to use for approximating spatial image derivative.
-            If ``forward``, ``backward``, or ``central``, the respective finite difference
-            scheme is used to approximate the image derivative, optionally after smoothing
-            the input image with a Gaussian kernel. If ``gaussian``, the image derivative
-            is computed by convolving the image with a derivative of Gaussian kernel.
-            If ``None``, a central difference scheme is used by default.
         which: String codes of spatial deriviatives to compute. See ``SpatialDerivativeKeys``.
         order: Order of spatial derivative. If zero, the input ``data`` is returned.
+        mode: Method to use for approximating spatial image derivative.
+            If ``forward``, ``backward``, ``central``, or ``forward_central_backward``,
+            the respective finite difference scheme is used to approximate the image derivative,
+            optionally after smoothing the input image with a Gaussian kernel if ``sigma`` is a
+            positive number. The ``forward_central_backward`` finite difference scheme consists
+            of forward differences at the lower boundary, a backward differences at the upper
+            boundary, and central differences in between. If ``gaussian``, the image derivative
+            is computed by convolving the image with a derivative of Gaussian kernel.
+            If ``bspline``, the input ``data`` is used as coefficients of a cubic B-spline
+            function, with the number of coefficients along each dimension equal the size of
+            the output tensor along this dimension plus one coefficient at the lower bound, and
+            plus two additional coefficients at the upper bound. In other words, the output tensor
+            will have a spatial size minus three with respect to the input ``data`` tensor.
+            If ``None``, ``forward_central_backward`` is used as default mode.
         sigma: Standard deviation of Gaussian kernel in grid units. If ``None`` or zero,
             no Gaussian smoothing is used for calculation of finite differences, and a
             default standard deviation of 0.4 is used when ``mode="gaussian"``.
@@ -1484,19 +1494,28 @@ def spatial_derivatives(
             tensor must be given, where the size of the first dimension is equal to ``N``. The second
             dimension can have either size 1 for an isotropic spacing, or ``D`` in case of an
             anisotropic grid spacing.
+        stride: Number of output grid points between control points plus one for ``mode='bspline'``.
+            If a sequence of values is given, these must be the strides for the different spatial
+            dimensions in the order ``(sx, ...)``. A stride of 1 is equivalent to evaluating partial
+            derivatives only at the usually coarser resolution of the control point grid. It should
+            be noted that the stride need not match the stride used to densely sample the spline at
+            a given fixed target image resolution.
 
     Returns:
         Mapping from spatial derivative keys to corresponding tensors of the respective spatial
         image derivatives of shape ``(N, C, ..., X)``. The keys are sequences of letters identifying
         the spatial dimensions along which a derivative was taken (cf. ``SpatialDerivativeKeys``).
+        If ``mode='bspline'``, the output size is ``X - 3`` for each spatial dimension.
 
     """
     if not isinstance(data, Tensor):
         raise TypeError("spatial_derivatives() 'data' must be torch.Tensor")
     if data.ndim < 4:
-        raise ValueError("spatial_derivatives() 'data' must have shape (N, C, ..., X)")
+        raise ValueError("spatial_derivatives() 'data' must be at least 4-dimensional")
+
     N = data.shape[0]
     D = data.ndim - 2
+
     if spacing is None:
         spacing = torch.ones((N, D), dtype=torch.float, device=torch.device("cpu"))
     else:
@@ -1510,6 +1529,7 @@ def spatial_derivatives(
                 f" or 2-dimensional array of shape (1, {D}), ({N}, 1), or ({N}, {D})"
             )
         spacing = spacing.expand(N, D)
+
     if isinstance(which, str):
         which = (which,)
     if which is None:
@@ -1518,16 +1538,20 @@ def spatial_derivatives(
         which = SpatialDerivativeKeys.all(ndim=D, order=order)
     elif order is not None:
         which = [arg for arg in which if len(arg) == order]
-    unique_keys = SpatialDerivativeKeys.unique(which)
-    max_order = SpatialDerivativeKeys.max_order(which)
+
     derivs = {}
     if not which:
         return derivs
-    if not data.is_floating_point():
-        data = data.type(torch.float)
+
+    unique_keys = SpatialDerivativeKeys.unique(which)
+    max_order = SpatialDerivativeKeys.max_order(which)
+
+    data = data.float()
+
     if mode is None:
-        mode = "central"
-    if mode in ("forward", "backward", "central", "prewitt", "sobel"):
+        mode = "forward_central_backward"
+
+    if mode in ("forward", "backward", "central", "forward_central_backward", "prewitt", "sobel"):
         if sigma and sigma > 0:
             blur = gaussian1d(sigma, dtype=torch.float, device=data.device)
             data = conv(data, blur, padding=PaddingMode.ZEROS)
@@ -1535,29 +1559,63 @@ def spatial_derivatives(
             avg_kernel = torch.tensor([1, 1 if mode == "prewitt" else 2, 1], dtype=data.dtype)
             avg_kernel /= avg_kernel.sum()
             avg_kernel = avg_kernel.to(data.device)
-            fd_mode = "central"
+            fd_mode = "forward_central_backward"
         else:
             avg_kernel = None
             fd_mode = mode
-        for i in range(max_order):
-            for code in unique_keys:
-                key = code[: i + 1]
-                if i < len(code) and key not in derivs:
-                    sdim = SpatialDim.from_arg(code[i])
-                    result = data if i == 0 else derivs[code[:i]]
-                    if avg_kernel is not None:
-                        for d in (d for d in range(D) if d != sdim):
-                            dim = SpatialDim(d).tensor_dim(result.ndim)
-                            result = conv1d(
-                                result,
-                                avg_kernel,
-                                dim=dim,
-                                padding=len(avg_kernel) // 2,
-                            )
-                    fd_spacing = spacing[:, sdim]
-                    result = finite_differences(result, sdim, mode=fd_mode, spacing=fd_spacing)
-                    derivs[key] = result
+        for i, code in itertools.product(range(max_order), unique_keys):
+            key = code[: i + 1]
+            if i < len(code) and key not in derivs:
+                sdim = SpatialDim.from_arg(code[i])
+                result = data if i == 0 else derivs[code[:i]]
+                if avg_kernel is not None:
+                    for d in (d for d in range(D) if d != sdim):
+                        dim = SpatialDim(d).tensor_dim(result.ndim)
+                        result = conv1d(
+                            result,
+                            avg_kernel,
+                            dim=dim,
+                            padding=len(avg_kernel) // 2,
+                        )
+                fd_spacing = spacing[:, sdim]
+                result = finite_differences(result, sdim, mode=fd_mode, spacing=fd_spacing)
+                derivs[key] = result
         derivs = {key: derivs[SpatialDerivativeKeys.sorted(key)] for key in which}
+
+    elif mode == "bspline":
+        from .bspline import cubic_bspline_interpolation_weights, evaluate_cubic_bspline
+
+        if sigma and sigma > 0:
+            blur = gaussian1d(sigma, dtype=torch.float, device=data.device)
+            data = conv(data, blur, padding=PaddingMode.ZEROS)
+
+        if stride is None:
+            stride = 1
+        if isinstance(stride, int):
+            stride = (stride,) * D
+
+        kernels = {}
+
+        def bspline1d(s: int, d: int) -> Tensor:
+            key = (s, d)
+            kernel = kernels.get(key, None)
+            if kernel is None:
+                kernel = cubic_bspline_interpolation_weights(
+                    stride=s,
+                    derivative=d,
+                    dtype=data.dtype,
+                    device=data.device,
+                )
+                kernels[key] = kernel
+            return kernel
+
+        for code in unique_keys:
+            order = [0] * D
+            for spatial_dim in SpatialDerivativeKeys.split(code):
+                order[spatial_dim] += 1
+            kernel = [bspline1d(s, d) for s, d in zip(stride, order)]
+            derivs[code] = evaluate_cubic_bspline(data, kernel=kernel)
+
     elif mode == "gaussian":
         if not sigma:
             sigma = 0.4
@@ -1578,17 +1636,19 @@ def spatial_derivatives(
                         result = conv1d(result, kernel, dim=dim, padding=len(kernel) // 2)
                     derivs[key] = result
         derivs = {key: derivs[SpatialDerivativeKeys.sorted(key)] for key in which}
+
     else:
         raise ValueError(
             "spatial_derivatives() 'mode' must be 'forward', 'backward', 'central', or 'gaussian'"
         )
+
     return derivs
 
 
 def finite_differences(
     data: Tensor,
     sdim: SpatialDimArg,
-    mode: str = "central",
+    mode: str = "forward_central_backward",
     order: int = 1,
     dilation: int = 1,
     spacing: Union[float, Sequence[float]] = 1,
@@ -1622,41 +1682,78 @@ def finite_differences(
         raise TypeError("finite_differences() 'dilation' must be int")
     if dilation < 1:
         raise ValueError("finite_differences() 'dilation' must be positive")
-    spatial_dim = SpatialDim.from_arg(sdim)
-    dim = spatial_dim.tensor_dim(data.ndim)
-    if mode not in ("forward", "backward", "central"):
-        raise ValueError("finite_differences() 'mode' must be 'forward', 'backward', or 'central'")
+    if mode not in ("forward", "backward", "central", "forward_central_backward"):
+        raise ValueError(
+            "finite_differences() 'mode' must be"
+            " 'forward', 'backward', 'central', or 'forward_central_backward'"
+        )
+
     if order == 0:
         return data
+
+    N = data.shape[0]
+    spatial_dim = SpatialDim.from_arg(sdim)
+    dim = spatial_dim.tensor_dim(data.ndim)
+
+    step_size: Tensor = torch.atleast_1d(as_tensor(spacing, dtype=data.dtype, device=data.device))
+    if step_size.ndim > 1 or step_size.shape[0] not in (1, N):
+        raise ValueError(f"finite_differences() 'spacing' must be scalar or sequence of length {N}")
+
+    data = data.float()
+
+    def pad_spatial_dim(data: Tensor, left: int, right: int) -> Tensor:
+        pad = [(left, right) if d == spatial_dim else (0, 0) for d in range(data.ndim - 2)]
+        pad = [n for v in pad for n in v]
+        return F.pad(data, pad, mode="replicate")
+
+    def finite_difference(data: Tensor, i: slice, j: slice) -> Tensor:
+        h = step_size.mul(j.start - i.start)
+        h = h.reshape((h.shape[0],) + (1,) * (data.ndim - 1))
+        a = tuple((i if d == dim else slice(0, n, 1) for d, n in enumerate(data.shape)))
+        b = tuple((j if d == dim else slice(0, n, 1) for d, n in enumerate(data.shape)))
+        return data[b].sub(data[a]).div_(h)
+
     if order == 1:
         if mode == "forward":
+            data = pad_spatial_dim(data, 0, dilation)
             i = slice(0, data.shape[dim] - dilation, 1)
             j = slice(dilation, data.shape[dim], 1)
-            p = (0, dilation)
+            deriv = finite_difference(data, i, j)
         elif mode == "backward":
-            i = slice(dilation, data.shape[dim], 1)
-            j = slice(0, data.shape[dim] - dilation, 1)
-            p = (dilation, 0)
-        else:
+            data = pad_spatial_dim(data, dilation, 0)
+            i = slice(0, data.shape[dim] - dilation, 1)
+            j = slice(dilation, data.shape[dim], 1)
+            deriv = finite_difference(data, i, j)
+        elif mode == "central":
+            data = pad_spatial_dim(data, dilation, dilation)
             i = slice(0, data.shape[dim] - 2 * dilation, 1)
             j = slice(2 * dilation, data.shape[dim], 1)
-            p = (dilation, dilation)
+            deriv = finite_difference(data, i, j)
+        else:
+            if data.shape[dim] < 2 * dilation:
+                raise ValueError(
+                    "finite_differences() mode 'forward_central_backward' requires spatial"
+                    " dimension to have size of at least twice the 'dilation' step size"
+                    " used to calculate finite differences"
+                )
+            # forward differences at lower boundary
+            i = slice(0, dilation, 1)
+            j = slice(dilation, 2 * dilation, 1)
+            lower = finite_difference(data, i, j)
+            # central differences within boundaries
+            i = slice(0, data.shape[dim] - 2 * dilation, 1)
+            j = slice(2 * dilation, data.shape[dim], 1)
+            deriv = finite_difference(data, i, j)
+            # backward differences at upper boundary
+            i = slice(data.shape[dim] - 2 * dilation, data.shape[dim] - dilation, 1)
+            j = slice(data.shape[dim] - dilation, data.shape[dim], 1)
+            upper = finite_difference(data, i, j)
+            # concatenate computed derivatives
+            deriv = torch.cat([lower, deriv, upper], dim=dim)
     else:
         raise NotImplementedError(f"finite_differences(..., order={order})")
-    i = tuple((i if d == dim else slice(0, n, 1) for d, n in enumerate(data.shape)))
-    j = tuple((j if d == dim else slice(0, n, 1) for d, n in enumerate(data.shape)))
-    N = data.shape[0]
-    data = data.float()
-    deriv = data[j].sub(data[i])
-    denom: Tensor = torch.atleast_1d(as_tensor(spacing, dtype=data.dtype, device=data.device))
-    if denom.ndim > 1 or denom.shape[0] not in (1, N):
-        raise ValueError(f"finite_differences() 'spacing' must be scalar or sequence of length {N}")
-    denom = denom.mul((2 if mode == "central" else 1) * dilation)
-    denom = denom.reshape((denom.shape[0],) + (1,) * (deriv.ndim - 1))
-    deriv = deriv.div(denom)
-    pad = [p if d == spatial_dim else (0, 0) for d in range(data.ndim - 2)]
-    pad = [n for v in pad for n in v]
-    return F.pad(deriv, pad, mode="constant", value=0)
+
+    return deriv
 
 
 def _image_size(
