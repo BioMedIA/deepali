@@ -12,6 +12,7 @@ from .basic import Pad
 from .basic import Reshape
 from .basic import View
 
+from .flow import Curl
 from .flow import ExpFlow
 
 from .image import BlurImage
@@ -37,6 +38,7 @@ from .utilities import rename_layers_in_state_dict
 __all__ = (
     "AlignImage",
     "BlurImage",
+    "Curl",
     "DeviceProperty",
     "ExpFlow",
     "FilterImage",
