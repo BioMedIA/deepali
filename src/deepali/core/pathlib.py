@@ -1,5 +1,6 @@
 r"""File path utility functions."""
 
+from errno import ENOTEMPTY
 import os
 from os import rmdir
 from pathlib import Path
@@ -79,7 +80,12 @@ def delete(path: PathStr, non_empty: bool = True) -> bool:
         if non_empty:
             rmtree(path)
         else:
-            rmdir(path)
+            try:
+                rmdir(path)
+            except OSError as error:
+                if error.errno == ENOTEMPTY:
+                    return False
+                raise
     else:
         try:
             path.unlink()
