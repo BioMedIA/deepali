@@ -22,7 +22,7 @@ def read_polydata(path: PathUri) -> vtkPolyData:
     with StorageObject.from_path(path) as obj:
         if not obj.is_file():
             raise FileNotFoundError(f"File not found: {obj.uri}")
-        obj = obj.pull()
+        obj = obj.pull(force=True)
         if not obj.path.is_file():
             raise FileNotFoundError(f"File not found: {obj.path}")
         suffix = obj.path.suffix.lower()
