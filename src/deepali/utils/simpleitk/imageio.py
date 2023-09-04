@@ -7,7 +7,7 @@ import SimpleITK as sitk
 def read_image(path: PathUri) -> sitk.Image:
     r"""Read image from file."""
     with StorageObject.from_path(path) as obj:
-        if not path.exists():
+        if not obj.is_file():
             raise FileNotFoundError(f"No such file or no access: '{path}'")
         obj.pull(force=True)
         image = sitk.ReadImage(str(obj.path))
