@@ -282,7 +282,7 @@ def gaussian1d(
     else:
         if scale is None:
             scale = 1
-        kernel = as_tensor(scale, dtype=dtype, device=device)
+        kernel = as_tensor([scale], dtype=dtype, device=device)
     return kernel
 
 
