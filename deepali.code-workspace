@@ -21,6 +21,7 @@
 			"grapecity.gc-excelviewer",
 			// Git
 			"eamodio.gitlens",
+			"github.vscode-github-actions",
 			// Markdown
 			"yzhang.markdown-all-in-one",
 			"shd101wyy.markdown-preview-enhanced",
