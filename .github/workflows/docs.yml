@@ -5,6 +5,10 @@ on:
     branches:
       - main
       - docs
+    paths:
+      - docs/**
+      - examples/**
+      - src/**
   workflow_dispatch:
 
 permissions:
