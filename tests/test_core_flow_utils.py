@@ -1,9 +1,14 @@
+from typing import Optional, Sequence
+
+import pytest
 import torch
 import torch.nn.functional as F
 from torch import Tensor
+from torch.random import Generator
 
 from deepali.core import Grid
 from deepali.core.enum import FlowDerivativeKeys
+import deepali.core.bspline as B
 import deepali.core.functional as U
 
 
@@ -81,6 +86,17 @@ def periodic_flow_divergence(p: Tensor) -> Tensor:
     du_dx = periodic_flow_du_dx(p)
     dv_dy = periodic_flow_dv_dy(p)
     return du_dx.add(dv_dy)
+
+
+def random_svf(
+    size: Sequence[int],
+    stride: int = 1,
+    generator: Optional[Generator] = None,
+) -> Tensor:
+    cp_grid_size = B.cubic_bspline_control_point_grid_size(size, stride=stride)
+    data = torch.randn((1, 3) + cp_grid_size, generator=generator)
+    data = U.fill_border(data, margin=3, value=0, inplace=True)
+    return B.evaluate_cubic_bspline(data, size=size, stride=stride)
 
 
 def difference(a: Tensor, b: Tensor, margin: int = 0) -> Tensor:
@@ -380,3 +396,90 @@ def test_flow_jacobian() -> None:
         jac[[slice(None)] + interior].det(),
         atol=0.01,
     )
+
+
+def test_flow_lie_bracket() -> None:
+    p = U.move_dim(Grid(size=(64, 32, 16)).coords().unsqueeze_(0), -1, 1)
+
+    x = p.narrow(1, 0, 1)
+    y = p.narrow(1, 1, 1)
+    z = p.narrow(1, 2, 1)
+
+    # u = [yz, xz, xy] and v = [x, y, z]
+    u = torch.cat([y.mul(z), x.mul(z), x.mul(y)], dim=1)
+    v = torch.cat([x, y, z], dim=1)
+    w = u
+
+    lb_uv = U.lie_bracket(u, v)
+    assert torch.allclose(U.lie_bracket(v, u), lb_uv.neg())
+    assert U.lie_bracket(u, u).abs().lt(1e-6).all()
+    assert torch.allclose(lb_uv, w, atol=1e-6)
+
+    # u = [z^2, 0, xy] and v = [0, x + y^3, yz]
+    u = torch.cat([z.square(), torch.zeros_like(y), x.mul(y)], dim=1)
+    v = torch.cat([torch.zeros_like(x), x.add(y.pow(3)), y.mul(z)], dim=1)
+    w = torch.cat([-2 * y * z**2, z**2, x * y**2 - x**2 - x * y**3], dim=1).neg_()
+
+    lb_uv = U.lie_bracket(u, v)
+    assert torch.allclose(U.lie_bracket(v, u), lb_uv.neg())
+    assert U.lie_bracket(u, u).abs().lt(1e-6).all()
+    error = difference(lb_uv, w).abs()
+    assert error[:, :, 1:-1, 1:-1, 1:-1].max().lt(1e-5)
+    assert error.max().lt(0.134)
+
+
+def test_flow_compose_svfs() -> None:
+    # 3D flow fields
+    p = U.move_dim(Grid(size=(64, 32, 16)).coords().unsqueeze_(0), -1, 1)
+
+    x = p.narrow(1, 0, 1)
+    y = p.narrow(1, 1, 1)
+    z = p.narrow(1, 2, 1)
+
+    with pytest.raises(ValueError):
+        U.compose_svfs(p, p, bch_terms=-1)
+    with pytest.raises(ValueError):
+        U.compose_svfs(p, p, bch_terms=0)
+    with pytest.raises(ValueError):
+        U.compose_svfs(p, p, bch_terms=1)
+    with pytest.raises(NotImplementedError):
+        U.compose_svfs(p, p, bch_terms=7)
+
+    # u = [yz, xz, xy] and v = u
+    u = v = torch.cat([y.mul(z), x.mul(z), x.mul(y)], dim=1)
+
+    w = U.compose_svfs(u, v, bch_terms=2)
+    assert torch.allclose(w, u.add(v))
+    w = U.compose_svfs(u, v, bch_terms=3)
+    assert torch.allclose(w, u.add(v))
+    w = U.compose_svfs(u, v, bch_terms=4)
+    assert torch.allclose(w, u.add(v))
+    w = U.compose_svfs(u, v, bch_terms=5)
+    assert torch.allclose(w, u.add(v))
+    w = U.compose_svfs(u, v, bch_terms=6)
+    assert torch.allclose(w, u.add(v), atol=1e-5)
+
+    # u = [yz, xz, xy] and v = [x, y, z]
+    u = torch.cat([y.mul(z), x.mul(z), x.mul(y)], dim=1)
+    v = torch.cat([x, y, z], dim=1)
+
+    w = U.compose_svfs(u, v, bch_terms=2)
+    assert torch.allclose(w, u.add(v))
+    w = U.compose_svfs(u, v, bch_terms=3)
+    assert torch.allclose(w, u.mul(0.5).add(v), atol=1e-6)
+
+    # u = random_svf(), u -> 0 at boundary
+    # v = random_svf(), v -> 0 at boundary
+    size = (64, 64, 64)
+    generator = torch.Generator().manual_seed(42)
+    u = random_svf(size, stride=4, generator=generator).mul_(0.1)
+    v = random_svf(size, stride=4, generator=generator).mul_(0.05)
+    w = U.compose_svfs(u, v, bch_terms=6)
+
+    flow_u = U.expv(u)
+    flow_v = U.expv(v)
+    flow_w = U.expv(w)
+    flow = U.compose_flows(flow_u, flow_v)
+
+    error = flow_w.sub(flow).norm(dim=1)
+    assert error.max().lt(0.01)

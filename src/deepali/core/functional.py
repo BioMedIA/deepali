@@ -93,6 +93,7 @@ from .image import zeros_image
 
 from .flow import affine_flow
 from .flow import compose_flows
+from .flow import compose_svfs
 from .flow import curl
 from .flow import denormalize_flow
 from .flow import divergence
@@ -102,6 +103,7 @@ from .flow import flow_derivatives
 from .flow import jacobian_det
 from .flow import jacobian_dict
 from .flow import jacobian_matrix
+from .flow import lie_bracket
 from .flow import normalize_flow
 from .flow import sample_flow
 from .flow import warp_grid
@@ -182,6 +184,7 @@ __all__ = (
     "closest_point_distances",
     "closest_point_indices",
     "compose_flows",
+    "compose_svfs",
     "conv",
     "conv1d",
     "crop",
@@ -216,6 +219,7 @@ __all__ = (
     "jacobian_det",
     "jacobian_dict",
     "jacobian_matrix",
+    "lie_bracket",
     "max_pool",
     "min_pool",
     "normalize_flow",
