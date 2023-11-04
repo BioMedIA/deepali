@@ -1,0 +1,85 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"extensions": {
+		"recommendations": [
+			// Python
+			"ms-python.python",
+			"ms-python.vscode-pylance",
+			"ms-toolsai.jupyter",
+			// Remote SSH
+			"ms-vscode-remote.remote-ssh",
+			"ms-vscode-remote.remote-ssh-edit",
+			// Code completion
+			"visualstudioexptteam.vscodeintellicode",
+			// Docker
+			"ms-azuretools.vscode-docker",
+			// Tables (e.g. CSV)
+			"grapecity.gc-excelviewer",
+			// Git
+			"eamodio.gitlens",
+			// Markdown
+			"yzhang.markdown-all-in-one",
+			"shd101wyy.markdown-preview-enhanced",
+		]
+	},
+	"settings": {
+		"files.exclude": {
+			"**/__pycache__": true,
+			"**/.ipynb_checkpoints": true,
+			"**/.git": true,
+			"**/.DS_Store": true,
+			"**/._.DS_Store": true,
+			"**/.pytest_cache": true,
+			"**/*.egg-info": true,
+			".venv": true
+		},
+		"editor.formatOnSave": false,
+		"[python]": {
+			"editor.formatOnSave": true,
+			"editor.formatOnSaveMode": "file",
+			"editor.defaultFormatter": "ms-python.black-formatter",
+		},
+		"python.testing.unittestEnabled": false,
+		"python.testing.pytestEnabled": true,
+	},
+	"launch": {
+		// Use IntelliSense to learn about possible attributes.
+		// Hover to view descriptions of existing attributes.
+		// For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+		"version": "0.2.0",
+		"configurations": [
+			{
+				"name": "FFD: register",
+				"type": "python",
+				"request": "launch",
+				"program": "register.py",
+				"console": "integratedTerminal",
+				"args": [
+					"--config", "params.yaml",
+					"--target-seg", "seg_00.nii.gz",
+					"--source-seg", "seg_25.nii.gz",
+					"--output", "transform.pt",
+					"--debug-dir", "debug",
+					"--debug", "0",  // 3: write all interim files
+					"--verbose", "1",  // 3: highest verbosity
+					"--device", "cuda",
+				],
+				"cwd": "${workspaceFolder}/examples/ffd",
+				"env": {"CUDA_LAUNCH_BLOCKING": "0", "CUDA_VISIBLE_DEVICES": "0"},
+			},
+			{
+				"name": "ISTN: train",
+				"type": "python",
+				"request": "launch",
+				"program": "train.py",
+				"console": "integratedTerminal",
+				"cwd": "${workspaceFolder}/examples/istn",
+				"args": ["--config", "params.yaml"],
+			}
+		]
+	}
+}
