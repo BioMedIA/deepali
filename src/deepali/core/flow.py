@@ -64,6 +64,79 @@ def compose_flows(u: Tensor, v: Tensor, align_corners: bool = True) -> Tensor:
     return u.add(v)
 
 
+def compose_svfs(
+    u: Tensor,
+    v: Tensor,
+    mode: Optional[str] = None,
+    sigma: Optional[float] = None,
+    spacing: Optional[Union[Scalar, Array]] = None,
+    stride: Optional[ScalarOrTuple[int]] = None,
+    bch_terms: int = 4,
+) -> Tensor:
+    r"""Approximate stationary velocity field (SVF) of composite deformation.
+
+    The output velocity field is ``w = log(exp(v) o exp(u))``, where ``exp`` is the exponential map
+    of a stationary velocity field, and ``log`` its inverse. The velocity field ``w`` is given by the
+    `Baker-Campbell-Hausdorff (BCH) formula <https://en.wikipedia.org/wiki/Baker%E2%80%93Campbell%E2%80%93Hausdorff_formula>`_.
+
+    References:
+    - Vercauteren, 2008. Symmetric Log-Domain Diffeomorphic Registration: A Demons-based Approach.
+        doi:10.1007/978-3-540-85988-8_90
+
+    Args:
+        u: First applied stationary velocity field as tensor of shape ``(N, D, ..., X)``.
+        v: Second applied stationary velocity field as tensor of shape ``(N, D, ..., X)``.
+        bch_terms: Number of terms of the BCH formula to consider. Must be at least 2.
+            When 2, the returned velocity field is the sum of ``u`` and ``v``.
+            This approximation is accurate if the input velocity fields commute, i.e.,
+            the Lie bracket [v, u] = 0. When ``bch_terms=3``, the approximation is given by
+            ``w = v + u + 1/2 [v, u]`` (note that deformation ``exp(u)`` is applied first),
+            and when ``bch_terms=4``, it is ``w = v + u + 1/2 [v, u] + 1/12 [v, [v, u]]``.
+        mode: Mode of :func:`flow_derivatives()` approximation.
+        sigma: Standard deviation of Gaussian used for computing spatial derivatives.
+        spacing: Physical size of image voxels used to compute spatial derivatives.
+        stride: Number of output grid points between control points plus one for ``mode='bspline'``.
+
+    Returns:
+        Approximation of BCH formula as tensor of shape ``(N, D, ..., X)``.
+
+    """
+
+    def lb(a: Tensor, b: Tensor) -> Tensor:
+        return lie_bracket(a, b, mode=mode, sigma=sigma, spacing=spacing, stride=stride)
+
+    for name, flow in [("u", u), ("v", v)]:
+        if flow.ndim < 4:
+            raise ValueError(
+                f"compose_svfs() '{name}' must be vector field of shape (N, D, ..., X)"
+            )
+        if flow.shape[1] != flow.ndim - 2:
+            raise ValueError(f"compose_svfs() '{name}' must have shape (N, D, ..., X)")
+    if u.shape != v.shape:
+        raise ValueError("compose_svfs() 'u' and 'v' must have the same shape")
+    if bch_terms < 2:
+        raise ValueError("compose_svfs() 'bch_terms' must be at least 2")
+    elif bch_terms > 6:
+        raise NotImplementedError("compose_svfs() 'bch_terms' of more than 6 not implemented")
+
+    w = v.add(u)
+    if bch_terms >= 3:
+        vu = lb(v, u)
+        w = w.add(vu.mul(0.5))
+    if bch_terms >= 4:
+        vvu = lb(v, vu)
+        w = w.add(vvu.mul(1 / 12))
+    if bch_terms >= 5:
+        uv = lb(u, v)
+        uuv = lb(u, uv)
+        w = w.add(uuv.mul(1 / 12))
+    if bch_terms >= 6:
+        uvvu = lb(u, vvu)
+        w = w.sub(uvvu.mul(1 / 24))
+
+    return w
+
+
 def curl(
     flow: Tensor,
     mode: Optional[str] = None,
@@ -506,6 +579,71 @@ def jacobian_matrix(
     jac = move_dim(jac, 1, -1)
     jac = jac.reshape(jac.shape[:-1] + (D, D))
     return jac.contiguous()
+
+
+def lie_bracket(
+    v: Tensor,
+    u: Tensor,
+    mode: Optional[str] = None,
+    sigma: Optional[float] = None,
+    spacing: Optional[Union[Scalar, Array]] = None,
+    stride: Optional[ScalarOrTuple[int]] = None,
+) -> Tensor:
+    r"""Lie bracket of two vector fields.
+
+    Evaluate Lie bracket given by ``[v, u] = Jac(v) * u - Jac(u) * v`` as defined in Eq (6)
+    of Vercauteren et al. (2008).
+
+        Most authors define the Lie bracket as the opposite of (6). Numerical simulations,
+        and personal communication with M. Bossa, showed the relevance of this definition.
+        Future research will aim at fully understanding the reason of this discrepancy.
+
+    References:
+    - Vercauteren, 2008. Symmetric Log-Domain Diffeomorphic Registration: A Demons-based Approach.
+        doi:10.1007/978-3-540-85988-8_90
+
+    Args:
+        u: Left vector field as tensor of shape ``(N, D, ..., X)``.
+        v: Right vector field as tensor of shape ``(N, D, ..., X)``.
+        mode: Mode of :func:`flow_derivatives()` approximation.
+        sigma: Standard deviation of Gaussian used for computing spatial derivatives.
+        spacing: Physical size of image voxels used to compute spatial derivatives.
+        stride: Number of output grid points between control points plus one for ``mode='bspline'``.
+
+    Returns:
+        Lie bracket of vector fields as tensor of shape ``(N, D, ..., X)``.
+
+    """
+    for name, flow in [("u", u), ("v", v)]:
+        if flow.ndim < 4:
+            raise ValueError(f"lie_bracket() '{name}' must be vector field of shape (N, D, ..., X)")
+        if flow.shape[1] != flow.ndim - 2:
+            raise ValueError(f"lie_bracket() '{name}' must have shape (N, D, ..., X)")
+    if u.shape != v.shape:
+        raise ValueError("lie_bracket() 'u' and 'v' must have the same shape")
+    jac_u = jacobian_dict(
+        u,
+        mode=mode,
+        sigma=sigma,
+        spacing=spacing,
+        stride=stride,
+    )
+    jac_v = jacobian_dict(
+        v,
+        mode=mode,
+        sigma=sigma,
+        spacing=spacing,
+        stride=stride,
+    )
+    D = flow.ndim - 2
+    w = torch.zeros_like(u)
+    for i in range(D):
+        w_i = w.narrow(1, i, 1)
+        for j in range(D):
+            w_i = w_i.add_(jac_v[(i, j)].mul(u.narrow(1, j, 1)))
+        for j in range(D):
+            w_i = w_i.sub_(jac_u[(i, j)].mul(v.narrow(1, j, 1)))
+    return w
 
 
 def normalize_flow(
