@@ -102,7 +102,6 @@ from .flow import flow_derivatives
 from .flow import jacobian_det
 from .flow import jacobian_dict
 from .flow import jacobian_matrix
-from .flow import jacobian_triu
 from .flow import normalize_flow
 from .flow import sample_flow
 from .flow import warp_grid
@@ -217,7 +216,6 @@ __all__ = (
     "jacobian_det",
     "jacobian_dict",
     "jacobian_matrix",
-    "jacobian_triu",
     "max_pool",
     "min_pool",
     "normalize_flow",

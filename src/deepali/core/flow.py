@@ -1,6 +1,6 @@
 r"""Functions relating to tensors representing vector fields."""
 
-from itertools import combinations_with_replacement, permutations, product
+from itertools import permutations, product
 from typing import Dict, Optional, Sequence, Tuple, Union
 
 import torch
@@ -56,10 +56,12 @@ def affine_flow(matrix: Tensor, grid: Union[Grid, Tensor], channels_last: bool =
 
 
 def compose_flows(u: Tensor, v: Tensor, align_corners: bool = True) -> Tensor:
-    r"""Compute composite flow field ``w = v o u``."""
-    u = move_dim(u, 1, -1)
-    w = F.grid_sample(v, u, mode="bilinear", padding_mode="border", align_corners=align_corners)
-    return w
+    r"""Compute composite flow field ``w = v o u = u(x) + v(x + u(x))``."""
+    grid = Grid(shape=u.shape[2:], align_corners=align_corners)
+    x = grid.coords(channels_last=False, dtype=u.dtype, device=u.device)
+    x = move_dim(x.unsqueeze(0).add_(u), 1, -1)
+    v = F.grid_sample(v, x, mode="bilinear", padding_mode="border", align_corners=align_corners)
+    return u.add(v)
 
 
 def curl(
@@ -462,9 +464,9 @@ def jacobian_dict(
         for i in range(D):
             deriv[FlowDerivativeKeys.symbol(i, i)].add_(1)
     jac = {}
-    for i, j in combinations_with_replacement(range(D), 2):
+    for i, j in product(range(D), repeat=2):
         jac[(i, j)] = deriv[FlowDerivativeKeys.symbol(i, j)]
-    return {(i, j): jac[(i, j) if i < j else (j, i)] for i, j in product(range(D), repeat=2)}
+    return jac
 
 
 def jacobian_matrix(
@@ -491,7 +493,8 @@ def jacobian_matrix(
         Full Jacobian matrices as tensor of shape ``(N, ..., X, D, D)``.
 
     """
-    jac = jacobian_dict(
+    D = flow.ndim - 2
+    deriv = jacobian_dict(
         flow,
         mode=mode,
         sigma=sigma,
@@ -499,47 +502,10 @@ def jacobian_matrix(
         stride=stride,
         add_identity=add_identity,
     )
-    D = flow.ndim - 2
-    mat = torch.cat([jac[(i, j)] for i, j in product(range(D), repeat=2)], dim=1)
-    mat = move_dim(mat, 1, -1)
-    mat = mat.reshape(mat.shape[:-1] + (D, D))
-    return mat.contiguous()
-
-
-def jacobian_triu(
-    flow: torch.Tensor,
-    mode: Optional[str] = None,
-    sigma: Optional[float] = None,
-    spacing: Optional[Union[Scalar, Array]] = None,
-    stride: Optional[ScalarOrTuple[int]] = None,
-    add_identity: bool = False,
-) -> Tensor:
-    r"""Evaluate Jacobian of spatial deformation.
-
-    Args:
-        flow: Input vector field as tensor of shape ``(N, D, ..., X)``.
-        mode: Mode of :func:`flow_derivatives()` approximation.
-        sigma: Standard deviation of Gaussian used for computing spatial derivatives.
-        spacing: Physical size of image voxels used to compute spatial derivatives.
-        stride: Number of output grid points between control points plus one for ``mode='bspline'``.
-        add_identity: Whether to calculate derivatives of :math:`u(x)` (False) or the spatial
-            deformation given by :math:`x + u(x)` (True), where :math:`u` is the flow field,
-            by adding the identity matrix to the Jacobian of :math:`u`.
-
-    Returns:
-        Flattened upper triangular Jacobian matrices as tensor of shape ``(N, D * (D + 1) / 2, ..., X)``.
-
-    """
-    jac = jacobian_dict(
-        flow,
-        mode=mode,
-        sigma=sigma,
-        spacing=spacing,
-        stride=stride,
-        add_identity=add_identity,
-    )
-    D = flow.ndim - 2
-    return torch.cat([jac[(i, j)] for i, j in combinations_with_replacement(range(D), 2)], dim=1)
+    jac = torch.cat(list(deriv.values()), dim=1)
+    jac = move_dim(jac, 1, -1)
+    jac = jac.reshape(jac.shape[:-1] + (D, D))
+    return jac.contiguous()
 
 
 def normalize_flow(

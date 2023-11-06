@@ -162,7 +162,6 @@ def test_flow_derivatives() -> None:
     z = p.narrow(1, 2, 1)
 
     flow = torch.cat([x.mul(z), y.mul(z), x.mul(y)], dim=1)
-
     deriv = U.flow_derivatives(flow, order=1)
 
     assert difference(deriv["du/dx"], z).abs().max().lt(1e-5)
@@ -235,3 +234,149 @@ def test_flow_divergence_free() -> None:
     assert flow.shape == data.shape
     div = U.divergence(flow)
     assert div.abs().max().lt(1e-4)
+
+
+def test_flow_jacobian() -> None:
+    # 2D flow field
+    p = Grid(size=(64, 32)).coords(channels_last=False).unsqueeze_(0)
+
+    x = p.narrow(1, 0, 1)
+    y = p.narrow(1, 1, 1)
+
+    interior = [slice(1, n - 1) for n in p.shape[2:]]
+
+    # u = [x^2, xy]
+    flow = torch.cat([x.square(), x.mul(y)], dim=1)
+
+    jac = torch.zeros((p.shape[0],) + p.shape[2:] + (2, 2))
+    jac[..., 0, 0] = x.squeeze(1).mul(2)
+    jac[..., 1, 0] = y.squeeze(1)
+    jac[..., 1, 1] = x.squeeze(1)
+
+    derivs = U.jacobian_dict(flow)
+    for (i, j), deriv in derivs.items():
+        atol = 1e-5
+        error = difference(jac[..., i, j].unsqueeze(1), deriv)
+        if (i, j) == (0, 0):
+            error = error[[slice(None), slice(None)] + interior]
+        if error.abs().max().gt(atol):
+            raise AssertionError(f"max absolute difference of jac[{i}, {j}] > {atol}")
+
+    mat = U.jacobian_matrix(flow)
+    assert torch.allclose(
+        mat[[slice(None)] + interior],
+        jac[[slice(None)] + interior],
+        atol=1e-5,
+    )
+
+    jac[..., 0, 0] += 1
+    jac[..., 1, 1] += 1
+
+    mat = U.jacobian_matrix(flow, add_identity=True)
+    assert torch.allclose(
+        mat[[slice(None)] + interior],
+        jac[[slice(None)] + interior],
+        atol=1e-5,
+    )
+
+    det = U.jacobian_det(flow)
+    assert torch.allclose(
+        det[[slice(None), 0] + interior],
+        jac[[slice(None)] + interior].det(),
+        atol=1e-5,
+    )
+
+    # 3D flow field
+    p = Grid(size=(64, 32, 16)).coords(channels_last=False).unsqueeze_(0)
+
+    x = p.narrow(1, 0, 1)
+    y = p.narrow(1, 1, 1)
+    z = p.narrow(1, 2, 1)
+
+    interior = [slice(1, n - 1) for n in p.shape[2:]]
+
+    # u = [z^2, 0, xy]
+    flow = torch.cat([z.square(), torch.zeros_like(y), x.mul(y)], dim=1)
+
+    jac = torch.zeros((p.shape[0],) + p.shape[2:] + (3, 3))
+    jac[..., 0, 2] = z.squeeze(1).mul(2)
+    jac[..., 2, 0] = y.squeeze(1)
+    jac[..., 2, 1] = x.squeeze(1)
+
+    derivs = U.jacobian_dict(flow)
+    for (i, j), deriv in derivs.items():
+        atol = 1e-5
+        error = difference(jac[..., i, j].unsqueeze(1), deriv)
+        if (i, j) == (0, 2):
+            error = error[[slice(None), slice(None)] + interior]
+        if error.abs().max().gt(atol):
+            raise AssertionError(f"max absolute difference of jac[{i}, {j}] > {atol}")
+
+    mat = U.jacobian_matrix(flow)
+    assert torch.allclose(
+        mat[[slice(None)] + interior],
+        jac[[slice(None)] + interior],
+        atol=1e-5,
+    )
+
+    jac[..., 0, 0] += 1
+    jac[..., 1, 1] += 1
+    jac[..., 2, 2] += 1
+
+    mat = U.jacobian_matrix(flow, add_identity=True)
+    assert torch.allclose(
+        mat[[slice(None)] + interior],
+        jac[[slice(None)] + interior],
+        atol=1e-5,
+    )
+
+    det = U.jacobian_det(flow)
+    assert torch.allclose(
+        det[[slice(None), 0] + interior],
+        jac[[slice(None)] + interior].det(),
+        atol=1e-5,
+    )
+
+    # u = [0, x + y^3, yz]
+    flow = torch.cat([torch.zeros_like(x), x.add(y.pow(3)), y.mul(z)], dim=1)
+
+    jac = torch.zeros((p.shape[0],) + p.shape[2:] + (3, 3))
+    jac[..., 1, 0] = 1
+    jac[..., 1, 1] = y.squeeze(1).square().mul(3)
+    jac[..., 2, 1] = z.squeeze(1)
+    jac[..., 2, 2] = y.squeeze(1)
+
+    derivs = U.jacobian_dict(flow)
+    for (i, j), deriv in derivs.items():
+        atol = 1e-5
+        error = difference(jac[..., i, j].unsqueeze(1), deriv)
+        if (i, j) == (1, 1):
+            atol = 0.005
+            error = error[[slice(None), slice(None)] + interior]
+        if error.abs().max().gt(atol):
+            raise AssertionError(f"max absolute difference of jac[{i}, {j}] > {atol}")
+
+    mat = U.jacobian_matrix(flow)
+    assert torch.allclose(
+        mat[[slice(None)] + interior],
+        jac[[slice(None)] + interior],
+        atol=0.005,
+    )
+
+    jac[..., 0, 0] += 1
+    jac[..., 1, 1] += 1
+    jac[..., 2, 2] += 1
+
+    mat = U.jacobian_matrix(flow, add_identity=True)
+    assert torch.allclose(
+        mat[[slice(None)] + interior],
+        jac[[slice(None)] + interior],
+        atol=0.005,
+    )
+
+    det = U.jacobian_det(flow)
+    assert torch.allclose(
+        det[[slice(None), 0] + interior],
+        jac[[slice(None)] + interior].det(),
+        atol=0.01,
+    )
