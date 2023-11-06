@@ -1306,7 +1306,8 @@ def normalize_image(
             return data.clamp_(a, b)
 
     else:
-        data = data.float()
+        if not data.is_floating_point():
+            data = data.float()
 
         def add_fn(data: Tensor, a: float) -> Tensor:
             return data.add(a)
@@ -1546,7 +1547,8 @@ def spatial_derivatives(
     unique_keys = SpatialDerivativeKeys.unique(which)
     max_order = SpatialDerivativeKeys.max_order(which)
 
-    data = data.float()
+    if not data.is_floating_point():
+        data = data.float()
 
     if mode is None:
         mode = "forward_central_backward"
@@ -1699,7 +1701,8 @@ def finite_differences(
     if step_size.ndim > 1 or step_size.shape[0] not in (1, N):
         raise ValueError(f"finite_differences() 'spacing' must be scalar or sequence of length {N}")
 
-    data = data.float()
+    if not data.is_floating_point():
+        data = data.float()
 
     def pad_spatial_dim(data: Tensor, left: int, right: int) -> Tensor:
         pad = [(left, right) if d == spatial_dim else (0, 0) for d in range(data.ndim - 2)]
