@@ -46,6 +46,7 @@
 		},
 		"python.testing.unittestEnabled": false,
 		"python.testing.pytestEnabled": true,
+		"python.testing.pytestArgs": ["tests"],
 	},
 	"launch": {
 		// Use IntelliSense to learn about possible attributes.
