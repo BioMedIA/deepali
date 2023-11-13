@@ -325,6 +325,7 @@ def expv(
     sampling: Union[Sampling, str] = Sampling.LINEAR,
     padding: Union[PaddingMode, str] = PaddingMode.BORDER,
     align_corners: bool = ALIGN_CORNERS,
+    inverse: bool = False,
 ) -> Tensor:
     r"""Group exponential maps of flow fields computed using scaling and squaring.
 
@@ -336,6 +337,8 @@ def expv(
         padding: Flow field extrapolation mode.
         align_corners: Whether ``flow`` vectors are defined with respect to
             ``Axes.CUBE`` (False) or ``Axes.CUBE_CORNERS`` (True).
+        inverse: Whether to negate scaled velocity field. Setting this to ``True``
+            is equivalent to negating the ``scale`` (e.g., ``scale=-1``).
 
     Returns:
         Exponential map of input flow field. If ``steps=0``, a reference to ``flow`` is returned.
@@ -343,6 +346,8 @@ def expv(
     """
     if scale is None:
         scale = 1
+    if inverse:
+        scale = -scale
     if steps is None:
         steps = 5
     if not isinstance(steps, int):
@@ -697,6 +702,56 @@ def normalize_flow(
     if not channels_last:
         data = move_dim(data, -1, 1)
     return data
+
+
+def logv(
+    flow: Tensor,
+    num_iters: int = 5,
+    bch_terms: int = 1,
+    sigma: Optional[float] = 1.0,
+    spacing: Optional[Union[Scalar, Array]] = None,
+    exp_steps: Optional[int] = None,
+    sampling: Union[Sampling, str] = Sampling.LINEAR,
+    padding: Union[PaddingMode, str] = PaddingMode.BORDER,
+    align_corners: bool = ALIGN_CORNERS,
+) -> Tensor:
+    r"""Group logarithmic maps of flow fields computed using algorithm by Bossa & Olsom (2008).
+
+    References:
+    - Bossa & Olmos, 2008. A new algorithm for the computation of the group logarithm of diffeomorphisms.
+        https://inria.hal.science/inria-00629873
+
+    Args:
+        num_iters: Number of iterations.
+        bch_terms: Number of Lie bracket terms of the Baker-Campbell-Hausdorff (BCH) formula to use
+            when computing the composite of current velocity field with the correction field.
+        sigma: Standard deviation of Gaussian kernel used as low-pass filter when computing spatial
+            derivatives required for evaluation of Lie brackets during application of BCH formula.
+        spacing: Physical size of image voxels used to compute spatial derivatives.
+        exp_steps: Number of exponentiation steps to evaluate current inverse displacement field.
+        sampling: Flow field interpolation mode when computing inverse displacement field.
+        padding: Flow field extrapolation mode when computing inverse displacement field.
+        align_corners: Whether ``flow`` vectors are defined with respect to
+            ``Axes.CUBE`` (False) or ``Axes.CUBE_CORNERS`` (True).
+
+    Returns:
+        Approximate stationary velocity field which when exponentiated (cf. :func:`expv`) results
+        in the given input ``flow`` field.
+
+    """
+    v = flow
+    for _ in range(num_iters):
+        u = expv(
+            v,
+            steps=exp_steps,
+            sampling=sampling,
+            padding=padding,
+            align_corners=align_corners,
+            inverse=True,
+        )
+        u = compose_flows(flow, u)
+        v = compose_svfs(u, v, bch_terms=bch_terms, sigma=sigma, spacing=spacing)
+    return v
 
 
 def denormalize_flow(

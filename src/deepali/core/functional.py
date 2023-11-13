@@ -104,6 +104,7 @@ from .flow import jacobian_det
 from .flow import jacobian_dict
 from .flow import jacobian_matrix
 from .flow import lie_bracket
+from .flow import logv
 from .flow import normalize_flow
 from .flow import sample_flow
 from .flow import warp_grid
@@ -220,6 +221,7 @@ __all__ = (
     "jacobian_dict",
     "jacobian_matrix",
     "lie_bracket",
+    "logv",
     "max_pool",
     "min_pool",
     "normalize_flow",

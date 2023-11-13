@@ -428,6 +428,17 @@ def test_flow_lie_bracket() -> None:
     assert error.max().lt(0.134)
 
 
+def test_flow_logv() -> None:
+    size = (128, 128, 128)
+    generator = torch.Generator().manual_seed(42)
+    v = random_svf(size, stride=8, generator=generator).mul_(0.1)
+    u = U.expv(v)
+    w = U.logv(u)
+    error = w.sub(v).norm(dim=1, keepdim=True)
+    assert error.mean().lt(0.001)
+    assert error.max().lt(0.02)
+
+
 def test_flow_compose_svfs() -> None:
     # 3D flow fields
     p = U.move_dim(Grid(size=(64, 32, 16)).coords().unsqueeze_(0), -1, 1)
