@@ -438,34 +438,32 @@ def test_flow_compose_svfs() -> None:
 
     with pytest.raises(ValueError):
         U.compose_svfs(p, p, bch_terms=-1)
-    with pytest.raises(ValueError):
-        U.compose_svfs(p, p, bch_terms=0)
-    with pytest.raises(ValueError):
-        U.compose_svfs(p, p, bch_terms=1)
     with pytest.raises(NotImplementedError):
-        U.compose_svfs(p, p, bch_terms=7)
+        U.compose_svfs(p, p, bch_terms=6)
 
     # u = [yz, xz, xy] and v = u
     u = v = torch.cat([y.mul(z), x.mul(z), x.mul(y)], dim=1)
 
+    w = U.compose_svfs(u, v, bch_terms=0)
+    assert torch.allclose(w, u.add(v))
+    w = U.compose_svfs(u, v, bch_terms=1)
+    assert torch.allclose(w, u.add(v))
     w = U.compose_svfs(u, v, bch_terms=2)
     assert torch.allclose(w, u.add(v))
     w = U.compose_svfs(u, v, bch_terms=3)
     assert torch.allclose(w, u.add(v))
     w = U.compose_svfs(u, v, bch_terms=4)
-    assert torch.allclose(w, u.add(v))
+    assert torch.allclose(w, u.add(v), atol=1e-5)
     w = U.compose_svfs(u, v, bch_terms=5)
-    assert torch.allclose(w, u.add(v))
-    w = U.compose_svfs(u, v, bch_terms=6)
     assert torch.allclose(w, u.add(v), atol=1e-5)
 
     # u = [yz, xz, xy] and v = [x, y, z]
     u = torch.cat([y.mul(z), x.mul(z), x.mul(y)], dim=1)
     v = torch.cat([x, y, z], dim=1)
 
-    w = U.compose_svfs(u, v, bch_terms=2)
+    w = U.compose_svfs(u, v, bch_terms=0)
     assert torch.allclose(w, u.add(v))
-    w = U.compose_svfs(u, v, bch_terms=3)
+    w = U.compose_svfs(u, v, bch_terms=1)
     assert torch.allclose(w, u.mul(0.5).add(v), atol=1e-6)
 
     # u = random_svf(), u -> 0 at boundary
@@ -474,7 +472,7 @@ def test_flow_compose_svfs() -> None:
     generator = torch.Generator().manual_seed(42)
     u = random_svf(size, stride=4, generator=generator).mul_(0.1)
     v = random_svf(size, stride=4, generator=generator).mul_(0.05)
-    w = U.compose_svfs(u, v, bch_terms=6)
+    w = U.compose_svfs(u, v, bch_terms=5)
 
     flow_u = U.expv(u)
     flow_v = U.expv(v)
