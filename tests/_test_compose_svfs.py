@@ -52,7 +52,7 @@ flow = U.compose_flows(flow_u, flow_v)
 
 # %%
 # Approximate velocity field of composite displacement field
-flow_w = U.expv(U.compose_svfs(u, v, bch_terms=6))
+flow_w = U.expv(U.compose_svfs(u, v, bch_terms=3))
 
 
 # %%
