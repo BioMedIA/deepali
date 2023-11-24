@@ -206,12 +206,12 @@ class SpatialDerivativeKeys(object):
         return len(set(key)) > 1
 
     @staticmethod
-    def all(ndim: int, order: Union[int, Sequence[int]]) -> List[SpatialDerivativeKey]:
+    def all(spatial_dims: int, order: Union[int, Sequence[int]]) -> List[SpatialDerivativeKey]:
         r"""Unmixed spatial derivatives of specified order."""
         if isinstance(order, int):
             order = [order]
         keys = []
-        dims = [str(SpatialDim(d)) for d in range(ndim)]
+        dims = [str(SpatialDim(d)) for d in range(spatial_dims)]
         for n in order:
             if n > 0:
                 codes = dims
@@ -221,11 +221,11 @@ class SpatialDerivativeKeys(object):
         return keys
 
     @staticmethod
-    def unmixed(ndim: int, order: int) -> List[SpatialDerivativeKey]:
+    def unmixed(spatial_dims: int, order: int) -> List[SpatialDerivativeKey]:
         r"""Unmixed spatial derivatives of specified order."""
         if order <= 0:
             return []
-        return [SpatialDim(d).symbol() * order for d in range(ndim)]
+        return [SpatialDim(d).symbol() * order for d in range(spatial_dims)]
 
     @classmethod
     def unique(cls, keys: Iterable[SpatialDerivativeKey]) -> Set[SpatialDerivativeKey]:
@@ -466,7 +466,7 @@ class FlowDerivativeKeys(object):
         if order == 0:
             return []
         channels = cls._channels(spatial_dims, channel)
-        derivs = SpatialDerivativeKeys.all(spatial_dims, order=order)
+        derivs = SpatialDerivativeKeys.all(spatial_dims=spatial_dims, order=order)
         return [cls.symbol(c, d) for c, d in itertools.product(channels, derivs)]
 
     @classmethod
@@ -482,7 +482,7 @@ class FlowDerivativeKeys(object):
         if order == 0:
             return []
         channels = cls._channels(spatial_dims, channel)
-        derivs = SpatialDerivativeKeys.unmixed(spatial_dims, order=order)
+        derivs = SpatialDerivativeKeys.unmixed(spatial_dims=spatial_dims, order=order)
         return [cls.symbol(c, d) for c, d in itertools.product(channels, derivs)]
 
     @classmethod
@@ -504,7 +504,7 @@ class FlowDerivativeKeys(object):
     @classmethod
     def curvature(cls, spatial_dims: int) -> List[FlowDerivativeKey]:
         channels = range(spatial_dims)
-        derivs = SpatialDerivativeKeys.unmixed(spatial_dims, order=2)
+        derivs = SpatialDerivativeKeys.unmixed(spatial_dims=spatial_dims, order=2)
         return [cls.symbol(c, d) for c, d in itertools.product(channels, derivs)]
 
     @classmethod
