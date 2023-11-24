@@ -1536,7 +1536,7 @@ def spatial_derivatives(
     if which is None:
         if order is None:
             order = 1
-        which = SpatialDerivativeKeys.all(ndim=D, order=order)
+        which = SpatialDerivativeKeys.all(spatial_dims=D, order=order)
     elif order is not None:
         which = [arg for arg in which if len(arg) == order]
 

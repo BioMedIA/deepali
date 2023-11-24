@@ -74,7 +74,7 @@ def test_flow_derivative_keys_unique() -> None:
 def test_flow_derivative_keys_all() -> None:
     for d, order in itertools.product([2, 3], [0, 1, 2]):
         channel_keys = ["u", "v", "w"][:d]
-        spatial_keys = SpatialDerivativeKeys.all(ndim=d, order=order)
+        spatial_keys = SpatialDerivativeKeys.all(spatial_dims=d, order=order)
         expected = [f"d{a}/d{b}" for a, b in itertools.product(channel_keys, spatial_keys)]
         assert FlowDerivativeKeys.all(spatial_dims=d, order=order) == expected
 
