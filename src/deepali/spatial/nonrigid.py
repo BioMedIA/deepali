@@ -51,6 +51,10 @@ class DenseVectorFieldTransform(ParametricTransform, NonRigidTransform):
                 Can be used to subsample the dense vector field with respect to the image grid of the fixed target
                 image. When ``grid.align_corners() is True``, the corner points of the ``grid`` and the resampled
                 vector field grid are aligned. Otherwise, the edges of the grid domains are aligned.
+                Must be either a single scalar if the grid is subsampled equally along each spatial dimension,
+                or a sequence with length less than or equal to ``grid.ndim``, with subsampling factors given
+                in the order (x, ...). When a sequence shorter than ``grid.ndim`` is given, remaining spatial
+                dimensions are not being subsampled.
             resize: Whether to resize vector field during transformation update. If ``True``, the buffered vector
                 field ``u`` (and ``v`` if applicable) is resized to match the image ``grid`` size. This means that
                 transformation constraints defined on these resized vector fields, such as those based on finite
@@ -62,11 +66,15 @@ class DenseVectorFieldTransform(ParametricTransform, NonRigidTransform):
             stride = 1
         if isinstance(stride, (int, float)):
             stride = (stride,) * grid.ndim
-        if len(stride) != grid.ndim:
+        if not isinstance(stride, Sequence):
+            raise TypeError(f"{type(self).__name__}() 'stride' must be float or Sequence[float]")
+        if len(stride) > grid.ndim:
             raise ValueError(
-                f"{type(self).__name__}() 'stride' must be float or Sequence of length {grid.ndim}"
+                f"{type(self).__name__}() 'stride' sequence length"
+                f" ({len(stride)}) exceeds grid dimensions ({grid.ndim})"
             )
-        self.stride = tuple(float(s) for s in stride)
+        stride = tuple(float(s) for s in stride) + (1.0,) * (grid.ndim - len(stride))
+        self.stride = stride
         self._resize = resize
         super().__init__(grid, groups=groups, params=params)
 
@@ -93,7 +101,19 @@ class DenseVectorFieldTransform(ParametricTransform, NonRigidTransform):
             grid = self.grid()
         if stride is None:
             stride = self.stride
-        return tuple(int(math.ceil(n / s)) for n, s in zip(grid.shape, stride))
+        if isinstance(stride, (int, float)):
+            stride = (stride,) * grid.ndim
+        if not isinstance(stride, Sequence):
+            raise TypeError(
+                f"{type(self).__name__}.data_grid_shape() 'stride' must be float or Sequence[float]"
+            )
+        if len(stride) > grid.ndim:
+            raise ValueError(
+                f"{type(self).__name__}.data_grid_shape() 'stride' sequence length"
+                f" ({len(stride)}) exceeds grid dimensions ({grid.ndim})"
+            )
+        stride = tuple(float(s) for s in stride) + (1.0,) * (grid.ndim - len(stride))
+        return tuple(int(math.ceil(n / s)) for n, s in zip(grid.shape, reversed(stride)))
 
     @torch.no_grad()
     def grid_(self: TDenseVectorFieldTransform, grid: Grid) -> TDenseVectorFieldTransform:
@@ -208,6 +228,10 @@ class StationaryVelocityFieldTransform(DenseVectorFieldTransform):
                 Can be used to subsample the dense vector field with respect to the image grid of the fixed target
                 image. When ``grid.align_corners() is True``, the corner points of the ``grid`` and the resampled
                 vector field grid are aligned. Otherwise, the edges of the grid domains are aligned.
+                Must be either a single scalar if the grid is subsampled equally along each spatial dimension,
+                or a sequence with length less than or equal to ``grid.ndim``, with subsampling factors given
+                in the order (x, ...). When a sequence shorter than ``grid.ndim`` is given, remaining spatial
+                dimensions are not being subsampled.
             resize: Whether to resize vector field during transformation update. If ``True``, the buffered vector
                 fields ``v`` and ``u`` are resized to match the image ``grid`` size. This means that transformation
                 constraints defined on these resized vector fields, such as those based on finite differences, are
