@@ -142,8 +142,6 @@ class FlowFields(ImageBatch):
 
     @classmethod
     def __torch_function__(cls, func, types, args=(), kwargs=None):
-        if func == F.grid_sample:
-            raise ValueError("Argument of F.grid_sample() must be a batch, not a single image")
         if kwargs is None:
             kwargs = {}
         data = Tensor.__torch_function__(func, (Tensor,), args, kwargs)
