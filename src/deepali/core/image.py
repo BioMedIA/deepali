@@ -1486,7 +1486,10 @@ def spatial_derivatives(
             If ``None``, ``forward_central_backward`` is used as default mode.
         sigma: Standard deviation of Gaussian kernel in grid units. If ``None`` or zero,
             no Gaussian smoothing is used for calculation of finite differences, and a
-            default standard deviation of 0.4 is used when ``mode="gaussian"``.
+            default standard deviation of 0.7355 is used when ``mode="gaussian"``. With a smaller
+            standard deviation, the magnitude of the derivative values starts to deviate between
+            ``mode="gaussian"`` and finite differences of a Gaussian smoothed input. This is likely
+            due to a too small discretized Gaussian filter and its derivative.
         spacing: Physical spacing between image grid points, e.g., ``(sx, sy, sz)``.
             When a scalar is given, the same spacing is used for each image and spatial dimension.
             If a sequence is given, it must be of length equal to the number of spatial dimensions ``D``,
@@ -1556,7 +1559,7 @@ def spatial_derivatives(
     if mode in ("forward", "backward", "central", "forward_central_backward", "prewitt", "sobel"):
         if sigma and sigma > 0:
             blur = gaussian1d(sigma, dtype=torch.float, device=data.device)
-            data = conv(data, blur, padding=PaddingMode.ZEROS)
+            data = conv(data, blur, padding=PaddingMode.REPLICATE)
         if mode in ("prewitt", "sobel"):
             avg_kernel = torch.tensor([1, 1 if mode == "prewitt" else 2, 1], dtype=data.dtype)
             avg_kernel /= avg_kernel.sum()
@@ -1589,7 +1592,7 @@ def spatial_derivatives(
 
         if sigma and sigma > 0:
             blur = gaussian1d(sigma, dtype=torch.float, device=data.device)
-            data = conv(data, blur, padding=PaddingMode.ZEROS)
+            data = conv(data, blur, padding=PaddingMode.REPLICATE)
 
         if stride is None:
             stride = 1
@@ -1616,27 +1619,41 @@ def spatial_derivatives(
             for spatial_dim in SpatialDerivativeKeys.split(code):
                 order[spatial_dim] += 1
             kernel = [bspline1d(s, d) for s, d in zip(stride, order)]
-            derivs[code] = evaluate_cubic_bspline(data, kernel=kernel)
+            deriv = evaluate_cubic_bspline(data, kernel=kernel)
+            if sum(order) > 0:
+                denom = torch.ones(N, dtype=spacing.dtype, device=spacing.device)
+                for delta, d in zip(spacing.transpose(0, 1), order):
+                    if d > 0:
+                        denom.mul_(delta.pow(d))
+                denom = denom.reshape((N,) + (1,) * (deriv.ndim - 1))
+                deriv = deriv.div_(denom.to(deriv))
+            derivs[code] = deriv
 
     elif mode == "gaussian":
+
+        def pad_spatial_dim(data: Tensor, sdim: int, padding: int) -> Tensor:
+            pad = [(padding, padding) if d == sdim else (0, 0) for d in range(data.ndim - 2)]
+            pad = [n for v in pad for n in v]
+            return F.pad(data, pad, mode="replicate")
+
         if not sigma:
-            sigma = 0.4
-        kernel_0 = gaussian1d(sigma, normalize=False, dtype=torch.float)
-        kernel_1 = gaussian1d_I(sigma, normalize=False, dtype=torch.float)
-        norm = kernel_0.sum()
-        kernel_0 = kernel_0.div_(norm).to(data.device)
-        kernel_1 = kernel_1.div_(norm).to(data.device)
+            sigma = 0.7355  # same default value as used in downsample()
+        kernel_0 = gaussian1d(sigma, normalize=False, dtype=torch.float, device=data.device)
+        kernel_1 = gaussian1d_I(sigma, normalize=False, dtype=torch.float, device=data.device)
         for i in range(max_order):
             for code in unique_keys:
                 key = code[: i + 1]
                 if i < len(code) and key not in derivs:
                     sdim = SpatialDim.from_arg(code[i])
-                    result = data if i == 0 else derivs[code[:i]]
+                    deriv = data if i == 0 else derivs[code[:i]]
                     for d in range(D):
-                        dim = SpatialDim(d).tensor_dim(result.ndim)
+                        dim = SpatialDim(d).tensor_dim(deriv.ndim)
                         kernel = kernel_1 if sdim == d else kernel_0
-                        result = conv1d(result, kernel, dim=dim, padding=len(kernel) // 2)
-                    derivs[key] = result
+                        deriv = pad_spatial_dim(deriv, d, len(kernel) // 2)
+                        deriv = conv1d(deriv, kernel, dim=dim, padding=0)
+                    denom = spacing.narrow(1, sdim, 1).reshape((N,) + (1,) * (deriv.ndim - 1))
+                    deriv = deriv.div_(denom.to(deriv))
+                    derivs[key] = deriv
         derivs = {key: derivs[SpatialDerivativeKeys.sorted(key)] for key in which}
 
     else:
