@@ -234,7 +234,6 @@ def divergence(
         raise TypeError("divergence() 'flow' must be of type torch.Tensor")
     if flow.ndim < 4:
         raise ValueError("divergence() 'flow' must be at least 4-dimensional tensor")
-    N = flow.shape[0]
     D = flow.shape[1]
     if flow.ndim != D + 2:
         raise ValueError(
@@ -243,10 +242,10 @@ def divergence(
     kwargs = dict(mode=mode, sigma=sigma, spacing=spacing, stride=stride)
     which = FlowDerivativeKeys.divergence(spatial_dims=D)
     deriv = flow_derivatives(flow, which=which, **kwargs)
-    ref = deriv["du/dx"]
-    div = torch.zeros((N, 1) + ref.shape[2:], dtype=ref.dtype, device=ref.device)
+    div: Optional[Tensor] = None
     for value in deriv.values():
-        div = div.add_(value)
+        div = value if div is None else div.add_(value)
+    assert div is not None
     return div
 
 
@@ -258,6 +257,9 @@ def divergence_free_flow(
     stride: Optional[ScalarOrTuple[int]] = None,
 ) -> Tensor:
     r"""Construct divergence-free vector field from D-1 scalar fields or one 3-dimensional vector field, respectively.
+
+    Experimental: This function may change in the future. Constructing a divergence-free field in 3D using curl() works best.
+        The construction of a divergence free field from one or two scalar fields, respectively, may need to be revised.
 
     The input fields must be sufficiently smooth for the output vector field to have zero divergence. To produce a
     3-dimensional vector field, a better result may be obtained using the :func:`curl()` of another 3-dimensional
@@ -274,7 +276,7 @@ def divergence_free_flow(
             the cross product of the gradients of the two scalar fields. Otherwise, the input tensor must be of shape
             ``(N, 3, Z, Y, X)`` and the output is the curl of the vector field.
         mode: Mode of :func:`flow_derivatives()` approximation.
-        sigma: Standard deviation of Gaussian used smooth input field.
+        sigma: Standard deviation of Gaussian used to smooth input field.
         spacing: Physical size of image voxels used to compute finite differences.
         stride: Number of output grid points between control points plus one for ``mode='bspline'``.
 
@@ -830,7 +832,7 @@ def sample_flow(
         padding = PaddingMode.BORDER
     x = coords.expand((N,) + coords.shape[1:])
     t = flow.expand((N,) + flow.shape[1:])
-    g = x.reshape((N,) + (1,) * (t.ndim - 3) + (-1, D))
+    g = x if x.ndim == t.ndim else x.reshape((N,) + (1,) * (t.ndim - 3) + (-1, D))
     u = grid_sample(t, g, padding=padding, align_corners=align_corners)
     u = move_dim(u, 1, -1)
     u = u.reshape(x.shape)
