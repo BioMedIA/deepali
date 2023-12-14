@@ -161,7 +161,7 @@ class ImageBatch(DataTensor):
                 data._grid = grid
             else:
                 data = cls(data, grid)
-        elif type(data) != Tensor:
+        elif type(data) is not Tensor:
             data = data.as_subclass(Tensor)
         return data
 
@@ -1025,7 +1025,7 @@ class Image(DataTensor):
                 data._grid = grid
             else:
                 data = cls(data, grid)
-        elif type(data) != Tensor:
+        elif type(data) is not Tensor:
             data = data.as_subclass(Tensor)
         return data
 
