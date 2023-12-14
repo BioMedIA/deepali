@@ -261,7 +261,7 @@ class QuaternionRotation(InvertibleParametricTransform, LinearTransform):
         Args:
             grid: Grid domain on which transformation is defined.
             groups: Number of transformations. Must be either 1 or equal to batch size.
-            params: (nnormalized quaternion as 2-dimensional tensor of ``(N, 4)``.
+            params: (normalized quaternion as 2-dimensional tensor of ``(N, 4)``.
 
         """
         if grid.ndim != 3:
