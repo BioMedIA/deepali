@@ -272,9 +272,9 @@ class MI(PairwiseImageLoss):
             raise ValueError(
                 f"{type(self).__name__}() 'num_samples' must be positive integral value"
             )
-        if sample_ratio is not None and (sample_ratio <= 0 or sample_ratio >= 1):
+        if sample_ratio is not None and (sample_ratio <= 0 or sample_ratio > 1):
             raise ValueError(
-                f"{type(self).__name__}() 'sample_ratio' must be in closed interval [0, 1]"
+                f"{type(self).__name__}() 'sample_ratio' must be in open-closed interval (0, 1]"
             )
 
         super().__init__()
