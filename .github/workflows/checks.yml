@@ -37,7 +37,7 @@ jobs:
           fetch-depth: 0
       - name: Set up Python ${{ matrix.py }}
         if: steps.filter.outputs.changed == 'true'
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.py }}
       - name: Install package
