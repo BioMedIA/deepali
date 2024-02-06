@@ -357,6 +357,8 @@ def expv(
     if steps < 0:
         raise ValueError("expv() 'steps' must be positive value")
     if steps == 0:
+        if abs(scale - 1) > 1e-15:
+            flow = flow.mul(scale)
         return flow
     device = flow.device
     grid = Grid(shape=flow.shape[2:], align_corners=align_corners)
