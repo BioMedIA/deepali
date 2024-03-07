@@ -110,6 +110,7 @@ Below we list a few projects which are either similar to *deepali* or complement
 - **[Neurite]**: A neural networks toolbox with a focus on medical image analysis in [TensorFlow]. Parts of it have been used in [VoxelMorph], for example.
 - **[NITorch]**: A library written by post-docs in John Ashburner's group which is conceptually related to SPM and has a great overlap with *deepali*. Some low-level functionality for applying spatial transformations has more recently been contributed to MONAI as well.
 - **[TorchIO]**: A library in the [PyTorch Ecosystem] for efficient loading, preprocessing, augmentation, and patch-based sampling of 3D medical images.
+- **[TorchIR]**: PyTorch registration library for deep learning based image registration by Bob de Vos based on his related publications.
 
 
 [AIRLab]: https://github.com/airlab-unibas/airlab
@@ -125,6 +126,7 @@ Below we list a few projects which are either similar to *deepali* or complement
 [SimpleITK]: https://simpleitk.org/
 [TensorFlow]: https://www.tensorflow.org/
 [TorchIO]: https://torchio.readthedocs.io/
+[TorchIR]: https://github.com/BDdeVos/TorchIR/
 [VoxelMorph]: https://github.com/voxelmorph/voxelmorph
 [VTK]: https://vtk.org/
 
