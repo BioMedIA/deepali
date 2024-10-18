@@ -50,8 +50,8 @@ class GridAttrs(object):
             if center is None:
                 origin = (0.0,) * ndim
             else:
-                offset = np.array(0.5 * n if n > 0 else 0 for n in self._int_size(size))
-                rotation = np.array(self.direction).reshape(ndim, ndim)
+                offset = np.array([0.5 * n if n > 0 else 0 for n in self._int_size(size)])
+                rotation = np.array(direction).reshape(ndim, ndim)
                 scaling = np.diag(spacing)
                 coords: NDArray = np.asanyarray(center) - np.matmul(rotation @ scaling, offset)
                 origin = tuple(float(x) for x in coords)
@@ -68,7 +68,7 @@ class GridAttrs(object):
     @property
     def center(self) -> Tuple[float, ...]:
         r"""Get grid center point coordinates in world space."""
-        offset = np.array(0.5 * n if n > 0 else 0 for n in self.size)
+        offset = np.array([0.5 * n if n > 0 else 0 for n in self.size])
         coords: NDArray = self.origin + np.matmul(self.transform[:-1, :-1], offset)
         return tuple(float(x) for x in coords)
 
