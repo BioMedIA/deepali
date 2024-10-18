@@ -8,9 +8,9 @@ from vtk import (
     vtkImageData,
     vtkImageStencilData,
     vtkImageStencilToImage,
-    vtkMatrixToLinearTransform,
     vtkPolyData,
     vtkPolyDataToImageStencil,
+    vtkTransform,
     vtkTransformPolyDataFilter,
 )
 
@@ -42,20 +42,21 @@ def surface_mesh_grid(*mesh: vtkPolyData, resolution: Optional[float] = None) ->
 
 
 def surface_image_stencil(mesh: vtkPolyData, grid: Grid) -> vtkImageStencilData:
-    r"""Convert vtkPolyData surface mesh to image stencil."""
-    max_index = [n - 1 for n in grid.size().tolist()]
+    r"""Convert vtkPolyData surface mesh to image stencil."""    
+    # Create the transform
+    transform = vtkTransform()
+    transform.Translate(grid.center().tolist())
+    transform.Concatenate(numpy_to_vtk_matrix4x4(grid.direction().numpy().T))  # type: ignore
+    transform.Translate(grid.center().neg().tolist())
 
-    rot = np.eye(4, dtype=np.float)
-    rot[:3, :3] = np.array(grid.direction).reshape(3, 3)
-    rot = numpy_to_vtk_matrix4x4(rot)
-
-    transform = vtkMatrixToLinearTransform()
-    transform.SetInput(rot)
-
+    # Apply the transform to the polydata
     transformer = vtkTransformPolyDataFilter()
     transformer.SetInputData(mesh)
     transformer.SetTransform(transform)
 
+    # Convert the transformed polydata to an image stencil
+    grid = Grid(size=grid.size(), spacing=grid.spacing(), center=grid.center())
+    max_index = [n - 1 for n in grid.size()]
     converter = vtkPolyDataToImageStencil()
     converter.SetInputConnection(transformer.GetOutputPort())
     converter.SetOutputOrigin(grid.origin().tolist())
@@ -63,6 +64,7 @@ def surface_image_stencil(mesh: vtkPolyData, grid: Grid) -> vtkImageStencilData:
     converter.SetOutputWholeExtent([0, max_index[0], 0, max_index[1], 0, max_index[2]])
     converter.Update()
 
+    # Get the output stencil
     stencil = vtkImageStencilData()
     stencil.DeepCopy(converter.GetOutput())
     return stencil
