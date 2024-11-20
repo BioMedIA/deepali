@@ -218,12 +218,13 @@ def read_meta_image_from_fileobj(f: io.BufferedReader) -> Tuple[np.ndarray, Meta
             "ElementDataFile",
         ):
             meta[key] = value
+        elif key == "HeaderSize":
+            meta[key] = np.intp(value)
         elif key in (
             "NDims",
             "ID",
             "ParentID",
             "CompressedDataSize",
-            "HeaderSize",
             "HeaderSizePerSlice",
             "ElementNumberOfChannels",
         ):
@@ -268,14 +269,15 @@ def read_meta_image_from_fileobj(f: io.BufferedReader) -> Tuple[np.ndarray, Meta
     element_size = np.dtype(meta["ElementType"]).itemsize
     increment = np.prod(shape[1:], dtype=int) * element_size
 
-    #See https://github.com/Kitware/MetaIO/blob/1a031fd8223c4846e2f90f50216cbcb415d52018/src/metaImage.cxx#L2601 for reference
-    header_size = meta.get("HeaderSize") or 0
+    header_size = int( meta.get("HeaderSize") or 0 )
     if header_size == -1:
-        data_quantity = np.prod(meta["DimSize"])
-        read_size = data_quantity * meta["ElementNumberOfChannels"] * meta["ElementSize"]
+        #See https://github.com/Kitware/MetaIO/blob/1a031fd8223c4846e2f90f50216cbcb415d52018/src/metaImage.cxx#L2601 for reference
+        data_quantity = int(np.prod(meta["DimSize"])) #type: ignore
+        element_size = int(np.dtype(meta["ElementType"]).itemsize)
+        read_size = data_quantity * int(meta["ElementNumberOfChannels"]) * element_size #type: ignore
         f.seek(-read_size, 2)
     elif header_size >= 0:
-        f.seek(meta_size+header_size, 0)
+        f.seek(meta_size + header_size, 0)
     else:
         raise ValueError(f"Invalid HeaderSize {header_size}")
 
