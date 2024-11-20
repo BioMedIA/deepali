@@ -268,8 +268,17 @@ def read_meta_image_from_fileobj(f: io.BufferedReader) -> Tuple[np.ndarray, Meta
     element_size = np.dtype(meta["ElementType"]).itemsize
     increment = np.prod(shape[1:], dtype=int) * element_size
 
-    f.seek(meta_size, 0)
-    f.seek((meta.get("HeaderSize") or 0), 1)
+    #See https://github.com/Kitware/MetaIO/blob/1a031fd8223c4846e2f90f50216cbcb415d52018/src/metaImage.cxx#L2601 for reference
+    header_size = meta.get("HeaderSize") or 0
+    if header_size == -1:
+        data_quantity = np.prod(meta["DimSize"])
+        read_size = data_quantity * meta["ElementNumberOfChannels"] * meta["ElementSize"]
+        f.seek(-read_size, 2)
+    elif header_size >= 0:
+        f.seek(meta_size+header_size, 0)
+    else:
+        raise ValueError(f"Invalid HeaderSize {header_size}")
+
     if meta.get("CompressedData"):
         if meta["CompressedDataSize"] is None:
             raise ValueError("CompressedDataSize needs to be specified when using CompressedData")
