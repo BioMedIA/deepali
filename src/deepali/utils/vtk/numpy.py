@@ -55,10 +55,12 @@ NUMPY_DTYPE_FROM_VTK_DATA_TYPE = {
 
 def numpy_to_vtk_matrix4x4(arr: np.ndarray) -> vtkMatrix4x4:
     """Create vtkMatrix4x4 from NumPy array."""
-    assert arr.shape == (4, 4)
+    if arr.shape not in [(3, 3), (3, 4), (4, 4)]:
+        raise ValueError("numpy_to_vtk_matrix4x4() 'arr' must have shape (3, 3), (3, 4), or (4, 4)")
     matrix = vtkMatrix4x4()
-    for i in range(4):
-        for j in range(4):
+    matrix.Identity()
+    for i in range(arr.shape[0]):
+        for j in range(arr.shape[1]):
             matrix.SetElement(i, j, arr[i, j])
     return matrix
 
