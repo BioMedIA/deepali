@@ -10,7 +10,7 @@ from torch.nn import Module
 
 from deepali.core import Axes, Device, Grid, PathStr
 from deepali.core import functional as U
-from deepali.core import join_kwargs_in_sequence
+from deepali.core.config import join_kwargs_in_sequence
 from deepali.data import FlowField, Image
 from deepali.losses import RegistrationResult, new_loss
 from deepali.spatial import DisplacementFieldTransform
