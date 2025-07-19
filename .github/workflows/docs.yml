@@ -44,7 +44,7 @@ jobs:
             activate-environment: deepali
             use-mamba: true
       - id: cache
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: /usr/share/miniconda3/envs/deepali
           key: conda-env-deepali-${{ hashFiles('conda/environment.linux-64.lock') }}
@@ -56,11 +56,11 @@ jobs:
       - name: Build Pages
         run: conda run --name deepali jupyter-book build docs
       - name: Set up Pages
-        uses: actions/configure-pages@v3
+        uses: actions/configure-pages@v5
       - name: Upload Pages
-        uses: actions/upload-pages-artifact@v1
+        uses: actions/upload-pages-artifact@v3
         with:
           path: docs/_build/html
       - id: deployment
         name: Deploy Pages
-        uses: actions/deploy-pages@v2
+        uses: actions/deploy-pages@v4
