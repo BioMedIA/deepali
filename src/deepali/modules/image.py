@@ -1,7 +1,6 @@
 r"""Convoluational modules with fixed parameters."""
 
 import math
-from numbers import Number
 from typing import Optional, Union
 
 from packaging.version import Version
@@ -38,7 +37,7 @@ class FilterImage(Module):
     def forward(self, x: Tensor) -> Tensor:
         r"""Convolve input image with predefined filter kernel."""
         kernel: Optional[Tensor] = self.kernel
-        if self.kernel is None or kernel.numel() < 2:
+        if kernel is None or kernel.numel() < 2:
             return x
         return U.conv(x, kernel, padding=self.padding)
 
@@ -70,7 +69,11 @@ class GaussianConv(Module):
     r"""Blurs an image by a predefined Gaussian low-pass filter."""
 
     def __init__(
-        self, channels: int, kernel_size: ScalarOrTuple[int], sigma: float, dim: int = 3
+        self,
+        channels: int,
+        kernel_size: ScalarOrTuple[int] | Tensor,
+        sigma: ScalarOrTuple[float] | Tensor,
+        dim: int = 3,
     ) -> None:
         r"""Initialize Gaussian convolution kernel.
 
@@ -84,10 +87,30 @@ class GaussianConv(Module):
         if dim < 2 or dim > 3:
             raise ValueError(f"Only 2 and 3 dimensions are supported, got: {dim}")
         super().__init__()
-        if isinstance(kernel_size, Number):
+        # Convert kernel size argument
+        if isinstance(kernel_size, Tensor):
+            if kernel_size.ndim == 0 or (kernel_size.ndim == 1 and len(kernel_size) == 1):
+                kernel_size = (int(kernel_size.item()),) * dim
+            else:
+                kernel_size = tuple(int(x) for x in kernel_size)
+        elif isinstance(kernel_size, int):
             kernel_size = (kernel_size,) * dim
-        if isinstance(sigma, Number):
+        else:
+            kernel_size = tuple(int(x) for x in kernel_size)
+        assert isinstance(kernel_size, tuple)
+        assert all(isinstance(x, int) for x in kernel_size)
+        # Convert kernel standard deviation argument
+        if isinstance(sigma, Tensor):
+            if sigma.ndim == 0 or (sigma.ndim == 1 and len(sigma) == 1):
+                sigma = (float(sigma.item()),) * dim
+            else:
+                sigma = tuple(float(x) for x in sigma)
+        elif isinstance(sigma, float):
             sigma = (sigma,) * dim
+        else:
+            sigma = tuple(float(x) for x in sigma)  # type: ignore
+        assert isinstance(sigma, tuple)
+        assert all(isinstance(x, float) for x in sigma)
         # The gaussian kernel is the product of the gaussian function of each dimension.
         kernel = torch.tensor(1, dtype=torch.float32, device="cpu")
         mgrids = [torch.arange(n, dtype=torch.float32) for n in kernel_size]
