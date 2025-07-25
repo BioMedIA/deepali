@@ -10,7 +10,7 @@ import numpy as np
 from packaging.version import Version
 
 try:
-    import SimpleITK as _sitk
+    import SimpleITK as _sitk  # type: ignore
 except ImportError:
     _sitk = None
 
@@ -253,13 +253,12 @@ class Grid(object):
             size=attrs[0:d],
             spacing=attrs[d : 2 * d],
             direction=attrs[3 * d :],
-            align_corners=align_corners,
         )
         if origin:
             kwargs["origin"] = attrs[2 * d : 3 * d]
         else:
             kwargs["center"] = attrs[2 * d : 3 * d]
-        return Grid(**kwargs)
+        return Grid(**kwargs, align_corners=align_corners, device=None)
 
     @classmethod
     def from_batch(cls, tensor: Tensor) -> Grid:
@@ -1549,7 +1548,7 @@ class Grid(object):
                 continue
             value = getattr(self, name)
             other_value = getattr(other, name)
-            if type(value) != type(other_value):
+            if type(value) is not type(other_value):
                 return False
             if isinstance(value, Tensor):
                 assert isinstance(other_value, Tensor)

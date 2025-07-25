@@ -98,6 +98,7 @@ def is_optional_type_hint(type_hint: Any) -> bool:
     type_origin = getattr(type_hint, "__origin__", None)
     if type_origin is Union:
         return type(None) in type_hint.__args__
+    return False
 
 
 def is_path_str(arg: Any) -> bool:

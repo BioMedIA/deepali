@@ -6,7 +6,7 @@ from typing import Optional, Union
 from packaging.version import Version
 
 import torch
-from torch import Generator, LongTensor, Tensor
+from torch import Generator, Tensor
 
 
 def manual_seed(seed: int):
@@ -59,8 +59,8 @@ def multinomial(
     num_samples: int,
     replacement: bool = False,
     generator: Optional[Generator] = None,
-    out: Optional[LongTensor] = None,
-) -> LongTensor:
+    out: Optional[Tensor] = None,
+) -> Tensor:
     r"""Sample from a multinomial probability distribution.
 
     Args:
@@ -94,8 +94,8 @@ def _multinomial(
     num_samples: int,
     replacement: bool = False,
     generator: Optional[Generator] = None,
-    out: Optional[LongTensor] = None,
-) -> LongTensor:
+    out: Optional[Tensor] = None,
+) -> Tensor:
     r"""Sample from a multinomial probability distribution.
 
     This function can be used for inputs of any size and is unlike ``torch.multinomial`` not limited
@@ -130,7 +130,7 @@ def _multinomial(
         cdf = input.type(torch.float64).cumsum(dim=-1)
         cdf = cdf.div_(cdf[..., -1:].clone())
         val = torch.rand(out_shape, generator=generator, dtype=cdf.dtype, device=cdf.device)
-        out = torch.searchsorted(cdf, val, out=out).clip_(0, num_candidates - 1)
+        ret = torch.searchsorted(cdf, val, out=out).clip_(0, num_candidates - 1)
     # In case of replacement=False, use Gumbel-max trick instead of inverse transform sampling.
     else:
         if num_samples > num_candidates:
@@ -147,10 +147,10 @@ def _multinomial(
         value = value.log_().neg_().log_().neg_().add_(logit)
         if Version(torch.__version__) < Version("1.12"):
             _, index = torch.topk(value, num_samples, dim=-1, sorted=False)
-            out = index if out is None else out.copy_(index)
+            ret = index if out is None else out.copy_(index)
         else:
             if out is None:
                 out = torch.empty(out_shape, dtype=torch.int64, device=value.device)
             _ = torch.empty(out_shape, dtype=value.dtype, device=value.device)
-            _, out = torch.topk(value, num_samples, dim=-1, sorted=False, out=(_, out))
-    return out
+            _, ret = torch.topk(value, num_samples, dim=-1, sorted=False, out=(_, out))
+    return ret
