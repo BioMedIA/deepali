@@ -2,11 +2,11 @@
 
 [![doi](https://zenodo.org/badge/DOI/10.5281/zenodo.8170161.svg)](https://doi.org/10.5281/zenodo.8170161) [![pypi](https://img.shields.io/pypi/v/hf-deepali)](https://pypi.org/project/hf-deepali/) [![downloads](https://img.shields.io/pypi/dm/hf-deepali)](https://pypistats.org/packages/hf-deepali) [![docs](https://github.com/BioMedIA/deepali/actions/workflows/docs.yml/badge.svg)](https://github.com/BioMedIA/deepali/actions/workflows/docs.yml) [![tests](https://github.com/BioMedIA/deepali/actions/workflows/tests.yml/badge.svg)](https://github.com/BioMedIA/deepali/actions/workflows/tests.yml) [![release](https://github.com/BioMedIA/deepali/actions/workflows/release.yml/badge.svg)](https://github.com/BioMedIA/deepali/actions/workflows/release.yml)
 
-An [open source](https://github.com/BioMedIA/deepali/tree/main/LICENSE) research library for image, point set, and surface registration in [PyTorch], which is developed and maintained by the [HeartFlow-Imperial College London] research lab at the [Biomedical Image Analysis Group].
+An [open source](https://github.com/BioMedIA/deepali/tree/main/LICENSE) research library for image, point set, and surface registration in [PyTorch], which is developed and maintained by the [Heartflow-Imperial College London] research lab at the [Biomedical Image Analysis Group].
 
 *[Deepali](https://en.wikipedia.org/wiki/Deepali)* is a Hindu/Sanskrit Indian given name, which means "joy" as in the gratification one may feel working with code built on a modern tensor library with support for automatic differentiation, and "chain of lamps" alluding to the application of the chain rule by *torch.autograd*, the concatenation of spatial coordinate transformations, and furthermore the (sequential) composition of PyTorch modules. In addition, the English words "deep" and "ali(-gnment)" partially contained in this name should highlight that this project is not only suitable for traditional non-learning based registration, but in particular facilitates deep learning based approaches to image alignment.
 
-[HeartFlow-Imperial College London]: https://www.heartflow.com/newsroom/heartflow-announces-collaborative-research-agreement-with-imperial-college-london/
+[Heartflow-Imperial College London]: https://www.heartflow.com/newsroom/heartflow-announces-collaborative-research-agreement-with-imperial-college-london/
 [Biomedical Image Analysis Group]: https://biomedia.doc.ic.ac.uk/
 
 
@@ -81,7 +81,7 @@ pip install hf-deepali[utils]
 
 ## Citation
 
-Schuh, A., Qiu, H., and HeartFlow Research. *deepali: Image, point set, and surface registration in PyTorch* (2023). [doi:10.5281/zenodo.8170161](https://doi.org/10.5281/zenodo.8170161)
+Schuh, A., Qiu, H., and Heartflow Research. *deepali: Image, point set, and surface registration in PyTorch* (2023). [doi:10.5281/zenodo.8170161](https://doi.org/10.5281/zenodo.8170161)
 
 ## Contributing
 
