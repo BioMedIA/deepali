@@ -7,7 +7,7 @@ from enum import Enum
 from typing import TYPE_CHECKING, Any, Dict, Optional, Sequence, Union, overload
 
 import numpy as np
-from pkg_resources import parse_version
+from packaging.version import Version
 
 try:
     import SimpleITK as _sitk
@@ -1047,7 +1047,7 @@ class Grid(object):
                 coord = torch.arange(n, dtype=dtype, device=device)
             coords.append(coord)
         channels_dim = len(coords) if channels_last else 0
-        if parse_version(torch.__version__) < parse_version("1.10"):
+        if Version(torch.__version__) < Version("1.10"):
             coords = torch.stack(torch.meshgrid(*coords), dim=channels_dim)
         else:
             coords = torch.stack(torch.meshgrid(*coords, indexing="ij"), dim=channels_dim)

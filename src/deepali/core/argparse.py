@@ -86,8 +86,8 @@ from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Unio
 from typing_extensions import Protocol
 from collections import namedtuple
 from importlib import import_module
+from importlib.metadata import PackageNotFoundError, version as _pypi_package_version
 from pkgutil import walk_packages
-from pkg_resources import DistributionNotFound, get_distribution
 
 from .psutil import memory_limit
 from .typing import BoolStr
@@ -146,15 +146,13 @@ class ArgumentParser(argparse.ArgumentParser):
 class ParserCallable(Protocol):
     r"""Type annotation for argument parser constructor."""
 
-    def __call__(self, **kwargs) -> ArgumentParser:
-        ...
+    def __call__(self, **kwargs) -> ArgumentParser: ...
 
 
 class MainCallable(Protocol):
     r"""Type annotation for main function."""
 
-    def __call__(self, args: Optional[List[Any]] = None) -> int:
-        ...
+    def __call__(self, args: Optional[List[Any]] = None) -> int: ...
 
 
 def entry_point(
@@ -210,8 +208,8 @@ def entry_point(
         else:
             prog = os.path.basename(sys.argv[0])
         try:
-            version = get_distribution(dist).version
-        except DistributionNotFound:
+            version = _pypi_package_version(dist)
+        except PackageNotFoundError:
             version = None
 
         # Main parser
@@ -252,11 +250,14 @@ def entry_point(
                 command_name = basename.replace("_", "-")
                 commands[command_name] = CommandInfo(
                     module=module_name,
-                    commands=find_commands(
-                        name=module_name, path=[os.path.join(prefix, basename) for prefix in path]
-                    )
-                    if ispkg
-                    else None,
+                    commands=(
+                        find_commands(
+                            name=module_name,
+                            path=[os.path.join(prefix, basename) for prefix in path],
+                        )
+                        if ispkg
+                        else None
+                    ),
                 )
             return commands
 

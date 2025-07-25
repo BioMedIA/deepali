@@ -4,7 +4,7 @@ import math
 from numbers import Number
 from typing import Optional, Union
 
-from pkg_resources import parse_version
+from packaging.version import Version
 
 import torch
 from torch import Tensor
@@ -91,7 +91,7 @@ class GaussianConv(Module):
         # The gaussian kernel is the product of the gaussian function of each dimension.
         kernel = torch.tensor(1, dtype=torch.float32, device="cpu")
         mgrids = [torch.arange(n, dtype=torch.float32) for n in kernel_size]
-        if parse_version(torch.__version__) < parse_version("1.10"):
+        if Version(torch.__version__) < Version("1.10"):
             mgrids = torch.meshgrid(mgrids)
         else:
             mgrids = torch.meshgrid(mgrids, indexing="ij")

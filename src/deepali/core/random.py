@@ -3,7 +3,7 @@ r"""Auxiliary functions for random sampling."""
 import random
 from typing import Optional, Union
 
-from pkg_resources import parse_version
+from packaging.version import Version
 
 import torch
 from torch import Generator, LongTensor, Tensor
@@ -145,7 +145,7 @@ def _multinomial(
             device=input.device,
         )
         value = value.log_().neg_().log_().neg_().add_(logit)
-        if parse_version(torch.__version__) < parse_version("1.12"):
+        if Version(torch.__version__) < Version("1.12"):
             _, index = torch.topk(value, num_samples, dim=-1, sorted=False)
             out = index if out is None else out.copy_(index)
         else:
