@@ -40,6 +40,7 @@ dynamic = ["version"]
 dependencies = [
     "dacite",
     "deprecation",
+    "packaging",
     "pandas",
     "ruamel.yaml",
     "torch>=1.9",
