@@ -23,52 +23,67 @@ r"""Conversion functions between different representations of 3D rotations."""
 
 
 import torch
-import torch.nn.functional as F
+from torch import Tensor
+from torch.nn import functional as F
 
 
 __all__ = (
     "angle_axis_to_rotation_matrix",
     "angle_axis_to_quaternion",
+    "axis_angle_to_rotation_matrix",
+    "axis_angle_to_quaternion",
     "normalize_quaternion",
     "rotation_matrix_to_angle_axis",
+    "rotation_matrix_to_axis_angle",
     "rotation_matrix_to_quaternion",
     "quaternion_to_angle_axis",
+    "quaternion_to_axis_angle",
     "quaternion_to_rotation_matrix",
     "quaternion_log_to_exp",
     "quaternion_exp_to_log",
 )
 
 
-def angle_axis_to_rotation_matrix(angle_axis: torch.Tensor) -> torch.Tensor:
-    r"""Convert 3d vector of axis-angle rotation to 3x3 rotation matrix
+def angle_axis_to_rotation_matrix(axis_angle: Tensor) -> Tensor:
+    r"""Alias for :func:`axis_angle_to_rotation_matrix`."""
+    return axis_angle_to_rotation_matrix(axis_angle)
+
+
+def axis_angle_to_rotation_matrix(axis_angle: Tensor) -> Tensor:
+    r"""Convert 3d vector of axis-angle rotation to 3x3 rotation matrix.
 
     Args:
-        angle_axis (torch.Tensor): tensor of 3d vector of axis-angle rotations.
+        axis_angle: tensor of 3d vector of axis-angle rotations in radians with shape :math:`(N, 3)`.
 
     Returns:
-        torch.Tensor: tensor of 3x3 rotation matrices.
-
-    Shape:
-        - Input: :math:`(N, 3)`
-        - Output: :math:`(N, 3, 3)`
+        tensor of rotation matrices of shape :math:`(N, 3, 3)`.
 
     Example:
-        >>> input = torch.rand(1, 3)  # Nx3
-        >>> output = angle_axis_to_rotation_matrix(input)  # Nx3x3
+        >>> input = tensor([[0., 0., 0.]])
+        >>> axis_angle_to_rotation_matrix(input)
+        tensor([[[1., 0., 0.],
+                 [0., 1., 0.],
+                 [0., 0., 1.]]])
+
+        >>> input = tensor([[1.5708, 0., 0.]])
+        >>> axis_angle_to_rotation_matrix(input)
+        tensor([[[ 1.0000e+00,  0.0000e+00,  0.0000e+00],
+                 [ 0.0000e+00, -3.6200e-06, -1.0000e+00],
+                 [ 0.0000e+00,  1.0000e+00, -3.6200e-06]]])
     """
-    if not isinstance(angle_axis, torch.Tensor):
-        raise TypeError("Input type is not a torch.Tensor. Got {}".format(type(angle_axis)))
+    if not isinstance(axis_angle, Tensor):
+        raise TypeError(f"Input type is not a Tensor. Got {type(axis_angle)}")
 
-    if not angle_axis.shape[-1] == 3:
-        raise ValueError("Input size must be a (*, 3) tensor. Got {}".format(angle_axis.shape))
+    if not axis_angle.shape[-1] == 3:
+        raise ValueError(f"Input size must be a (*, 3) tensor. Got {axis_angle.shape}")
 
-    def _compute_rotation_matrix(angle_axis, theta2, eps=1e-6):
+    def _compute_rotation_matrix(axis_angle: Tensor, theta2: Tensor, eps: float = 1e-6) -> Tensor:
         # We want to be careful to only evaluate the square root if the
-        # norm of the angle_axis vector is greater than zero. Otherwise
+        # norm of the axis_angle vector is greater than zero. Otherwise
         # we get a division by zero.
         k_one = 1.0
         theta = torch.sqrt(theta2)
-        wxyz = angle_axis / (theta + eps)
+        wxyz = axis_angle / (theta + eps)
         wx, wy, wz = torch.chunk(wxyz, 3, dim=1)
         cos_theta = torch.cos(theta)
         sin_theta = torch.sin(theta)
@@ -85,47 +100,46 @@ def angle_axis_to_rotation_matrix(angle_axis: torch.Tensor) -> torch.Tensor:
         rotation_matrix = torch.cat([r00, r01, r02, r10, r11, r12, r20, r21, r22], dim=1)
         return rotation_matrix.view(-1, 3, 3)
 
-    def _compute_rotation_matrix_taylor(angle_axis):
-        rx, ry, rz = torch.chunk(angle_axis, 3, dim=1)
+    def _compute_rotation_matrix_taylor(axis_angle: Tensor) -> Tensor:
+        rx, ry, rz = torch.chunk(axis_angle, 3, dim=1)
         k_one = torch.ones_like(rx)
         rotation_matrix = torch.cat([k_one, -rz, ry, rz, k_one, -rx, -ry, rx, k_one], dim=1)
         return rotation_matrix.view(-1, 3, 3)
 
     # stolen from ceres/rotation.h
 
-    _angle_axis = torch.unsqueeze(angle_axis, dim=1)
-    theta2 = torch.matmul(_angle_axis, _angle_axis.transpose(1, 2))
+    _axis_angle = torch.unsqueeze(axis_angle, dim=1)
+    theta2 = torch.matmul(_axis_angle, _axis_angle.transpose(1, 2))
     theta2 = torch.squeeze(theta2, dim=1)
 
     # compute rotation matrices
-    rotation_matrix_normal = _compute_rotation_matrix(angle_axis, theta2)
-    rotation_matrix_taylor = _compute_rotation_matrix_taylor(angle_axis)
+    rotation_matrix_normal = _compute_rotation_matrix(axis_angle, theta2)
+    rotation_matrix_taylor = _compute_rotation_matrix_taylor(axis_angle)
 
     # create mask to handle both cases
     eps = 1e-6
     mask = (theta2 > eps).view(-1, 1, 1).to(theta2.device)
     mask_pos = (mask).type_as(theta2)
-    mask_neg = (mask == False).type_as(theta2)  # noqa
+    mask_neg = (~mask).type_as(theta2)
 
-    # create output pose matrix
-    batch_size = angle_axis.shape[0]
-    rotation_matrix = torch.eye(3).to(angle_axis.device).type_as(angle_axis)
-    rotation_matrix = rotation_matrix.view(1, 3, 3).repeat(batch_size, 1, 1)
-    # fill output matrix with masked values
-    rotation_matrix[..., :3, :3] = (
-        mask_pos * rotation_matrix_normal + mask_neg * rotation_matrix_taylor
-    )
+    # create output pose matrix with masked values
+    rotation_matrix = mask_pos * rotation_matrix_normal + mask_neg * rotation_matrix_taylor
     return rotation_matrix  # Nx3x3
 
 
-def rotation_matrix_to_angle_axis(rotation_matrix: torch.Tensor) -> torch.Tensor:
+def rotation_matrix_to_angle_axis(rotation_matrix: Tensor) -> Tensor:
+    r"""Alias for :func:`rotation_matrix_to_axis_angle`."""
+    return rotation_matrix_to_axis_angle
+
+
+def rotation_matrix_to_axis_angle(rotation_matrix: Tensor) -> Tensor:
     r"""Convert 3x3 rotation matrix to Rodrigues vector.
 
     Args:
-        rotation_matrix (torch.Tensor): rotation matrix.
+        rotation_matrix (Tensor): rotation matrix.
 
     Returns:
-        torch.Tensor: Rodrigues vector transformation.
+        Tensor: Rodrigues vector transformation.
 
     Shape:
         - Input: :math:`(N, 3, 3)`
@@ -135,18 +149,16 @@ def rotation_matrix_to_angle_axis(rotation_matrix: torch.Tensor) -> torch.Tensor
         >>> input = torch.rand(2, 3, 3)  # Nx3x3
         >>> output = rotation_matrix_to_angle_axis(input)  # Nx3
     """
-    if not isinstance(rotation_matrix, torch.Tensor):
-        raise TypeError(f"Input type is not a torch.Tensor. Got {type(rotation_matrix)}")
+    if not isinstance(rotation_matrix, Tensor):
+        raise TypeError(f"Input type is not a Tensor. Got {type(rotation_matrix)}")
 
     if not rotation_matrix.shape[-2:] == (3, 3):
         raise ValueError(f"Input size must be a (*, 3, 3) tensor. Got {rotation_matrix.shape}")
-    quaternion: torch.Tensor = rotation_matrix_to_quaternion(rotation_matrix)
+    quaternion: Tensor = rotation_matrix_to_quaternion(rotation_matrix)
     return quaternion_to_angle_axis(quaternion)
 
 
-def rotation_matrix_to_quaternion(
-    rotation_matrix: torch.Tensor, eps: float = 1.0e-8
-) -> torch.Tensor:
+def rotation_matrix_to_quaternion(rotation_matrix: Tensor, eps: float = 1.0e-8) -> Tensor:
     r"""Convert 3x3 rotation matrix to 4d quaternion vector.
 
     The quaternion vector has components in (w, x, y, z) or (x, y, z, w) format.
@@ -155,13 +167,13 @@ def rotation_matrix_to_quaternion(
         The (x, y, z, w) order is going to be deprecated in favor of efficiency.
 
     Args:
-        rotation_matrix (torch.Tensor): the rotation matrix to convert.
+        rotation_matrix (Tensor): the rotation matrix to convert.
         eps (float): small value to avoid zero division. Default: 1e-8.
         order (QuaternionCoeffOrder): quaternion coefficient order. Default: 'xyzw'.
           Note: 'xyzw' will be deprecated in favor of 'wxyz'.
 
     Return:
-        torch.Tensor: the rotation in quaternion.
+        Tensor: the rotation in quaternion.
 
     Shape:
         - Input: :math:`(*, 3, 3)`
@@ -172,21 +184,21 @@ def rotation_matrix_to_quaternion(
         >>> output = rotation_matrix_to_quaternion(input, eps=torch.finfo(input.dtype).eps,
         ...                                        order=QuaternionCoeffOrder.WXYZ)  # Nx4
     """
-    if not isinstance(rotation_matrix, torch.Tensor):
-        raise TypeError(f"Input type is not a torch.Tensor. Got {type(rotation_matrix)}")
+    if not isinstance(rotation_matrix, Tensor):
+        raise TypeError(f"Input type is not a Tensor. Got {type(rotation_matrix)}")
 
     if not rotation_matrix.shape[-2:] == (3, 3):
         raise ValueError(f"Input size must be a (*, 3, 3) tensor. Got {rotation_matrix.shape}")
 
-    def safe_zero_division(numerator: torch.Tensor, denominator: torch.Tensor) -> torch.Tensor:
+    def safe_zero_division(numerator: Tensor, denominator: Tensor) -> Tensor:
         eps: float = torch.finfo(numerator.dtype).tiny  # type: ignore
         return numerator / torch.clamp(denominator, min=eps)
 
-    rotation_matrix_vec: torch.Tensor = rotation_matrix.view(*rotation_matrix.shape[:-2], 9)
+    rotation_matrix_vec: Tensor = rotation_matrix.view(*rotation_matrix.shape[:-2], 9)
 
     m00, m01, m02, m10, m11, m12, m20, m21, m22 = torch.chunk(rotation_matrix_vec, chunks=9, dim=-1)
 
-    trace: torch.Tensor = m00 + m11 + m22
+    trace: Tensor = m00 + m11 + m22
 
     def trace_positive_cond():
         sq = torch.sqrt(trace + 1.0) * 2.0  # sq = 4 * qw.
@@ -223,31 +235,31 @@ def rotation_matrix_to_quaternion(
     where_2 = torch.where(m11 > m22, cond_2(), cond_3())
     where_1 = torch.where((m00 > m11) & (m00 > m22), cond_1(), where_2)
 
-    quaternion: torch.Tensor = torch.where(trace > 0.0, trace_positive_cond(), where_1)
+    quaternion: Tensor = torch.where(trace > 0.0, trace_positive_cond(), where_1)
     return quaternion
 
 
-def normalize_quaternion(quaternion: torch.Tensor, eps: float = 1.0e-12) -> torch.Tensor:
+def normalize_quaternion(quaternion: Tensor, eps: float = 1.0e-12) -> Tensor:
     r"""Normalizes a quaternion.
 
     The quaternion should be in (x, y, z, w) format.
 
     Args:
-        quaternion (torch.Tensor): a tensor containing a quaternion to be
+        quaternion (Tensor): a tensor containing a quaternion to be
           normalized. The tensor can be of shape :math:`(*, 4)`.
         eps (Optional[bool]): small value to avoid division by zero.
           Default: 1e-12.
 
     Return:
-        torch.Tensor: the normalized quaternion of shape :math:`(*, 4)`.
+        Tensor: the normalized quaternion of shape :math:`(*, 4)`.
 
     Example:
-        >>> quaternion = torch.tensor((1., 0., 1., 0.))
+        >>> quaternion = Tensor((1., 0., 1., 0.))
         >>> normalize_quaternion(quaternion)
         tensor([0.7071, 0.0000, 0.7071, 0.0000])
     """
-    if not isinstance(quaternion, torch.Tensor):
-        raise TypeError("Input type is not a torch.Tensor. Got {}".format(type(quaternion)))
+    if not isinstance(quaternion, Tensor):
+        raise TypeError("Input type is not a Tensor. Got {}".format(type(quaternion)))
 
     if not quaternion.shape[-1] == 4:
         raise ValueError("Input must be a tensor of shape (*, 4). Got {}".format(quaternion.shape))
@@ -259,55 +271,51 @@ def normalize_quaternion(quaternion: torch.Tensor, eps: float = 1.0e-12) -> torc
 # https://github.com/tensorflow/graphics/blob/master/tensorflow_graphics/geometry/transformation/rotation_matrix_3d.py#L247
 
 
-def quaternion_to_rotation_matrix(quaternion: torch.Tensor) -> torch.Tensor:
+def quaternion_to_rotation_matrix(quaternion: Tensor) -> Tensor:
     r"""Converts a quaternion to a rotation matrix.
 
-    The quaternion should be in (x, y, z, w) or (w, x, y, z) format.
-
     Args:
-        quaternion (torch.Tensor): a tensor containing a quaternion to be
+        quaternion (Tensor): a tensor containing quaternion coefficients 'wxyz' to be
           converted. The tensor can be of shape :math:`(*, 4)`.
-        order (QuaternionCoeffOrder): quaternion coefficient order. Default: 'xyzw'.
-          Note: 'xyzw' will be deprecated in favor of 'wxyz'.
 
     Return:
-        torch.Tensor: the rotation matrix of shape :math:`(*, 3, 3)`.
+        Tensor: the rotation matrix of shape :math:`(*, 3, 3)`.
 
     Example:
-        >>> quaternion = torch.tensor((0., 0., 0., 1.))
-        >>> quaternion_to_rotation_matrix(quaternion, order=QuaternionCoeffOrder.WXYZ)
+        >>> quaternion = Tensor((0., 0., 0., 1.))
+        >>> quaternion_to_rotation_matrix(quaternion)
         tensor([[-1.,  0.,  0.],
                 [ 0., -1.,  0.],
                 [ 0.,  0.,  1.]])
     """
-    if not isinstance(quaternion, torch.Tensor):
-        raise TypeError(f"Input type is not a torch.Tensor. Got {type(quaternion)}")
+    if not isinstance(quaternion, Tensor):
+        raise TypeError(f"Input type is not a Tensor. Got {type(quaternion)}")
 
     if not quaternion.shape[-1] == 4:
         raise ValueError(f"Input must be a tensor of shape (*, 4). Got {quaternion.shape}")
 
     # normalize the input quaternion
-    quaternion_norm: torch.Tensor = normalize_quaternion(quaternion)
+    quaternion_norm: Tensor = normalize_quaternion(quaternion)
 
     # unpack the normalized quaternion components
     w, x, y, z = torch.chunk(quaternion_norm, chunks=4, dim=-1)
 
     # compute the actual conversion
-    tx: torch.Tensor = 2.0 * x
-    ty: torch.Tensor = 2.0 * y
-    tz: torch.Tensor = 2.0 * z
-    twx: torch.Tensor = tx * w
-    twy: torch.Tensor = ty * w
-    twz: torch.Tensor = tz * w
-    txx: torch.Tensor = tx * x
-    txy: torch.Tensor = ty * x
-    txz: torch.Tensor = tz * x
-    tyy: torch.Tensor = ty * y
-    tyz: torch.Tensor = tz * y
-    tzz: torch.Tensor = tz * z
-    one: torch.Tensor = torch.tensor(1.0)
+    tx: Tensor = 2.0 * x
+    ty: Tensor = 2.0 * y
+    tz: Tensor = 2.0 * z
+    twx: Tensor = tx * w
+    twy: Tensor = ty * w
+    twz: Tensor = tz * w
+    txx: Tensor = tx * x
+    txy: Tensor = ty * x
+    txz: Tensor = tz * x
+    tyy: Tensor = ty * y
+    tyz: Tensor = tz * y
+    tzz: Tensor = tz * z
+    one: Tensor = torch.tensor(1.0)
 
-    matrix: torch.Tensor = torch.stack(
+    matrix: Tensor = torch.stack(
         (
             one - (tyy + tzz),
             txy - twz,
@@ -327,20 +335,21 @@ def quaternion_to_rotation_matrix(quaternion: torch.Tensor) -> torch.Tensor:
     return matrix
 
 
-def quaternion_to_angle_axis(quaternion: torch.Tensor) -> torch.Tensor:
-    """Convert quaternion vector to angle axis of rotation.
+def quaternion_to_angle_axis(quaternion: Tensor) -> Tensor:
+    r"""Alias for :func:`quaternion_to_axis_angle`."""
+    return quaternion_to_axis_angle(quaternion)
 
-    The quaternion should be in (x, y, z, w) or (w, x, y, z) format.
+
+def quaternion_to_axis_angle(quaternion: Tensor) -> Tensor:
+    """Convert quaternion vector to angle axis of rotation.
 
     Adapted from ceres C++ library: ceres-solver/include/ceres/rotation.h
 
     Args:
-        quaternion (torch.Tensor): tensor with quaternions.
-        order (QuaternionCoeffOrder): quaternion coefficient order. Default: 'xyzw'.
-          Note: 'xyzw' will be deprecated in favor of 'wxyz'.
+        quaternion (Tensor): tensor with quaternion coefficients 'wxyz'.
 
     Return:
-        torch.Tensor: tensor with angle axis of rotation.
+        Tensor: tensor with angle axis of rotation.
 
     Shape:
         - Input: :math:`(*, 4)` where `*` means, any number of dimensions
@@ -351,121 +360,111 @@ def quaternion_to_angle_axis(quaternion: torch.Tensor) -> torch.Tensor:
         >>> angle_axis = quaternion_to_angle_axis(quaternion)  # Nx3
     """
     if not torch.is_tensor(quaternion):
-        raise TypeError(f"Input type is not a torch.Tensor. Got {type(quaternion)}")
+        raise TypeError(f"Input type is not a Tensor. Got {type(quaternion)}")
 
     if not quaternion.shape[-1] == 4:
         raise ValueError(f"Input must be a tensor of shape Nx4 or 4. Got {quaternion.shape}")
 
     # unpack input and compute conversion
-    q1: torch.Tensor = torch.tensor([])
-    q2: torch.Tensor = torch.tensor([])
-    q3: torch.Tensor = torch.tensor([])
-    cos_theta: torch.Tensor = torch.tensor([])
+    q1: Tensor = torch.tensor([])
+    q2: Tensor = torch.tensor([])
+    q3: Tensor = torch.tensor([])
+    cos_theta: Tensor = torch.tensor([])
 
     cos_theta = quaternion[..., 0]
     q1 = quaternion[..., 1]
     q2 = quaternion[..., 2]
     q3 = quaternion[..., 3]
 
-    sin_squared_theta: torch.Tensor = q1 * q1 + q2 * q2 + q3 * q3
+    sin_squared_theta: Tensor = q1 * q1 + q2 * q2 + q3 * q3
 
-    sin_theta: torch.Tensor = torch.sqrt(sin_squared_theta)
-    two_theta: torch.Tensor = 2.0 * torch.where(
+    sin_theta: Tensor = torch.sqrt(sin_squared_theta)
+    two_theta: Tensor = 2.0 * torch.where(
         cos_theta < 0.0,
         torch.atan2(-sin_theta, -cos_theta),
         torch.atan2(sin_theta, cos_theta),
     )
 
-    k_pos: torch.Tensor = two_theta / sin_theta
-    k_neg: torch.Tensor = 2.0 * torch.ones_like(sin_theta)
-    k: torch.Tensor = torch.where(sin_squared_theta > 0.0, k_pos, k_neg)
+    k_pos: Tensor = two_theta / sin_theta
+    k_neg: Tensor = 2.0 * torch.ones_like(sin_theta)
+    k: Tensor = torch.where(sin_squared_theta > 0.0, k_pos, k_neg)
 
-    angle_axis: torch.Tensor = torch.zeros_like(quaternion)[..., :3]
-    angle_axis[..., 0] += q1 * k
-    angle_axis[..., 1] += q2 * k
-    angle_axis[..., 2] += q3 * k
-    return angle_axis
+    axis_angle: Tensor = torch.zeros_like(quaternion)[..., :3]
+    axis_angle[..., 0] += q1 * k
+    axis_angle[..., 1] += q2 * k
+    axis_angle[..., 2] += q3 * k
+    return axis_angle
 
 
-def quaternion_log_to_exp(quaternion: torch.Tensor, eps: float = 1.0e-8) -> torch.Tensor:
+def quaternion_log_to_exp(quaternion: Tensor, eps: float = 1.0e-8) -> Tensor:
     r"""Applies exponential map to log quaternion.
 
-    The quaternion should be in (x, y, z, w) or (w, x, y, z) format.
-
     Args:
-        quaternion (torch.Tensor): a tensor containing a quaternion to be
+        quaternion (Tensor): a tensor containing a quaternion to be
           converted. The tensor can be of shape :math:`(*, 3)`.
-        order (QuaternionCoeffOrder): quaternion coefficient order. Default: 'xyzw'.
-          Note: 'xyzw' will be deprecated in favor of 'wxyz'.
 
     Return:
-        torch.Tensor: the quaternion exponential map of shape :math:`(*, 4)`.
+        Tensor: the quaternion exponential map of shape :math:`(*, 4)`.
 
     Example:
-        >>> quaternion = torch.tensor((0., 0., 0.))
-        >>> quaternion_log_to_exp(quaternion, eps=torch.finfo(quaternion.dtype).eps,
-        ...                       order=QuaternionCoeffOrder.WXYZ)
+        >>> quaternion = Tensor((0., 0., 0.))
+        >>> quaternion_log_to_exp(quaternion, eps=torch.finfo(quaternion.dtype).eps)
         tensor([1., 0., 0., 0.])
     """
-    if not isinstance(quaternion, torch.Tensor):
-        raise TypeError(f"Input type is not a torch.Tensor. Got {type(quaternion)}")
+    if not isinstance(quaternion, Tensor):
+        raise TypeError(f"Input type is not a Tensor. Got {type(quaternion)}")
 
     if not quaternion.shape[-1] == 3:
         raise ValueError(f"Input must be a tensor of shape (*, 3). Got {quaternion.shape}")
 
     # compute quaternion norm
-    norm_q: torch.Tensor = torch.norm(quaternion, p=2, dim=-1, keepdim=True).clamp(min=eps)
+    norm_q: Tensor = torch.norm(quaternion, p=2, dim=-1, keepdim=True).clamp(min=eps)
 
     # compute scalar and vector
-    quaternion_vector: torch.Tensor = quaternion * torch.sin(norm_q) / norm_q
-    quaternion_scalar: torch.Tensor = torch.cos(norm_q)
+    quaternion_vector: Tensor = quaternion * torch.sin(norm_q) / norm_q
+    quaternion_scalar: Tensor = torch.cos(norm_q)
 
     # compose quaternion and return
-    quaternion_exp: torch.Tensor = torch.tensor([])
+    quaternion_exp: Tensor = torch.tensor([])
     quaternion_exp = torch.cat((quaternion_scalar, quaternion_vector), dim=-1)
 
     return quaternion_exp
 
 
-def quaternion_exp_to_log(quaternion: torch.Tensor, eps: float = 1.0e-8) -> torch.Tensor:
+def quaternion_exp_to_log(quaternion: Tensor, eps: float = 1.0e-8) -> Tensor:
     r"""Applies the log map to a quaternion.
 
-    The quaternion should be in (x, y, z, w) format.
-
     Args:
-        quaternion (torch.Tensor): a tensor containing a quaternion to be
+        quaternion (Tensor): a tensor containing quaternion coefficients 'wxyz' to be
           converted. The tensor can be of shape :math:`(*, 4)`.
         eps (float): A small number for clamping.
-        order (QuaternionCoeffOrder): quaternion coefficient order. Default: 'xyzw'.
-          Note: 'xyzw' will be deprecated in favor of 'wxyz'.
 
     Return:
-        torch.Tensor: the quaternion log map of shape :math:`(*, 3)`.
+        Tensor: the quaternion log map of shape :math:`(*, 3)`.
 
     Example:
-        >>> quaternion = torch.tensor((1., 0., 0., 0.))
-        >>> quaternion_exp_to_log(quaternion, eps=torch.finfo(quaternion.dtype).eps,
-        ...                       order=QuaternionCoeffOrder.WXYZ)
+        >>> quaternion = Tensor((1., 0., 0., 0.))
+        >>> quaternion_exp_to_log(quaternion, eps=torch.finfo(quaternion.dtype).eps)
         tensor([0., 0., 0.])
     """
-    if not isinstance(quaternion, torch.Tensor):
-        raise TypeError(f"Input type is not a torch.Tensor. Got {type(quaternion)}")
+    if not isinstance(quaternion, Tensor):
+        raise TypeError(f"Input type is not a Tensor. Got {type(quaternion)}")
 
     if not quaternion.shape[-1] == 4:
         raise ValueError(f"Input must be a tensor of shape (*, 4). Got {quaternion.shape}")
 
     # unpack quaternion vector and scalar
-    quaternion_vector: torch.Tensor = torch.tensor([])
-    quaternion_scalar: torch.Tensor = torch.tensor([])
+    quaternion_vector: Tensor = torch.tensor([])
+    quaternion_scalar: Tensor = torch.tensor([])
 
     quaternion_scalar = quaternion[..., 0:1]
     quaternion_vector = quaternion[..., 1:4]
 
     # compute quaternion norm
-    norm_q: torch.Tensor = torch.norm(quaternion_vector, p=2, dim=-1, keepdim=True).clamp(min=eps)
+    norm_q: Tensor = torch.norm(quaternion_vector, p=2, dim=-1, keepdim=True).clamp(min=eps)
 
     # apply log map
-    quaternion_log: torch.Tensor = (
+    quaternion_log: Tensor = (
         quaternion_vector * torch.acos(torch.clamp(quaternion_scalar, min=-1.0, max=1.0)) / norm_q
     )
 
@@ -476,59 +475,60 @@ def quaternion_exp_to_log(quaternion: torch.Tensor, eps: float = 1.0e-8) -> torc
 # https://github.com/facebookresearch/QuaterNet/blob/master/common/quaternion.py#L138
 
 
-def angle_axis_to_quaternion(angle_axis: torch.Tensor) -> torch.Tensor:
-    r"""Convert an angle axis to a quaternion.
+def angle_axis_to_quaternion(angle_axis: Tensor) -> Tensor:
+    r"""Alias for :func:`axis_angle_to_quaternion`."""
+    return axis_angle_to_quaternion(angle_axis)
 
-    The quaternion vector has components in (x, y, z, w) or (w, x, y, z) format.
+
+def axis_angle_to_quaternion(axis_angle: Tensor) -> Tensor:
+    r"""Convert an angle axis to a quaternion.
 
     Adapted from ceres C++ library: ceres-solver/include/ceres/rotation.h
 
     Args:
-        angle_axis (torch.Tensor): tensor with angle axis.
-        order (QuaternionCoeffOrder): quaternion coefficient order. Default: 'xyzw'.
-          Note: 'xyzw' will be deprecated in favor of 'wxyz'.
+        axis_angle (Tensor): tensor with angle axis.
 
     Return:
-        torch.Tensor: tensor with quaternion.
+        Tensor: tensor with quaternion coefficients 'wxyz'.
 
     Shape:
         - Input: :math:`(*, 3)` where `*` means, any number of dimensions
         - Output: :math:`(*, 4)`
 
     Example:
-        >>> angle_axis = torch.rand(2, 3)  # Nx3
-        >>> quaternion = angle_axis_to_quaternion(angle_axis, order=QuaternionCoeffOrder.WXYZ)  # Nx4
+        >>> axis_angle = torch.rand(2, 3)  # Nx3
+        >>> quaternion = axis_angle_to_quaternion(axis_angle)  # Nx4
     """
-    if not torch.is_tensor(angle_axis):
-        raise TypeError(f"Input type is not a torch.Tensor. Got {type(angle_axis)}")
+    if not torch.is_tensor(axis_angle):
+        raise TypeError(f"Input type is not a Tensor. Got {type(axis_angle)}")
 
-    if not angle_axis.shape[-1] == 3:
-        raise ValueError(f"Input must be a tensor of shape Nx3 or 3. Got {angle_axis.shape}")
+    if not axis_angle.shape[-1] == 3:
+        raise ValueError(f"Input must be a tensor of shape Nx3 or 3. Got {axis_angle.shape}")
 
     # unpack input and compute conversion
-    a0: torch.Tensor = angle_axis[..., 0:1]
-    a1: torch.Tensor = angle_axis[..., 1:2]
-    a2: torch.Tensor = angle_axis[..., 2:3]
-    theta_squared: torch.Tensor = a0 * a0 + a1 * a1 + a2 * a2
+    a0: Tensor = axis_angle[..., 0:1]
+    a1: Tensor = axis_angle[..., 1:2]
+    a2: Tensor = axis_angle[..., 2:3]
+    theta_squared: Tensor = a0 * a0 + a1 * a1 + a2 * a2
 
-    theta: torch.Tensor = torch.sqrt(theta_squared)
-    half_theta: torch.Tensor = theta * 0.5
+    theta: Tensor = torch.sqrt(theta_squared)
+    half_theta: Tensor = theta * 0.5
 
-    mask: torch.Tensor = theta_squared > 0.0
-    ones: torch.Tensor = torch.ones_like(half_theta)
+    mask: Tensor = theta_squared > 0.0
+    ones: Tensor = torch.ones_like(half_theta)
 
-    k_neg: torch.Tensor = 0.5 * ones
-    k_pos: torch.Tensor = torch.sin(half_theta) / theta
-    k: torch.Tensor = torch.where(mask, k_pos, k_neg)
-    w: torch.Tensor = torch.where(mask, torch.cos(half_theta), ones)
+    k_neg: Tensor = 0.5 * ones
+    k_pos: Tensor = torch.sin(half_theta) / theta
+    k: Tensor = torch.where(mask, k_pos, k_neg)
+    w: Tensor = torch.where(mask, torch.cos(half_theta), ones)
 
-    quaternion: torch.Tensor = torch.zeros(
-        size=(*angle_axis.shape[:-1], 4),
-        dtype=angle_axis.dtype,
-        device=angle_axis.device,
+    quaternion: Tensor = torch.zeros(
+        size=(*axis_angle.shape[:-1], 4),
+        dtype=axis_angle.dtype,
+        device=axis_angle.device,
     )
+    quaternion[..., 0:1] = w
     quaternion[..., 1:2] = a0 * k
     quaternion[..., 2:3] = a1 * k
     quaternion[..., 3:4] = a2 * k
-    quaternion[..., 0:1] = w
     return quaternion
