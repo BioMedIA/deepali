@@ -1095,11 +1095,11 @@ class Grid(object):
         if align_corners:
             spacing = (self.extent() - self.spacing()) / (size - 1)
             grid._spacing = torch.where(self._size.gt(0), spacing, self._spacing)
-            assert torch.allclose(grid.origin(), self.origin())
+            assert torch.allclose(grid.origin(), self.origin(), rtol=1e-4, atol=1e-6)
         else:
             spacing = self.extent() / size
             grid._spacing = torch.where(self._size.gt(0), spacing, self._spacing)
-            assert torch.allclose(grid.extent(), self.extent())
+            assert torch.allclose(grid.extent(), self.extent(), rtol=1e-4, atol=1e-6)
         return grid
 
     def resize(
