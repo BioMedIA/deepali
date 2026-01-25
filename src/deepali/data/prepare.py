@@ -2,7 +2,7 @@ r"""Functions for preparing model input containing tensor decorators."""
 
 from collections import abc
 from dataclasses import is_dataclass
-from typing import Any, Mapping, NamedTuple, Optional, Sequence, Union, overload
+from typing import Any, Dict, Mapping, NamedTuple, Optional, Sequence, Union, overload
 
 import torch
 from torch import Tensor
@@ -17,36 +17,33 @@ __all__ = ("prepare_batch",)
 
 
 @overload
-def prepare_batch(batch: Sequence[Mapping[str, Any]]) -> Mapping[str, Any]:
-    ...
+def prepare_batch(batch: Mapping) -> Dict[str, Any]: ...
 
 
 @overload
-def prepare_batch(batch: Sequence[Dataclass]) -> Dataclass:
-    ...
+def prepare_batch(batch: Dataclass) -> Dataclass: ...
 
 
 @overload
-def prepare_batch(batch: Sequence[NamedTuple]) -> NamedTuple:
-    ...
+def prepare_batch(batch: NamedTuple) -> NamedTuple: ...
 
 
 def prepare_batch(
-    batch: Batch,
+    batch: Union[Mapping, Dataclass, NamedTuple],
     device: Optional[Union[Device, str]] = None,
     non_blocking: bool = False,
     memory_format=torch.preserve_format,
 ) -> Batch:
     r"""Move batch data to execution device."""
-    names = sample_field_names(batch)
+    names = sample_field_names(batch)  # type: ignore[arg-type]
     values = []
     for name in names:
-        value = sample_field_value(batch, name)
+        value = sample_field_value(batch, name)  # type: ignore[arg-type]
         value = prepare_item(
             value, device=device, non_blocking=non_blocking, memory_format=memory_format
         )
         values.append(value)
-    return replace_all_sample_field_values(batch, values)
+    return replace_all_sample_field_values(batch, values)  # type: ignore[arg-type]
 
 
 def prepare_item(
@@ -56,11 +53,11 @@ def prepare_item(
     memory_format=torch.preserve_format,
 ) -> Any:
     r"""Move batch item data to execution device."""
-    kwargs = dict(device=device, non_blocking=non_blocking, memory_format=memory_format)
+    kwargs: dict = dict(device=device, non_blocking=non_blocking, memory_format=memory_format)
     if isinstance(value, Tensor):
         value = value.to(**kwargs)
     elif isinstance(value, abc.Mapping) or is_dataclass(value) or is_namedtuple(value):
-        value = prepare_batch(value, **kwargs)
+        value = prepare_batch(value, **kwargs)  # type: ignore[arg-type]
     elif isinstance(value, Sequence) and not isinstance(value, str):
         value = [prepare_item(item, **kwargs) for item in value]
     return value

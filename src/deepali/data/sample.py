@@ -16,12 +16,12 @@ __all__ = (
 )
 
 
-def sample_field_names(sample: Sample) -> Tuple[str]:
+def sample_field_names(sample: Sample) -> Tuple[str, ...]:
     r"""Get names of fields in data sample."""
     if is_dataclass(sample):
-        return tuple((field.name for field in fields(sample)))
+        return tuple((field.name for field in fields(sample)))  # type: ignore[arg-type]
     if is_namedtuple(sample):
-        return sample._fields
+        return sample._fields  # type: ignore[arg-type]
     if not isinstance(sample, Mapping):
         raise TypeError("Dataset 'sample' must be dataclass, Mapping, or NamedTuple")
     return tuple(sample.keys())
@@ -45,7 +45,7 @@ def replace_all_sample_field_values(sample: Sample, values: Sequence[Any]) -> Sa
             setattr(result, name, value)
         return result
     if is_namedtuple(sample):
-        return sample._replace(**{name: value for name, value in zip(names, values)})
+        return sample._replace(**{name: value for name, value in zip(names, values)})  # type: ignore[arg-type]
     if isinstance(sample, OrderedDict):
         return OrderedDict([(name, value) for name, value in zip(names, values)])
     return {name: value for name, value in zip(names, values)}
